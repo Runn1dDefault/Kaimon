@@ -1,13 +1,9 @@
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import IsAuthenticated
 
 
-def user_has_prem(user) -> bool:
-    return user.is_authenticated  # TODO: and user.registration_payed
-
-
-class RegistrationPayedPermission(BasePermission):
-    def has_object_permission(self, request, view, obj):
-        return user_has_prem(request.user)
-
+class RegistrationPayedPermission(IsAuthenticated):
+    """
+    to check the status of the authorized user's payment for registration
+    """
     def has_permission(self, request, view):
-        return user_has_prem(request.user)
+        return super().has_permission(request, view) and request.user.registration_payed

@@ -10,3 +10,5 @@ __pypackages__/
 .env
 venv/
 venv.bak/
+
+.idea/

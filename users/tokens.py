@@ -12,10 +12,6 @@ from users.exceptions import InvalidRestoreCode, RestoreCodeExist
 settings = server_settings.RESTORE_SETTINGS
 
 
-def get_cache():
-    return caches[settings['CACHE']]
-
-
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
     return {
@@ -25,7 +21,7 @@ def get_tokens_for_user(user):
 
 
 class BaseRestore:
-    _cache = get_cache()
+    _cache = caches[settings['CACHE_NAME']]
     LIVE: int = 60
 
     def __init__(self, sub: Any):
@@ -60,6 +56,9 @@ class BaseRestore:
     def for_user(cls, *args, **kwargs) -> Self:
         return cls(*args, **kwargs)
 
+    def remove(self) -> None:
+        return None
+
 
 class RestoreCode(BaseRestore):
     LIVE = settings["CODE_LIVE_SECONDS"]
@@ -93,10 +92,13 @@ class RestoreCode(BaseRestore):
         self._cache.set(self.cache_key, json.dumps(payload), timeout=self.LIVE)
         return code
 
+    def remove(self) -> None:
+        self._cache.delete(self.cache_key)
+
     @classmethod
-    def for_user(cls, user, raise_exist: bool = True) -> Self:
+    def for_user(cls, user, raise_on_exist: bool = True) -> Self:
         restore_code = cls(sub=user.id)
-        if raise_exist and restore_code.exist:
+        if raise_on_exist and restore_code.exist:
             raise RestoreCodeExist("code exist! Exp: %s seconds" % restore_code.exp)
         payload = {'user_id': user.id}
         restore_code._generate(payload)
@@ -111,10 +113,14 @@ class RestoreToken(BaseRestore):
     def cache_key(self) -> str:
         return '%s%s' % (settings["TOKEN_PREFIX"], self.sub)
 
-    def verify(self, token: str) -> bool:
+    def verify(self, token: str | bytes) -> bool:
         if not self.exist:
             return False
-        if self._token == token:
+
+        if isinstance(token, bytes):
+            token = token.decode()
+
+        if str(self._token) == str(token):
             return True
         return False
 
@@ -133,8 +139,8 @@ class RestoreToken(BaseRestore):
 
     @classmethod
     def for_user(cls, user, code: str) -> Self:
-        restore_code = RestoreCode(sub=user.id)
-        if not restore_code.exist or not restore_code.verify(code):
+        restore_code = RestoreCode.for_user(user, raise_on_exist=True)
+        if not restore_code.verify(code):
             raise InvalidRestoreCode("code %s invalid or expired!" % code)
         token = cls(sub=user.id)
         token._generate(payload={"user_id": user.id})

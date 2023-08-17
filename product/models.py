@@ -13,6 +13,9 @@ class Genre(models.Model):
     name_ky = models.CharField(max_length=255, blank=True, verbose_name=_('Name') + '[ky]')
     name_de = models.CharField(max_length=255, blank=True, verbose_name=_('Name') + '[de]')
 
+    def __str__(self):
+        return f'{self.id}{self.name}'
+
 
 class GenreChild(models.Model):
     parent = models.ForeignKey(Genre, on_delete=models.CASCADE, related_name='children')
@@ -67,6 +70,10 @@ class Product(models.Model):
     release_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f'{self.id}-{self.rakuten_id}'
 
 
 class ProductDetail(models.Model):

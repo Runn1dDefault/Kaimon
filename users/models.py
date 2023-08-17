@@ -14,7 +14,7 @@ class UserManager(BaseUserManager):
     def create_superuser(self, username, email=None, password=None, **extra_fields):
         extra_fields['registration_payed'] = True
         extra_fields['is_active'] = True
-        extra_fields['role'] = User.Role.MANAGER
+        extra_fields['role'] = User.Role.DEVELOPER
         return super().create_superuser(username, email=email, password=password, **extra_fields)
 
 
@@ -22,6 +22,7 @@ class User(AbstractUser):
     objects = UserManager()
 
     class Role(models.TextChoices):
+        DEVELOPER = 'dev', _('Developer')
         DIRECTOR = 'director', _('Director')
         MANAGER = 'manager', _('Manager')
         CLIENT = 'client', _('Client')

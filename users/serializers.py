@@ -2,12 +2,11 @@ from django.contrib.auth.password_validation import validate_password
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from .exceptions import InvalidRestoreCode
+from .exceptions import InvalidRestoreCode, RestoreCodeExist
 from .models import User
-from .tasks import send_code
-from .tokens import get_tokens_for_user, RestoreToken
+from .tasks import send_code_template
+from .tokens import get_tokens_for_user, RestoreToken, RestoreCode
 from .validators import validate_full_name
-from .permissions import user_has_prem
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -52,6 +51,7 @@ class RegistrationSerializer(PasswordSerializer):
 
 class RestoreSerializer(serializers.Serializer):
     RESTORE_TOKEN_CLASS = RestoreToken
+    RESTORE_CODE_CLASS = RestoreCode
 
     email = serializers.EmailField(write_only=True, required=True)
     code = serializers.CharField(write_only=True, required=False, min_length=6, max_length=6)
@@ -62,33 +62,45 @@ class RestoreSerializer(serializers.Serializer):
         user = User.objects.filter(email=email).first()
         if not user:
             raise serializers.ValidationError({'detail': _('User with email %s not exist!') % email})
-        if not user_has_prem(user):
-            raise serializers.ValidationError({'detail': _('you don\'t have access')}, code=403)
         return user
 
-    def create_token(self, **params):
+    def create_token(self, user, code):
         try:
-            token = self.RESTORE_TOKEN_CLASS.for_user(**params)
-        except InvalidRestoreCode as e:
+            token = self.RESTORE_TOKEN_CLASS.for_user(user=user, code=code)
+        except (RestoreCodeExist, InvalidRestoreCode) as e:
             raise serializers.ValidationError({'detail': _(str(e))})
         else:
-            print(token)
+            self.RESTORE_CODE_CLASS.for_user(user, raise_on_exist=False).remove()
             return token
+
+    def create_code(self, user, raise_on_exist: bool):
+        try:
+            code = self.RESTORE_CODE_CLASS.for_user(user=user, raise_on_exist=raise_on_exist)
+        except RestoreCodeExist as e:
+            raise serializers.ValidationError({'detail': _(str(e))})
+        else:
+            return code
 
     def validate(self, attrs):
         email = attrs['email']
         user = self._get_user_by_email(email)
-        if attrs['send_new_code'] is True:
-            send_code(email=email)
-            return {'status': 'send'}
-
         code = attrs.get('code')
-        if not code:
+        send_new_code = attrs['send_new_code']
+
+        if not code and not send_new_code:
             raise serializers.ValidationError(
                 {'detail': _('When send_new_code is false code field become required!')}
             )
-        token = self.create_token(user=user, code=code)
-        return {'token': token}
+        if code:
+            token = self.create_token(user=user, code=code)
+            return {'token': str(token)}
+
+        if send_new_code is True:
+            # if you need to restrict sending for a user who has already sent, then change raise_exist to True
+            code = self.create_code(user, raise_on_exist=False)
+            send_code_template.delay(email=email, code=str(code))
+            return {'status': 'send'}
+        return {'status': 'failed'}
 
 
 class UpdatePasswordSerializer(PasswordSerializer):

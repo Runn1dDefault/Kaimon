@@ -11,6 +11,7 @@ class CustomUserAdmin(UserAdmin):
     list_display = ('id', 'email', 'role', 'is_active', 'registration_payed', 'date_joined')
     list_filter = ('role', 'registration_payed', 'date_joined', 'last_login',
                    "is_staff", "is_superuser", "is_active", "groups")
+    list_display_links = ('id', 'email',)
     search_fields = ('id', 'email', 'full_name', 'username')
     search_help_text = _('Search by fields: ' + concat_to_upper_string(search_fields))
     ordering = ("date_joined",)

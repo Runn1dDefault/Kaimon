@@ -4,9 +4,9 @@ import os
 from celery import Celery
 from kombu import Exchange, Queue
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'kaimono.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'kaimon.settings')
 
-app = Celery('kaimono')
+app = Celery('kaimon')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
 

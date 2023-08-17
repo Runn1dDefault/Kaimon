@@ -6,3 +6,6 @@ djangorestframework-simplejwt==5.2.2
 Pillow==10.0.0
 python-decouple==3.8
 redis==5.0.0
+PyJWT~=2.8.0
+kombu~=5.3.1
+sendgrid~=6.10.0
