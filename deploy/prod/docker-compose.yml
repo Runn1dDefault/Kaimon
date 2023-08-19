@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  celery-beat:
+    container_name: celery-beat
+    build:
+      context: ../../
+      dockerfile: deploy/Dockerfile
+    command: celery --app kaimon beat --loglevel=info
+    env_file:
+      - .env
+
+  celery-mailing:
+    container_name: celery-mailing-worker
+    hostname: celery-mailing-dev
+    build:
+      context: ../../
+      dockerfile: deploy/Dockerfile
+    command: celery --app kaimon worker -Q feed_urls -c 2 --loglevel=info
+    env_file:
+      - .env
+
+  web:
+    container_name: web-kaimono
+    restart: always
+    build:
+      context: ../../
+      dockerfile: deploy/Dockerfile
+    volumes:
+      - ../../static:/static
+      - ../../media:/media
+    env_file:
+      - ./.env
+    expose:
+      - "8334"
+
+  nginx:
+    container_name: nginx-kaimono
+    build:
+      context: ../../
+      dockerfile: nginx.prod.Dockerfile
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+    volumes:
+      - ../../static:/static
+      - ../../media:/media
+      - ../../certbot/conf:/etc/letsencrypt
+      - ../../certbot/www:/var/www/certbot
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - web-kaimono
+    env_file:
+      - .env
+
+  certbot:
+    container_name: certbot-kaimono
+    image: certbot/certbot
+    restart: unless-stopped
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    volumes:
+      - ../../certbot/conf:/etc/letsencrypt
+      - ../../certbot/www:/var/www/certbot
