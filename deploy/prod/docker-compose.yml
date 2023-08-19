@@ -20,7 +20,7 @@ services:
     env_file:
       - .env
 
-  web:
+  web-kaimono:
     container_name: web-kaimono
     restart: always
     build:
@@ -34,7 +34,7 @@ services:
     expose:
       - "8334"
 
-  nginx:
+  nginx-kaimono:
     container_name: nginx-kaimono
     build:
       context: ../../
