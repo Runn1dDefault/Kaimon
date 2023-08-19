@@ -21,7 +21,7 @@ services:
       - .env
 
   web-kaimon-dev:
-    container_name: web-leadgen-dev
+    container_name: web-kaimon-dev
     restart: always
     build:
       context: ../../
