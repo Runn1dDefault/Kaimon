@@ -12,3 +12,4 @@ venv/
 venv.bak/
 
 .idea/
+static/

@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  celery-beat-dev:
+    container_name: celery-beat-dev
+    build:
+      context: ../../
+      dockerfile: deploy/Dockerfile
+    command: celery --app server beat --loglevel=info
+    env_file:
+      - .env
+
+  celery-mailing-dev:
+    container_name: celery-mailing-dev
+    hostname: celery-mailing-dev
+    build:
+      context: ../../
+      dockerfile: deploy/Dockerfile
+    command: celery --app server worker -Q feed_urls -c 1 --loglevel=info
+    env_file:
+      - .env
+
+  web-kaimon-dev:
+    container_name: web-leadgen-dev
+    restart: always
+    build:
+      context: ../../
+      dockerfile: deploy/Dockerfile
+    entrypoint: ["bash", "./deploy/entrypoint.sh"]
+    volumes:
+      - ../../static/:/static
+    env_file:
+      - ./.env
+    expose:
+      - "8334"
+
+  nginx_kaimon_dev:
+    container_name: nginx_kaimon_dev
+    build:
+      context: ../../
+      dockerfile: deploy/dev/nginx.Dockerfile
+    volumes:
+      - ../../static:/static
+    ports:
+      - "9010:80"
+    depends_on:
+      - web-kaimon-dev
+    env_file:
+      - .env
