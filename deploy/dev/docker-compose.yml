@@ -6,7 +6,7 @@ services:
     restart: always
     build:
       context: ../../
-    command: celery --app server beat --loglevel=info
+    command: celery --app kaimon beat --loglevel=info
     env_file:
       - ../../.env
 
