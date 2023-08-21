@@ -29,6 +29,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000/",  # JS for testing
     "http://176.126.166.140:9010/",
     "http://176.126.166.140",
 ]
