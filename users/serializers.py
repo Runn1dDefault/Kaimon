@@ -108,4 +108,5 @@ class UpdatePasswordSerializer(PasswordSerializer):
         user = self.context['request'].user
         attrs = super().validate(attrs)
         user.set_password(attrs['password'])
+        user.save()
         return get_tokens_for_user(user)
