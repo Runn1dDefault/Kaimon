@@ -1,48 +1,48 @@
 version: "3.9"
 
 services:
-  celery-beat:
-    container_name: celery-beat
-    build:
-      context: ../../
-      dockerfile: deploy/Dockerfile
-    command: celery --app kaimon beat --loglevel=info
-    env_file:
-      - .env
-
-  celery-mailing:
-    container_name: celery-mailing-worker
-    hostname: celery-mailing-dev
-    build:
-      context: ../../
-      dockerfile: deploy/Dockerfile
-    command: celery --app kaimon worker -Q feed_urls -c 2 --loglevel=info
-    env_file:
-      - .env
-
-  web-kaimono:
-    container_name: web-kaimono
+  celery-beat-dev:
+    container_name: celery-beat-dev
     restart: always
     build:
       context: ../../
-      dockerfile: deploy/Dockerfile
-    volumes:
-      - ../../static:/static
-      - ../../media:/media
+    command: celery --app server beat --loglevel=info
     env_file:
-      - ./.env
-    expose:
-      - "8334"
+      - ../../.env
 
-  nginx-kaimono:
-    container_name: nginx-kaimono
+  celery-mailing-dev:
+    container_name: celery-mailing-dev
+    hostname: celery-mailing-dev
+    restart: always
     build:
       context: ../../
-      dockerfile: nginx.prod.Dockerfile
+    command: celery --app kaimon worker -Q mailing -c 1 --loglevel=info
+    env_file:
+      - ../../.env
+
+  web-kaimon-dev:
+    container_name: web-kaimon-dev
+    restart: always
+    build:
+      context: ../../
+    entrypoint: [ "bash", "./deploy/entrypoint.sh" ]
+    env_file:
+      - ../../.env
+    expose:
+      - "8334"
+    volumes:
+      - static:/app/static
+      - media:/app/static
+
+  nginx-kaimon:
+    container_name: nginx-kaimon
+    build:
+      context: ../../
+      dockerfile: deploy/prod/nginx.Dockerfile
     command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
     volumes:
-      - ../../static:/static
-      - ../../media:/media
+      - static:/app/static
+      - media:/app/media
       - ../../certbot/conf:/etc/letsencrypt
       - ../../certbot/www:/var/www/certbot
     ports:
@@ -54,10 +54,15 @@ services:
       - .env
 
   certbot:
-    container_name: certbot-kaimono
+    container_name: certbot-kaimon
     image: certbot/certbot
     restart: unless-stopped
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
     volumes:
       - ../../certbot/conf:/etc/letsencrypt
       - ../../certbot/www:/var/www/certbot
+
+
+volumes:
+  static:
+  media:
