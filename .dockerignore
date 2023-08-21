@@ -1,1 +1,7 @@
-deploy/
+deploy/dev/docker-compose.yml
+deploy/dev/nginx.Dockerfile
+
+deploy/prod/docker-compose.yml
+deploy/prod/nginx.Dockerfile
+
+deploy/init_letsencrypt.sh
