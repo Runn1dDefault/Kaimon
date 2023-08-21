@@ -20,6 +20,26 @@ services:
     env_file:
       - ../../.env
 
+  celery-rakuten-requests-dev:
+      container_name: celery-rakuten-requests-dev
+      hostname: celery-genre-requests-dev
+      restart: always
+      build:
+        context: ../../
+      command: celery --app kaimon worker -Q genre_requests -c 2 --loglevel=info
+      env_file:
+        - ../../.env
+
+  celery-item-saving-dev:
+    container_name: celery-genre-requests-dev
+    hostname: celery-genre-requests-dev
+    restart: always
+    build:
+      context: ../../
+    command: celery --app kaimon worker -Q item_saving -c 25 --loglevel=info
+    env_file:
+      - ../../.env
+
   web-kaimon-dev:
     container_name: web-kaimon-dev
     restart: always

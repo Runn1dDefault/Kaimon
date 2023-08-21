@@ -27,8 +27,11 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['*']
+CSRF_TRUSTED_ORIGINS = [
+    "http://176.126.166.140:9010/",
+    "http://176.126.166.140",
+]
 # Application definition
 
 INSTALLED_APPS = [
@@ -41,7 +44,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
+    'django_celery_beat',
     'drf_spectacular',
+
     'users',
     'product',
     'rakuten_scraping',
@@ -151,7 +156,7 @@ CACHES = {
         "LOCATION": REDIS_CONNECTION_URL + '/0'
     },
     "users": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": REDIS_CONNECTION_URL + '/1'
     },
     "scraping": {

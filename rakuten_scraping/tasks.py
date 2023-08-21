@@ -1,16 +1,14 @@
 from datetime import datetime
 from typing import Any
 
-from celery import shared_task
-from django.utils.dateparse import parse_date
-
+from kaimon.celery import app
 from product.models import Genre, GenreChild, Product, ProductDetail, Marker
 from rakuten_scraping.settings import app_settings
 from rakuten_scraping.utils import RakutenRequest, get_db_genre_by_data
 
 
-@shared_task
-def save_genre(genre_info: dict[str, Any], parse_more: bool = False):
+@app.task()
+def save_genre_from_search(genre_info: dict[str, Any], parse_more: bool = False):
     conf = app_settings.GENRE_PARSE_SETTINGS
     current_data = genre_info[conf.CURRENT_KEY]
     current_id = current_data[conf.PARSE_KEYS.id]
@@ -52,19 +50,19 @@ def save_genre(genre_info: dict[str, Any], parse_more: bool = False):
             parse_and_save_genres.delay(child['genreId'])
 
 
-@shared_task
-def parse_and_save_genres(genre_id: int = 0, parse_more: bool = False):
+@app.task()
+def parse_and_save_genres(genre_id: int = 0, parse_more: bool = True):
     with RakutenRequest() as req:
         genre_info = req.client.genres_search(genre_id)
-    save_genre(genre_info, parse_more=parse_more)
+    save_genre_from_search.delay(genre_info, parse_more=parse_more)
 
 
-@shared_task
+@app.task()
 def save_product_from_search(search_data):
     genre_info = search_data.get('GenreInformation')
 
     if genre_info:
-        save_genre.delay(genre_info, parse_more=False)
+        save_genre_from_search.delay(genre_info, parse_more=False)
 
     saved_products = Product.objects.all().values_list('id', 'rakuten_id')
     saved_genre_ids = Genre.objects.all().values_list('id', flat=True)
@@ -130,12 +128,11 @@ def save_product_from_search(search_data):
     if new_products:
         Product.objects.bulk_create(new_products)
 
-    parse_date()
     if new_details:
         ProductDetail.objects.bulk_create(new_details)
 
 
-@shared_task
+@app.task()
 def parse_and_save_products(genre_id: int, keyword: str = None, product_id: int = None, page: int = None):
     with RakutenRequest() as req:
         results = req.client.product_search(
