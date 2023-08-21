@@ -96,11 +96,11 @@ class RestoreCode(BaseRestore):
         self._cache.delete(self.cache_key)
 
     @classmethod
-    def for_user(cls, user, raise_on_exist: bool = True) -> Self:
-        restore_code = cls(sub=user.id)
+    def for_user(cls, user_id: int, raise_on_exist: bool = True) -> Self:
+        restore_code = cls(sub=user_id)
         if raise_on_exist and restore_code.exist:
             raise RestoreCodeExist("code exist! Exp: %s seconds" % restore_code.exp)
-        payload = {'user_id': user.id}
+        payload = {'user_id': user_id}
         restore_code._generate(payload)
         return restore_code
 
@@ -138,12 +138,12 @@ class RestoreToken(BaseRestore):
         return jwt.decode(raw_token, server_settings.SECRET_KEY, algorithms=[cls.ALGORITHM])
 
     @classmethod
-    def for_user(cls, user, code: str) -> Self:
-        restore_code = RestoreCode.for_user(user, raise_on_exist=True)
+    def for_user(cls, user_id: int, code: str) -> Self:
+        restore_code = RestoreCode(sub=user_id)
         if not restore_code.verify(code):
             raise InvalidRestoreCode("code %s invalid or expired!" % code)
-        token = cls(sub=user.id)
-        token._generate(payload={"user_id": user.id})
+        token = cls(sub=user_id)
+        token._generate(payload={"user_id": user_id})
         return token
 
     @classmethod

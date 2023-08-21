@@ -58,24 +58,24 @@ class RestoreSerializer(serializers.Serializer):
     send_new_code = serializers.BooleanField(default=False)
 
     @staticmethod
-    def _get_user_by_email(email) -> User:
+    def _get_user_by_email(email):
         user = User.objects.filter(email=email).first()
         if not user:
             raise serializers.ValidationError({'detail': _('User with email %s not exist!') % email})
         return user
 
-    def create_token(self, user, code):
+    def create_token(self, user_id: int, code):
         try:
-            token = self.RESTORE_TOKEN_CLASS.for_user(user=user, code=code)
-        except (RestoreCodeExist, InvalidRestoreCode) as e:
+            token = self.RESTORE_TOKEN_CLASS.for_user(user_id=user_id, code=code)
+        except InvalidRestoreCode as e:
             raise serializers.ValidationError({'detail': _(str(e))})
         else:
-            self.RESTORE_CODE_CLASS.for_user(user, raise_on_exist=False).remove()
+            self.RESTORE_CODE_CLASS(sub=user_id).remove()
             return token
 
-    def create_code(self, user, raise_on_exist: bool):
+    def create_code(self, user_id: int, raise_on_exist: bool):
         try:
-            code = self.RESTORE_CODE_CLASS.for_user(user=user, raise_on_exist=raise_on_exist)
+            code = self.RESTORE_CODE_CLASS.for_user(user_id=user_id, raise_on_exist=raise_on_exist)
         except RestoreCodeExist as e:
             raise serializers.ValidationError({'detail': _(str(e))})
         else:
@@ -92,12 +92,12 @@ class RestoreSerializer(serializers.Serializer):
                 {'detail': _('When send_new_code is false code field become required!')}
             )
         if code:
-            token = self.create_token(user=user, code=code)
+            token = self.create_token(user_id=user.id, code=code)
             return {'token': str(token)}
 
         if send_new_code is True:
-            # if you need to restrict sending for a user who has already sent, then change raise_exist to True
-            code = self.create_code(user, raise_on_exist=False)
+            # if you need to restrict sending for a user who has already sent, then change raise_on_exist to True
+            code = self.create_code(user_id=user.id, raise_on_exist=False)
             send_code_template.delay(email=email, code=str(code))
             return {'status': 'send'}
         return {'status': 'failed'}
