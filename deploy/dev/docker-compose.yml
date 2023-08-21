@@ -32,7 +32,7 @@ services:
       - "8334"
     volumes:
       - static:/app/static
-      - media:/app/static
+      - media:/app/media
 
   nginx-kaimon-dev:
     container_name: nginx_kaimon_dev
@@ -46,7 +46,7 @@ services:
       - web-kaimon-dev
     volumes:
       - static:/app/static
-      - media:/app/static
+      - media:/app/media
 
 
 volumes:
