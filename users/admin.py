@@ -15,15 +15,22 @@ class CustomUserAdmin(UserAdmin):
     search_fields = ('id', 'email', 'full_name', 'username')
     search_help_text = _('Search by fields: ' + concat_to_upper_string(search_fields))
     ordering = ("date_joined",)
+    prepopulated_fields = {'username': ('email',)}
     add_fieldsets = (
         (
             None,
             {
                 "classes": ("wide",),
-                "fields": ("username", "email", "password1", "password2"),
-                "prepopulated_fields": {'username': ('email',)}
-            },
+                "fields": ("username", "email",  "full_name", "password1", "password2"),
+            }
         ),
+        (
+            _("Advanced options"),
+            {
+                "classes": ("collapse",),
+                "fields": ("role", "image", "registration_payed"),
+            }
+        )
     )
     fieldsets = (
         (_("Credentials"), {"fields": ("email", "username", "password")}),
