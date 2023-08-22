@@ -52,6 +52,15 @@ class CustomUserAdmin(UserAdmin):
         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
     )
 
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = super().get_readonly_fields(request=request, obj=obj)
+        if not request.user.is_superuser:
+            if 'is_superuser' not in readonly_fields:
+                readonly_fields = ('is_superuser', *readonly_fields)
+            if 'is_staff' not in readonly_fields:
+                readonly_fields = ('is_staff', *readonly_fields)
+        return readonly_fields
+
     def has_add_permission(self, request):
         return request.user.is_superuser
 
