@@ -21,6 +21,9 @@ class GenreChild(models.Model):
     parent = models.ForeignKey(Genre, on_delete=models.CASCADE, related_name='children')
     child = models.ForeignKey(Genre, on_delete=models.CASCADE, related_name='parents')
 
+    class Meta:
+        verbose_name_plural = _('GenreChildren')
+
 
 class Marker(models.Model):
     name = models.CharField(max_length=255, verbose_name=_('Name') + '[ja]', primary_key=True)

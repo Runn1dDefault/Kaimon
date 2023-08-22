@@ -4,24 +4,8 @@ from django.utils.translation import gettext_lazy as _
 from product.models import Genre, GenreChild, Product, Marker, ProductDetail
 
 
-class GenreChildInline(admin.TabularInline):
-    verbose_name = _('Child')
-    verbose_name_plural = _('Children')
-    fk_name = 'parent'
-    model = GenreChild
-    extra = 0
-
-
-class GenreParentInline(admin.TabularInline):
-    verbose_name = _('Parent')
-    fk_name = 'child'
-    model = GenreChild
-    extra = 0
-
-
 @admin.register(Genre)
 class GenreAdmin(admin.ModelAdmin):
-    # inlines = [GenreChildInline, GenreParentInline]
     list_display = ('id', 'name', 'level')
     list_display_links = ('id', 'name')
     search_fields = ('id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_de')
@@ -38,7 +22,7 @@ class GenreChildAdmin(admin.ModelAdmin):
     list_display = ('id', 'parent', 'child')
     list_display_links = ('id', 'parent', 'child')
     search_fields = ('parent__id', 'child__id', 'parent__name', 'child__name')
-    list_filter = ('child__level', 'parent__level')
+    list_filter = ('child__level',)
 
 
 class ProductDetailInline(admin.TabularInline):
