@@ -56,7 +56,7 @@ class CustomUserAdmin(UserAdmin):
     def check_to_obj_perm(user, obj):
         if not user.is_superuser and obj.is_superuser:
             return False
-        if not user.is_superuser and user.id == obj.id:
+        if not user.is_superuser and obj.is_staff:
             return False
         return True
 
