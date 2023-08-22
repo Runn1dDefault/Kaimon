@@ -53,6 +53,8 @@ class CustomUserAdmin(UserAdmin):
     )
 
     def has_change_permission(self, request, obj=None):
+        if obj and obj.id != request.user.id and obj.is_superuser:
+            return False
         if obj and request.user.is_superuser is False and request.user.id == obj.id:
             return False
         return super().has_change_permission(request=request, obj=obj)
