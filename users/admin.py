@@ -52,6 +52,9 @@ class CustomUserAdmin(UserAdmin):
         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
     )
 
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
     @staticmethod
     def check_to_obj_perm(user, obj):
         if not user.is_superuser and obj.is_superuser:
