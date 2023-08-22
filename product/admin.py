@@ -21,7 +21,7 @@ class GenreParentInline(admin.TabularInline):
 
 @admin.register(Genre)
 class GenreAdmin(admin.ModelAdmin):
-    inlines = [GenreChildInline, GenreParentInline]
+    # inlines = [GenreChildInline, GenreParentInline]
     list_display = ('id', 'name', 'level')
     list_display_links = ('id', 'name')
     search_fields = ('id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_de')
@@ -31,6 +31,14 @@ class GenreAdmin(admin.ModelAdmin):
         (_('General Info'), {'fields': ('id', 'name', 'level')}),
         (_('Another language names'), {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_de')}),
     )
+
+
+@admin.register(GenreChild)
+class GenreChildAdmin(admin.ModelAdmin):
+    list_display = ('id', 'parent', 'child')
+    list_display_links = ('id', 'parent', 'child')
+    search_fields = ('parent__id', 'child__id', 'parent__name', 'child__name')
+    list_filter = ('child__level', 'parent__level')
 
 
 class ProductDetailInline(admin.TabularInline):

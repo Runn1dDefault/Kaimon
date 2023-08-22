@@ -22,7 +22,7 @@ services:
 
   celery-rakuten-requests-dev:
       container_name: celery-rakuten-requests-dev
-      hostname: celery-genre-requests-dev
+      hostname: celery-rakuten-requests-dev
       restart: always
       build:
         context: ../../
@@ -31,8 +31,8 @@ services:
         - ../../.env
 
   celery-item-saving-dev:
-    container_name: celery-genre-requests-dev
-    hostname: celery-genre-requests-dev
+    container_name: celery-item-saving-dev
+    hostname: celery-item-saving-dev
     restart: always
     build:
       context: ../../
