@@ -51,3 +51,8 @@ class CustomUserAdmin(UserAdmin):
         ),
         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
     )
+
+    def has_change_permission(self, request, obj=None):
+        if obj and request.user.is_superuser is False and request.user.id == obj.id:
+            return False
+        return super().has_change_permission(request=request, obj=obj)
