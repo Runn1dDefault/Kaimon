@@ -68,4 +68,4 @@ class CustomUserAdmin(UserAdmin):
     def has_delete_permission(self, request, obj=None):
         if obj and not self.check_to_obj_perm(user=request.user, obj=obj):
             return False
-        return super().has_delete_permission(request=request.user, obj=obj)
+        return super().has_delete_permission(request=request, obj=obj)
