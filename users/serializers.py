@@ -31,6 +31,7 @@ class RegistrationSerializer(PasswordSerializer):
     _user_serializer = UserProfileSerializer
     full_name = serializers.CharField(max_length=300, required=True, validators=[validate_full_name])
     email = serializers.EmailField(max_length=300, required=True)
+    image = serializers.ImageField(required=False, allow_empty_file=False, write_only=True)
 
     def _get_user_data(self, user):
         return self._user_serializer(instance=user, context=self.context).data
@@ -44,7 +45,8 @@ class RegistrationSerializer(PasswordSerializer):
             password=attrs['password'],
             full_name=attrs['full_name'],
             is_active=False,
-            registration_payed=False
+            registration_payed=False,
+            image=attrs.get('image', None)
         )
         return self._get_user_data(user)
 
