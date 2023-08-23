@@ -30,3 +30,12 @@ class UserInfoView(generics.GenericAPIView):
     def get(self, request):
         serializer = self.get_serializer(instance=request.user, many=False)
         return Response(serializer.data)
+
+
+class UpdateUserInfo(generics.UpdateAPIView):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = UserProfileSerializer
+    lookup_field = None
+
+    def get_object(self):
+        return self.request.user

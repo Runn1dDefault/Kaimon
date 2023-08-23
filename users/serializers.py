@@ -13,6 +13,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('email', 'full_name', 'role', 'image')
+        extra_kwargs = {'role': {'read_only': True}}
 
 
 class PasswordSerializer(serializers.Serializer):
