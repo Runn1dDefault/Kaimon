@@ -229,13 +229,8 @@ EMAIL_PORT = 587  # 587 for TLS 465 for ssl
 EMAIL_USE_TLS = True
 
 SUPPORTED_LANG = ('ru', 'en', 'ja', 'tr', 'ky', 'kz')
-TRANSLATE_LANGUAGES = {
-    'ru': 'ru',
-    'en': 'en',
-    'tr': 'tr',
-    'ky': 'ky',
-    'kz': 'kk'
-}
+VERBOSE_LANGUAGES = {'ja': '日本語', 'ru': 'Русский', 'en': 'English', 'tr': 'Türkçe', 'ky': 'Кыргызча', 'kz': 'Қазақ'}
+TRANSLATE_LANGUAGES = {'ru': 'ru', 'en': 'en', 'tr': 'tr', 'ky': 'ky', 'kz': 'kk'}
 TRANSLATE_DELAY = 0.25
 LANGUAGE_QUERY = 'lang'
 

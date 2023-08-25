@@ -1,11 +1,15 @@
-from django.urls import path, re_path
+from django.urls import path, re_path, include
+from rest_framework.routers import SimpleRouter
 
-from .views import get_languages_view, genres_info_view, GenreProductsListView, SearchProduct
+from .views import get_languages_view, GenreProductsListView, SearchProduct, GenreView
+
+router = SimpleRouter()
+router.register('', GenreView, basename='product_genres')
 
 
 urlpatterns = [
     path('languages/', get_languages_view, name='product_languages_list'),
-    path('genres/', genres_info_view, name='product_genres'),
-    re_path('^genre/products/(?P<genre_id>.+)/$', GenreProductsListView.as_view(), name='product_genre_products'),
+    path('genres/', include(router.urls)),
+    re_path('^genres/(?P<id>.+)/products/$', GenreProductsListView.as_view(), name='product_genre_products'),
     path('search/', SearchProduct.as_view(), name='product_search')
 ]

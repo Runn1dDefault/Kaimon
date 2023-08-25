@@ -8,6 +8,7 @@ from product.utils import get_field_by_lang
 
 
 class LanguageMixin:
+
     def get_lang(self):
         return self.request.query_params.get(settings.LANGUAGE_QUERY, 'ja')
 
@@ -33,11 +34,13 @@ class LangSerializerMixin:
             raise serializers.ValidationError({'detail': gettext_lazy('Language %s does not support!') % lang})
         return translate_field
 
+    def valid_translate_instance(self, instance):
+        return instance
+
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         for field in self.lang_fields or []:
-            representation.pop(field)
+            old_value = representation.pop(field)
             field_name = self.get_field_by_lang(field)
-            representation[field_name] = getattr(instance, field_name)
+            representation[field_name] = getattr(self.valid_translate_instance(instance), field_name, old_value)
         return representation
-
