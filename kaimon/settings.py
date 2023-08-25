@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
+    'django_filters',
     'django_celery_beat',
     'drf_spectacular',
 
@@ -172,8 +173,8 @@ CACHES = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=10),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=31),
     "ROTATE_REFRESH_TOKENS": False,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
@@ -186,7 +187,7 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ]
+    ],
 }
 
 SPECTACULAR_SETTINGS = {
@@ -203,7 +204,7 @@ RESTORE_SETTINGS = {
     "CODE_LIVE_SECONDS": 600,
     "TOKEN_PREFIX": "restore_token:",
     "TOKEN_LEN": 6,
-    "TOKEN_LIVE_SECONDS": 600,
+    "TOKEN_LIVE_SECONDS": 1200,
     "TOKEN_ALGORITHM": "HS256",
     "MAIL_SUBJECT": ""
 }
@@ -226,3 +227,23 @@ EMAIL_HOST_USER = 'apikey'  # this is exactly the value 'apikey'
 EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
 EMAIL_PORT = 587  # 587 for TLS 465 for ssl
 EMAIL_USE_TLS = True
+
+SUPPORTED_LANG = ('ru', 'en', 'ja', 'tr', 'ky', 'kz')
+TRANSLATE_LANGUAGES = {
+    'ru': 'ru',
+    'en': 'en',
+    'tr': 'tr',
+    'ky': 'ky',
+    'kz': 'kk'
+}
+TRANSLATE_DELAY = 0.25
+LANGUAGE_QUERY = 'lang'
+
+GENRE_MODEL_PATH = 'product.models.Genre'
+GENRE_TRANSLATE_FIELDS = ('name',)
+PRODUCT_MODEL_PATH = 'product.models.Product'
+PRODUCT_TRANSLATE_FIELDS = ('name', 'description', 'brand_name')
+PRODUCT_DETAIL_MODEL_PATH = 'product.models.ProductDetail'
+PRODUCT_DETAIL_TRANSLATE_FIELDS = ('name', 'value',)
+MARKER_MODEL_PATH = 'product.models.Marker'
+MARKER_TRANSLATE_FIELDS = ('name',)
