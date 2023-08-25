@@ -4,9 +4,6 @@ from django.db.models.functions import JSONObject
 
 
 class GenreQuerySet(QuerySet):
-    def get_child_products(self):
-        return
-
     def genre_info_with_relations(self, name_field: str = 'name'):
         return self.values(
             genre_id=F('id'),
