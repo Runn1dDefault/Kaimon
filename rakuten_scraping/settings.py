@@ -21,6 +21,7 @@ class AppSettings(NamedTuple):
     CACHE_NAME: str = 'default'
     USED_USER_PREFIX: str = 'busy_client:'
     GENRE_PARSE_SETTINGS: GenreParseSettings = GenreParseSettings()
+    DELAY: float | int = 1.123
 
 
 def get_app_settings():
