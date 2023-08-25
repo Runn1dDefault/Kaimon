@@ -8,12 +8,12 @@ from product.models import Genre, GenreChild, Product, Marker, ProductDetail
 class GenreAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'level')
     list_display_links = ('id', 'name')
-    search_fields = ('id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_de')
+    search_fields = ('id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz')
     search_help_text = _('Search by fields: ID, NAME')
     list_filter = ('level',)
     fieldsets = (
         (_('General Info'), {'fields': ('id', 'name', 'level')}),
-        (_('Another language names'), {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_de')}),
+        (_('Another language names'), {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz')}),
     )
 
 
@@ -37,8 +37,9 @@ class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductDetailInline]
     list_display = ('id', 'rakuten_id', 'name', 'price', 'is_active', 'release_date')
     list_display_links = ('id', 'rakuten_id', 'name')
-    search_fields = ('id', 'rakuten_id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_de')
-    search_help_text = _('Search by fields: ID, Rakuten ID, NAME')
+    search_fields = ('id', 'rakuten_id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'genre__name',
+                     'brand_name', 'brand_name_tr', 'brand_name_ru', 'brand_name_en', 'brand_name_ky', 'brand_name_kz')
+    search_help_text = _('Search by fields: ID, Rakuten ID, NAME, GENRE NAME')
     list_filter = ('is_active', 'release_date',)
     readonly_fields = ('created_at', 'modified_at')
     fieldsets = (
@@ -46,23 +47,25 @@ class ProductAdmin(admin.ModelAdmin):
             _('General Info'),
             {'fields': ('rakuten_id', 'name', 'brand_name', 'description', 'price', 'genres', 'rank', 'count')}
         ),
-        (_('Important dates'), {'fields': ('release_date', 'created_at', 'modified_at')}),
+        (_('Dates'), {'fields': ('release_date', 'created_at', 'modified_at')}),
         (_('Marker'), {'fields': ('marker', 'marker_code')}),
         (_('Control'), {'fields': ('is_active',)}),
         (_('Links'), {'fields': ('image_url', 'product_url')}),
         (
             _('Another language fields'),
-            {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_de', 'description_tr', 'description_ru',
-                        'description_en', 'description_ky', 'description_de')}
+            {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'description_tr', 'description_ru',
+                        'description_en', 'description_ky', 'description_kz', 'brand_name_tr',
+                        'brand_name_ru', 'brand_name_en', 'brand_name_ky', 'brand_name_kz')}
         )
     )
+    filter_horizontal = ("genres",)
 
 
 @admin.register(Marker)
 class MarkerAdmin(admin.ModelAdmin):
     list_display = ('name',)
     list_display_links = ('name',)
-    search_fields = ('name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_de',)
+    search_fields = ('name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz',)
     search_help_text = _('Search by Marker name')
 
 
@@ -70,13 +73,13 @@ class MarkerAdmin(admin.ModelAdmin):
 class ProductDetailAdmin(admin.ModelAdmin):
     list_display = ('name', 'value', 'product')
     list_display_links = ('name', 'value')
-    search_fields = ('product__id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_de', 'value', 'value_tr',
-                     'value_ru', 'value_en', 'value_ky', 'value_de')
+    search_fields = ('product__id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'value', 'value_tr',
+                     'value_ru', 'value_en', 'value_ky', 'value_kz')
     search_help_text = _('Search By fields: Product ID, Name, Value')
     fieldsets = (
         (None, {'fields': ('product', 'name', 'value')}),
         (
             _('Another language fields'),
-            {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_de', 'value_tr', 'value_ru', 'value_en',
-                        'value_ky', 'value_de')})
+            {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'value_tr', 'value_ru', 'value_en',
+                        'value_ky', 'value_kz')})
     )
