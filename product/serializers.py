@@ -46,9 +46,14 @@ class GenreSerializer(serializers.ModelSerializer, LangSerializerMixin):
         translate_fields = ('name',)
 
     def get_children(self, instance):
-        children = instance.children.filter(
+        all_children = instance.children.filter(
             Q(child__deactivated__isnull=True) | Q(child__deactivated=False)
-        ).filter(child__level=instance.level + 1)
+        )
+
+        next_level_children = all_children.filter(child__level=instance.level + 1)
+        children = next_level_children
+        if not next_level_children.exists():
+            children = all_children
         return GenreChildSerializer(instance=children, many=True, for_children=True).data
 
 
