@@ -1,7 +1,10 @@
+from django.contrib.auth import get_user_model
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from product.querysets import GenreQuerySet
+from product.utils import round_half_integer
 
 
 class Genre(models.Model):
@@ -113,3 +116,19 @@ class ProductDetail(models.Model):
     value_en = models.TextField(blank=True, null=True, verbose_name=_('Value') + '[en]')
     value_ky = models.TextField(blank=True, null=True, verbose_name=_('Value') + '[ky]')
     value_kz = models.TextField(blank=True, null=True, verbose_name=_('Value') + '[kz]')
+
+
+class ProductReview(models.Model):
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='product_reviews')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
+    rank = models.FloatField(validators=[MinValueValidator(0), MaxValueValidator(5)], default=0)
+    comment = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+
+    def save(
+        self, force_insert=False, force_update=False, using=None, update_fields=None
+    ):
+        self.rank = round_half_integer(self.rank)
+        super().save(force_insert=force_insert, force_update=force_update, update_fields=update_fields)

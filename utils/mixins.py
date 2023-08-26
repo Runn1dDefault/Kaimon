@@ -24,11 +24,17 @@ class LangSerializerMixin:
         meta = getattr(self, 'Meta', None)
         return getattr(meta, 'translate_fields', [])
 
+    def get_lang(self) -> str:
+        return self.context.get('lang', 'ja')
+
     def get_field_by_lang(self, field_name: str):
         assert self.context
         if field_name not in self.lang_fields:
             return field_name
-        lang = self.context.get('lang', 'ja')
+        return self.get_translate_field(field_name)
+
+    def get_translate_field(self, field_name: str) -> str:
+        lang = self.get_lang()
         translate_field = get_field_by_lang(field_name, lang)
         if not translate_field:
             raise serializers.ValidationError({'detail': gettext_lazy('Language %s does not support!') % lang})

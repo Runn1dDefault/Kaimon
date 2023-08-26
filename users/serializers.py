@@ -1,3 +1,5 @@
+from typing import Iterable
+
 from django.contrib.auth.password_validation import validate_password
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -10,10 +12,25 @@ from .validators import validate_full_name
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    def __init__(self, hide_fields: Iterable[str], *args, **kwargs):
+        self.hide_fields = hide_fields
+        super().__init__(*args, **kwargs)
+
     class Meta:
         model = User
         fields = ('email', 'full_name', 'role', 'image')
         extra_kwargs = {'role': {'read_only': True}}
+
+    def remove_hide_fields(self, representation):
+        for field in self.hide_fields:
+            if field not in representation.keys():
+                continue
+            representation.pop(field)
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        self.remove_hide_fields(representation)
+        return representation
 
 
 class PasswordSerializer(serializers.Serializer):

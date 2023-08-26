@@ -1,7 +1,8 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
-from product.models import Genre, GenreChild, Product, Marker, ProductDetail
+from product.filters import ProductRankAdminFilter
+from product.models import Genre, GenreChild, Product, Marker, ProductDetail, ProductReview
 
 
 @admin.register(Genre)
@@ -37,10 +38,10 @@ class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductDetailInline]
     list_display = ('id', 'rakuten_id', 'name', 'price', 'is_active', 'release_date')
     list_display_links = ('id', 'rakuten_id', 'name')
-    search_fields = ('id', 'rakuten_id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'genre__name',
+    search_fields = ('id', 'rakuten_id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'genres__name',
                      'brand_name', 'brand_name_tr', 'brand_name_ru', 'brand_name_en', 'brand_name_ky', 'brand_name_kz')
     search_help_text = _('Search by fields: ID, Rakuten ID, NAME, GENRE NAME')
-    list_filter = ('is_active', 'release_date',)
+    list_filter = (ProductRankAdminFilter, 'is_active', 'release_date',)
     readonly_fields = ('created_at', 'modified_at')
     fieldsets = (
         (
@@ -83,3 +84,12 @@ class ProductDetailAdmin(admin.ModelAdmin):
             {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'value_tr', 'value_ru', 'value_en',
                         'value_ky', 'value_kz')})
     )
+
+
+@admin.register(ProductReview)
+class ProductReview(admin.ModelAdmin):
+    list_display = ('id', 'product', 'user', 'rank', 'is_active', 'created_at')
+    list_display_links = ('id', 'product', 'user')
+    search_fields = ('id', 'product_id', 'user__email')
+    list_filter = ('is_active', 'created_at')
+    readonly_fields = ('created_at', 'modified_at')

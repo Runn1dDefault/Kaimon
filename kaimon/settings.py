@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'users',
     'product',
     'rakuten_scraping',
+    'order',
 ]
 
 MIDDLEWARE = [

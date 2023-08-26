@@ -1,8 +1,11 @@
 from django.db.models import Q
 from rest_framework import serializers
 
-from product.mixins import LangSerializerMixin
-from product.models import Genre, Product, Marker, ProductDetail, GenreChild
+from users.serializers import UserProfileSerializer
+from utils.mixins import LangSerializerMixin
+
+from .models import Genre, Product, Marker, ProductDetail, GenreChild, ProductReview
+from .utils import round_half_integer
 
 
 class GenreChildSerializer(serializers.ModelSerializer, LangSerializerMixin):
@@ -71,11 +74,36 @@ class ProductDetailSerializer(serializers.ModelSerializer, LangSerializerMixin):
         translate_fields = ('name', 'value')
 
 
+class ProductReviewSerializer(serializers.ModelSerializer):
+    user = UserProfileSerializer(hide_fields=['role', 'email'], read_only=True)
+
+    class Meta:
+        model = ProductReview
+        fields = ('id', 'user', 'product', 'rank', 'comment')
+        extra_kwargs = {'product': {'write_only': True, 'required': True}}
+
+    def validate(self, attrs):
+        attrs['user'] = self.context['request'].user
+        rank = attrs.get('rank')
+        if rank:
+            attrs['rank'] = round_half_integer(rank)
+        return attrs
+
+
 class ProductSerializer(serializers.ModelSerializer, LangSerializerMixin):
     marker = MarkerSerializer(many=False)
     details = ProductDetailSerializer(many=True)
+    avg_rank = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'image_url', 'description', 'brand_name', 'marker', 'details')
+        fields = ('id', 'name', 'price', 'image_url', 'description', 'brand_name', 'marker', 'details', 'avg_rank')
         translate_fields = ('name', 'description', 'brand_name',)
+
+    def get_avg_rank(self, instance):
+        reviews = instance.reviews.filter(is_active=True)
+        if reviews.exists():
+            ranks = list(reviews.values_list('rank', flat=True))
+            return sum(ranks) / len(ranks)
+        return 0
+
