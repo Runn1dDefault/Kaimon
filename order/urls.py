@@ -5,7 +5,7 @@ from .views import CountryListView, DeliveryAddressViewSet, OrderViewSet
 
 router = SimpleRouter()
 router.register('delivery-address', DeliveryAddressViewSet)
-router.register('order', OrderViewSet)
+router.register('', OrderViewSet)
 
 
 urlpatterns = [
