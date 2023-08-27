@@ -12,6 +12,6 @@ urlpatterns = [
     path('auth/update/password/', UpdatePasswordView.as_view(), name='auth_update_pwd'),
     path('auth/me-info/', UserInfoView.as_view(), name='auth_me_info'),
     path('auth/me-info/update/', UpdateUserInfo.as_view(), name='auth_me_info_update'),
-    path('admin/', include('users.admin.urls'))
+    path('admin/', include('users.external_admin.urls'))
 ]
 

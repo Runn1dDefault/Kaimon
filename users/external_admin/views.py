@@ -5,7 +5,7 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
 from users.models import User
-from users.admin.paginators import UserListPagination
+from users.external_admin.paginators import UserListPagination
 
 from .serializers import AdminUserSerializer
 
