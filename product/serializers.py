@@ -8,7 +8,7 @@ from .models import Genre, Product, Marker, ProductDetail, GenreChild, ProductRe
 from .utils import round_half_integer
 
 
-class GenreChildSerializer(serializers.ModelSerializer, LangSerializerMixin):
+class GenreChildSerializer(LangSerializerMixin, serializers.ModelSerializer):
     id = serializers.SerializerMethodField(read_only=True)
     name = serializers.SerializerMethodField(read_only=True)
     level = serializers.SerializerMethodField(read_only=True)
@@ -40,7 +40,7 @@ class GenreChildSerializer(serializers.ModelSerializer, LangSerializerMixin):
         return self.get_fk_field(instance).level
 
 
-class GenreSerializer(serializers.ModelSerializer, LangSerializerMixin):
+class GenreSerializer(LangSerializerMixin, serializers.ModelSerializer):
     children = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -60,21 +60,21 @@ class GenreSerializer(serializers.ModelSerializer, LangSerializerMixin):
         return GenreChildSerializer(instance=children, many=True, for_children=True).data
 
 
-class MarkerSerializer(serializers.ModelSerializer, LangSerializerMixin):
+class MarkerSerializer(LangSerializerMixin, serializers.ModelSerializer):
     class Meta:
         model = Marker
         fields = ('name',)
         translate_fields = ('name',)
 
 
-class ProductDetailSerializer(serializers.ModelSerializer, LangSerializerMixin):
+class ProductDetailSerializer(LangSerializerMixin, serializers.ModelSerializer):
     class Meta:
         model = ProductDetail
         fields = ('id', 'name', 'value')
         translate_fields = ('name', 'value')
 
 
-class ProductReviewSerializer(serializers.ModelSerializer):
+class ProductReviewSerializer(LangSerializerMixin, serializers.ModelSerializer):
     user = UserProfileSerializer(hide_fields=['role', 'email'], read_only=True)
 
     class Meta:
@@ -90,7 +90,7 @@ class ProductReviewSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class ProductSerializer(serializers.ModelSerializer, LangSerializerMixin):
+class ProductSerializer(LangSerializerMixin, serializers.ModelSerializer):
     marker = MarkerSerializer(many=False)
     details = ProductDetailSerializer(many=True)
     avg_rank = serializers.SerializerMethodField(read_only=True)
@@ -106,4 +106,3 @@ class ProductSerializer(serializers.ModelSerializer, LangSerializerMixin):
             ranks = list(reviews.values_list('rank', flat=True))
             return sum(ranks) / len(ranks)
         return 0
-

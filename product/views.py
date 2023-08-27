@@ -9,6 +9,7 @@ from rest_framework.response import Response
 
 from users.permissions import RegistrationPayedPermission
 from utils.mixins import LanguageMixin
+from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM
 
 from .filters import SearchFilterByLang, GenreProductsFilter, GenreLevelFilter
 from .models import Genre, Product
@@ -21,26 +22,29 @@ def get_languages_view(request):
     return Response(settings.VERBOSE_LANGUAGES, status=status.HTTP_200_OK)
 
 
-LANGUAGE_QUERY_SCHEMA_PARAM = OpenApiParameter(
-    name=settings.LANGUAGE_QUERY,
-    type=OpenApiTypes.STR,
-    required=False,
-    default='ja'
-)
-
-
-@extend_schema_view(
-    get=[OpenApiParameter(name='level', type=OpenApiTypes.INT, required=False, default=1), LANGUAGE_QUERY_SCHEMA_PARAM]
-)
-class GenreReadViewSet(viewsets.ReadOnlyModelViewSet, LanguageMixin):
+class GenreReadViewSet(LanguageMixin, viewsets.ReadOnlyModelViewSet):
     queryset = Genre.objects.filter(Q(deactivated__isnull=True) | Q(deactivated=False))
     filter_backends = [GenreLevelFilter]
     pagination_class = GenrePagination
     serializer_class = GenreSerializer
 
+    @extend_schema(
+        parameters=[OpenApiParameter(name='level', type=OpenApiTypes.INT, required=False, default=1),
+                    LANGUAGE_QUERY_SCHEMA_PARAM]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        parameters=[OpenApiParameter(name='level', type=OpenApiTypes.INT, required=False, default=1),
+                    LANGUAGE_QUERY_SCHEMA_PARAM]
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
-class GenreProductsListView(generics.ListAPIView, LanguageMixin):
+class GenreProductsListView(LanguageMixin, generics.ListAPIView):
     lookup_field = 'id'
     queryset = Genre.objects.filter(Q(deactivated__isnull=True) | Q(deactivated=False))
     filter_backends = [GenreProductsFilter]
@@ -49,7 +53,7 @@ class GenreProductsListView(generics.ListAPIView, LanguageMixin):
 
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
-class SearchProductView(generics.ListAPIView, LanguageMixin):
+class SearchProductView(LanguageMixin, generics.ListAPIView):
     queryset = Product.objects.filter(is_active=True)
     pagination_class = PagePagination
     serializer_class = ProductSerializer
@@ -63,7 +67,7 @@ class SearchProductView(generics.ListAPIView, LanguageMixin):
 
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
-class NewProductsView(generics.ListAPIView, LanguageMixin):
+class NewProductsView(LanguageMixin, generics.ListAPIView):
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductSerializer
     pagination_class = PagePagination
