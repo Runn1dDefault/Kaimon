@@ -36,4 +36,5 @@ def block_or_unblock_user_view(request, user_id):
     user = get_object_or_404(queryset, id=user_id)
     user.is_active = not user.is_active
     user.save()
-    return Response(status=status.HTTP_200_OK)
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
