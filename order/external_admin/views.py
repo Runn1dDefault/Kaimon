@@ -13,7 +13,7 @@ from .serializers import AdminOrderSerializer
 class OrderMixin:
     queryset = Order.objects.all()
     serializer_class = AdminOrderSerializer
-    # permission_classes = (permissions.IsAuthenticated, permissions.IsAdminUser)
+    permission_classes = (permissions.IsAuthenticated, permissions.IsAdminUser)
 
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
