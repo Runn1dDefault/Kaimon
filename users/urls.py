@@ -1,7 +1,8 @@
-from django.urls import path
+from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .views import RegistrationView, RestorePasswordView, UpdatePasswordView, UserInfoView, UpdateUserInfo
+from .admin.urls import urlpatterns as admin_urls
 
 
 urlpatterns = [
@@ -11,5 +12,7 @@ urlpatterns = [
     path('restore/password/', RestorePasswordView.as_view(), name='auth_restore_pwd'),
     path('update/password/', UpdatePasswordView.as_view(), name='auth_update_pwd'),
     path('me-info/', UserInfoView.as_view(), name='auth_me_info'),
-    path('me-info/update/', UpdateUserInfo.as_view(), name='auth_me_info_update')
+    path('me-info/update/', UpdateUserInfo.as_view(), name='auth_me_info_update'),
+    path('admin/', include('users.admin.urls'))
 ]
+
