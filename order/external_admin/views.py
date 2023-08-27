@@ -16,7 +16,7 @@ from .serializers import AdminOrderSerializer
 class OrderMixin:
     queryset = Order.objects.all()
     serializer_class = AdminOrderSerializer
-    # permission_classes = (permissions.IsAuthenticated, permissions.IsAdminUser)
+    permission_classes = (permissions.IsAuthenticated, permissions.IsAdminUser)
 
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
@@ -50,11 +50,6 @@ class OrderSearchView(LanguageMixin, OrderMixin, generics.ListAPIView):
         'receipts__product_name',
         'receipts__p_id'
     ]
-
-
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
-class OrderDetailView(LanguageMixin, OrderMixin, generics.RetrieveAPIView):
-    lookup_field = 'id'
 
 
 @api_view(['GET'])
