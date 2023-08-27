@@ -12,7 +12,7 @@ from .validators import validate_full_name
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    def __init__(self, hide_fields: Iterable[str], *args, **kwargs):
+    def __init__(self, hide_fields: Iterable[str] = None, *args, **kwargs):
         self.hide_fields = hide_fields
         super().__init__(*args, **kwargs)
 
