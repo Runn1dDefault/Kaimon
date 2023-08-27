@@ -3,7 +3,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from product.querysets import GenreQuerySet
+from product.querysets import GenreQuerySet, ProductQuerySet
 from product.utils import round_half_integer
 
 
@@ -47,6 +47,8 @@ class Marker(models.Model):
 
 
 class Product(models.Model):
+    objects = ProductQuerySet.as_manager()
+
     # General Info
     rakuten_id = models.CharField(max_length=32, unique=True)
     number = models.CharField(max_length=50, blank=True)
