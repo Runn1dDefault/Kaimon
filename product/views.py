@@ -106,9 +106,8 @@ class ProductReviewView(generics.ListCreateAPIView):
         return Response(serializer.data)
 
 
-# @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
-# class PopularProductsView(generics.ListAPIView, LanguageMixin):
-#     queryset = Product.objects.filter(is_active=True)
-#     serializer_class = ProductSerializer
-#     pagination_class = PagePagination
-#
+@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
+class PopularProductsView(generics.ListAPIView, LanguageMixin):
+    queryset = Product.objects.filter(is_active=True).popular_by_orders_qty()
+    serializer_class = ProductSerializer
+    pagination_class = PagePagination
