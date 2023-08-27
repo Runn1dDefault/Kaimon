@@ -3,6 +3,7 @@ from django.utils.timezone import localtime
 from rest_framework import serializers
 
 from order.models import Order
+from order.serializers import ProductReceiptSerializer
 from utils.mixins import LangSerializerMixin
 
 
@@ -12,10 +13,11 @@ class AdminOrderSerializer(LangSerializerMixin, serializers.ModelSerializer):
     total_price = serializers.SerializerMethodField(read_only=True)
     date = serializers.SerializerMethodField(read_only=True)
     country = serializers.SerializerMethodField(read_only=True)
+    receipts = ProductReceiptSerializer(many=True, read_only=True)
 
     class Meta:
         model = Order
-        fields = ('id', 'status', 'email', 'full_name', 'total_price', 'date', 'country')
+        fields = ('id', 'status', 'email', 'full_name', 'total_price', 'date', 'country', 'receipts')
 
     def get_email(self, instance):
         return instance.delivery_address.user.email
