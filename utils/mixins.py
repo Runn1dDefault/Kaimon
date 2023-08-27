@@ -46,7 +46,10 @@ class LangSerializerMixin:
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         for field in self.lang_fields or []:
+            if field not in representation.keys():
+                continue
+
             old_value = representation.pop(field)
             field_name = self.get_field_by_lang(field)
-            representation[field_name] = getattr(self.valid_translate_instance(instance), field_name, old_value)
+            representation[field_name] = getattr(self.valid_translate_instance(instance), field_name, None) or old_value
         return representation
