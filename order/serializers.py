@@ -8,7 +8,7 @@ from utils.mixins import LangSerializerMixin
 from .models import Order, UserDeliveryAddress, Country, ProductReceipt
 
 
-class CountrySerializer(serializers.ModelSerializer, LangSerializerMixin):
+class CountrySerializer(LangSerializerMixin, serializers.ModelSerializer):
     class Meta:
         model = Country
         fields = ('id', 'name')
@@ -37,7 +37,7 @@ class DeliveryAddressSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class ProductReceiptSerializer(serializers.ModelSerializer, LangSerializerMixin):
+class ProductReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer):
     total_price = serializers.SerializerMethodField(read_only=True)
     qty = serializers.IntegerField(required=True)
 
@@ -74,6 +74,7 @@ class ProductReceiptSerializer(serializers.ModelSerializer, LangSerializerMixin)
         product_id = validated_data['p_id']
         product = self.get_product(product_id)
         self.validate_product_qty(qty=validated_data['qty'], product=product)
+        validated_data['total_qty'] = validated_data['qty']
         validated_data['product'] = product
         validated_data['image_url'] = product.image_url
         validated_data['unit_price'] = product.price
@@ -87,8 +88,8 @@ class ProductReceiptSerializer(serializers.ModelSerializer, LangSerializerMixin)
         self.validate_product_qty(qty, product)
         if qty < instance.qty:
             validated_data['returns'] = instance.qty - qty
-        elif qty == instance.qty:
-            validated_data['returns'] = instance.qty
+        if qty == 0:
+            validated_data['is_canceled'] = True
         return super().update(instance, validated_data)
 
 
@@ -145,5 +146,11 @@ class OrderSerializer(serializers.ModelSerializer):
                 )
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
+
+            all_returns_qty = sum(instance.receipts.values_list('returns', flat=True))
+            total_qty = sum(instance.receipts.values_list('total_qty', flat=True))
+            if all_returns_qty == total_qty:
+                validated_data['status'] = Order.Status.canceled
+                validated_data['is_deleted'] = True
             updated = super().update(instance, validated_data)
         return updated

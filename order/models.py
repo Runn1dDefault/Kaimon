@@ -52,11 +52,25 @@ class Order(BaseModel):
     class Status(models.TextChoices):
         pending = 'pending', _('Pending')
         rejected = 'rejected', _('Rejected')
+        canceled = 'canceled', _('Canceled')
+        delivered = 'delivered', _('Delivered')
         success = 'success', _('Success')
 
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.pending)
     delivery_address = models.ForeignKey(UserDeliveryAddress, on_delete=models.CASCADE, related_name='orders')
     is_deleted = models.BooleanField(default=False)
+    is_payed = models.BooleanField(default=False)
+
+    def delete_receipts(self):
+        if self.status == self.Status.pending:
+            return
+
+        receipts = self.receipts.filter(is_canceled=False)
+        for receipt in receipts:
+            receipt.is_canceled = True
+            receipt.returns = receipt.total_qty
+            receipt.qty = 0
+        self.__class__.objects.bulk_update(receipts, {'is_canceled', 'returns', 'qty'})
 
 
 class ProductReceipt(BaseModel):
@@ -66,5 +80,7 @@ class ProductReceipt(BaseModel):
     product_name = models.CharField(max_length=500)
     image_url = models.TextField(blank=True, null=True)
     unit_price = models.FloatField()
-    qty = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    total_qty = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    qty = models.PositiveIntegerField(validators=[MinValueValidator(0)])
     returns = models.PositiveIntegerField(default=0)
+    is_canceled = models.BooleanField(default=False)

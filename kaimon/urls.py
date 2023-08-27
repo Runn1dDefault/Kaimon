@@ -15,7 +15,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v1/', include('users.urls')),
     path('api/v1/product/', include('product.urls')),
-    path('api/v1/order/', include('order.urls')),
+    path('api/v1/', include('order.urls')),
 
 ] + docs_urlpatterns
 
