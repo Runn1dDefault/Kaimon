@@ -21,7 +21,7 @@ class DeliveryAddressSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserDeliveryAddress
-        fields = ('id', 'country', 'city', 'address', 'phone', 'country_name')
+        fields = ('id', 'country', 'city', 'address', 'phone', 'country_name', 'zip_code')
 
     def get_country(self, country_name) -> Country:
         country = Country.objects.filter(name=country_name, is_active=True).first()

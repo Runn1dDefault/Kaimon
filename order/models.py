@@ -36,6 +36,7 @@ class UserDeliveryAddress(BaseModel):
     city = models.CharField(max_length=255)
     address = models.TextField()
     phone = models.CharField(max_length=15)
+    zip_code = models.CharField(max_length=50, blank=True, null=True)
 
     is_deleted = models.BooleanField(default=False)
 
