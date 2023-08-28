@@ -9,3 +9,9 @@ LANGUAGE_QUERY_SCHEMA_PARAM = OpenApiParameter(
     required=False,
     default='ja'
 )
+CURRENCY_QUERY_SCHEMA_PARAM = OpenApiParameter(
+    name=settings.CURRENCY_QUERY_PARAM,
+    type=OpenApiTypes.STR,
+    required=False,
+    default='dollar'
+)

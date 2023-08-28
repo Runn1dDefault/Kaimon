@@ -3,6 +3,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from users.serializers import UserProfileSerializer
+from currency_conversion.mixins import CurrencySerializerMixin
 from utils.mixins import LangSerializerMixin
 
 from .models import Genre, Product, Marker, ProductDetail, GenreChild, ProductReview
@@ -65,13 +66,6 @@ class GenreSerializer(LangSerializerMixin, serializers.ModelSerializer):
         return GenreChildSerializer(instance=children, many=True, for_children=True, context=self.context).data
 
 
-class MarkerSerializer(LangSerializerMixin, serializers.ModelSerializer):
-    class Meta:
-        model = Marker
-        fields = ('name',)
-        translate_fields = ('name',)
-
-
 class ProductDetailSerializer(LangSerializerMixin, serializers.ModelSerializer):
     class Meta:
         model = ProductDetail
@@ -101,19 +95,18 @@ class ProductReviewSerializer(LangSerializerMixin, serializers.ModelSerializer):
         return getattr(product, translate_field, None) or product.name
 
 
-class ProductSerializer(LangSerializerMixin, serializers.ModelSerializer):
-    marker = MarkerSerializer(many=False)
+class ProductSerializer(CurrencySerializerMixin, LangSerializerMixin, serializers.ModelSerializer):
     details = ProductDetailSerializer(many=True)
     reviews_count = serializers.SerializerMethodField(read_only=True)
     avg_rank = serializers.SerializerMethodField(read_only=True)
-    price = serializers.SerializerMethodField(read_only=True)
     # promotions = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'image_url', 'description', 'brand_name', 'marker', 'details',
+        fields = ('id', 'name', 'price', 'image_url', 'description', 'brand_name', 'details',
                   'reviews_count', 'avg_rank',)
         translate_fields = ('name', 'description', 'brand_name',)
+        currency_convert_fields = ('price',)
 
     def get_avg_rank(self, instance):
         reviews = instance.reviews.filter(is_active=True)

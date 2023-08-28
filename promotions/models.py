@@ -28,10 +28,14 @@ class Promotion(models.Model):
         related_name="promotions",
         related_query_name="promotion",
     )
-    discount = models.FloatField(validators=[MaxValueValidator(100)])
     start_date = models.DateField()
     end_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class Discount(models.Model):
+    promotion = models.ForeignKey(Promotion, on_delete=models.CASCADE, related_name='discounts')
+    discount = models.FloatField()
 
     def calc_price(self, price: float | int):
         if price <= 0:

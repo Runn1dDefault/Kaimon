@@ -10,7 +10,7 @@ from product.utils import get_field_by_lang
 class LanguageMixin:
 
     def get_lang(self):
-        return self.request.query_params.get(settings.LANGUAGE_QUERY, 'ja')
+        return self.request.query_params.get(settings.LANGUAGE_QUERY_PARAM, 'ja')
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

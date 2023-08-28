@@ -9,7 +9,7 @@ class CurrencyMixin:
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context['currency'] = self.get_lang()
+        context['currency'] = self.get_currency()
         return context
 
 
@@ -28,12 +28,12 @@ class CurrencySerializerMixin:
         representation = super().to_representation(instance)
         for field in self.get_convert_fields():
             value = representation.get(field, None)
-            if not value:
+            if not value or self.get_currency() == 'yen':
                 continue
 
             conversation_instance = self.get_conversation_instance()
             if not conversation_instance:
                 continue
-            representation[f'{field}_{self.get_currency()}'] = conversation_instance.calc_price(value)
-        return representation
 
+            representation[field] = conversation_instance.calc_price(value)
+        return representation

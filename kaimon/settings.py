@@ -235,7 +235,7 @@ VERBOSE_LANGUAGES = {'ja': '日本語', 'ru': 'Русский', 'en': 'English',
 TRANSLATE_LANGUAGES = {'ru': 'ru', 'en': 'en', 'tr': 'tr', 'ky': 'ky', 'kz': 'kk'}
 TRANSLATE_DELAY = 0.25
 LANGUAGE_QUERY_PARAM = 'lang'
-CURRENCY_QUERY_PARAM = ''
+CURRENCY_QUERY_PARAM = 'currency'
 
 GENRE_MODEL_PATH = 'product.models.Genre'
 GENRE_TRANSLATE_FIELDS = ('name',)
