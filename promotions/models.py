@@ -36,4 +36,4 @@ class Promotion(models.Model):
     def calc_price(self, price: float | int):
         if price <= 0:
             return 0
-        return self.discount * price / 100
+        return price - (self.discount * price / 100)
