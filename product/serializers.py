@@ -57,7 +57,7 @@ class GenreSerializer(LangSerializerMixin, serializers.ModelSerializer):
         children = next_level_children
         if not next_level_children.exists():
             children = all_children
-        return GenreChildSerializer(instance=children, many=True, for_children=True).data
+        return GenreChildSerializer(instance=children, many=True, for_children=True, context=self.context).data
 
 
 class MarkerSerializer(LangSerializerMixin, serializers.ModelSerializer):
