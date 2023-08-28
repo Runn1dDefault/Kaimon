@@ -22,7 +22,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         extra_kwargs = {'role': {'read_only': True}}
 
     def remove_hide_fields(self, representation):
-        for field in self.hide_fields:
+        for field in self.hide_fields or []:
             if field not in representation.keys():
                 continue
             representation.pop(field)
