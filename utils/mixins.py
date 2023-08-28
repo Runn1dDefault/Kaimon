@@ -50,5 +50,5 @@ class LangSerializerMixin:
 
             old_value = representation.pop(field)
             field_name = self.get_field_by_lang(field)
-            representation[field_name] = getattr(self.valid_translate_instance(instance), field_name, None) or old_value
+            representation[field] = getattr(self.valid_translate_instance(instance), field_name, None) or old_value
         return representation
