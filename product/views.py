@@ -10,10 +10,11 @@ from rest_framework.response import Response
 from users.permissions import RegistrationPayedPermission
 from utils.mixins import LanguageMixin
 from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM
+from utils.paginators import PagePagination
 
 from .filters import SearchFilterByLang, GenreProductsFilter, GenreLevelFilter
 from .models import Genre, Product
-from .paginators import PagePagination, GenrePagination
+from .paginators import GenrePagination
 from .serializers import ProductSerializer, GenreSerializer, ProductReviewSerializer
 
 

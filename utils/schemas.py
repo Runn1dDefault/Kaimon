@@ -4,7 +4,7 @@ from drf_spectacular.utils import OpenApiParameter
 
 
 LANGUAGE_QUERY_SCHEMA_PARAM = OpenApiParameter(
-    name=settings.LANGUAGE_QUERY,
+    name=settings.LANGUAGE_QUERY_PARAM,
     type=OpenApiTypes.STR,
     required=False,
     default='ja'

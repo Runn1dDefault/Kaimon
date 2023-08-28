@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'product',
     'rakuten_scraping',
     'order',
+    'currency_conversion'
 ]
 
 MIDDLEWARE = [
@@ -233,7 +234,8 @@ SUPPORTED_LANG = ('ru', 'en', 'ja', 'tr', 'ky', 'kz')
 VERBOSE_LANGUAGES = {'ja': '日本語', 'ru': 'Русский', 'en': 'English', 'tr': 'Türkçe', 'ky': 'Кыргызча', 'kz': 'Қазақ'}
 TRANSLATE_LANGUAGES = {'ru': 'ru', 'en': 'en', 'tr': 'tr', 'ky': 'ky', 'kz': 'kk'}
 TRANSLATE_DELAY = 0.25
-LANGUAGE_QUERY = 'lang'
+LANGUAGE_QUERY_PARAM = 'lang'
+CURRENCY_QUERY_PARAM = ''
 
 GENRE_MODEL_PATH = 'product.models.Genre'
 GENRE_TRANSLATE_FIELDS = ('name',)

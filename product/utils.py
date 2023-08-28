@@ -38,15 +38,6 @@ def get_last_children(current_genre) -> list[int]:
     return last_children
 
 
-def get_request_lang(request):
-    lang = str(request.query_params.get(settings.LANGUAGE_QUERY, 'ja')).lower()
-    if lang not in settings.SUPPORTED_LANG:
-        raise ParseError(detail=_("Language %s does not support!") % lang)
-    return lang
-
-
 def get_field_by_lang(field_name: str, lang: str):
     if lang in settings.SUPPORTED_LANG:
         return f'{field_name}_{lang}' if lang != 'ja' else field_name
-
-

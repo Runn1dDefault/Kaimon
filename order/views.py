@@ -1,10 +1,10 @@
 from rest_framework import generics, viewsets
 
-from product.paginators import PagePagination
 from users.filters import FilterByUser
 from users.permissions import RegistrationPayedPermission
 from utils.mixins import LanguageMixin
-from .filters import FilterByFields
+from utils.filters import FilterByFields
+from utils.paginators import PagePagination
 
 from .models import Country, UserDeliveryAddress, Order
 from .permissions import OrderPermission

@@ -4,23 +4,23 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
-from order.filters import FilterByFields
 from order.models import Order
-from product.paginators import PagePagination
 from utils.mixins import LanguageMixin
+from utils.filters import FilterByFields
+from utils.paginators import PagePagination
 from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM
 
 from .serializers import AdminOrderSerializer
 
 
-class OrderMixin:
+class AdminOrderMixin:
     queryset = Order.objects.all()
     serializer_class = AdminOrderSerializer
     permission_classes = (permissions.IsAuthenticated, permissions.IsAdminUser)
 
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
-class OrderListView(LanguageMixin, OrderMixin, generics.ListAPIView):
+class AdminOrderListView(LanguageMixin, AdminOrderMixin, generics.ListAPIView):
     pagination_class = PagePagination
     filter_backends = [FilterByFields, filters.OrderingFilter]
     filter_fields = {
@@ -32,7 +32,7 @@ class OrderListView(LanguageMixin, OrderMixin, generics.ListAPIView):
 
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
-class OrderSearchView(LanguageMixin, OrderMixin, generics.ListAPIView):
+class AdminOrderSearchView(LanguageMixin, AdminOrderMixin, generics.ListAPIView):
     pagination_class = PagePagination
     filter_backends = [filters.SearchFilter]
     search_fields = [

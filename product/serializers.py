@@ -1,4 +1,5 @@
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import serializers
 
 from users.serializers import UserProfileSerializer
@@ -80,10 +81,11 @@ class ProductDetailSerializer(LangSerializerMixin, serializers.ModelSerializer):
 
 class ProductReviewSerializer(LangSerializerMixin, serializers.ModelSerializer):
     user = UserProfileSerializer(hide_fields=['role', 'email'], read_only=True)
+    product_name = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ProductReview
-        fields = ('id', 'user', 'product', 'rank', 'comment')
+        fields = ('id', 'user', 'product', 'product_name', 'rank', 'comment')
         extra_kwargs = {'product': {'write_only': True, 'required': True}}
 
     def validate(self, attrs):
@@ -93,15 +95,24 @@ class ProductReviewSerializer(LangSerializerMixin, serializers.ModelSerializer):
             attrs['rank'] = round_half_integer(rank)
         return attrs
 
+    def get_product_name(self, instance):
+        product = instance.product
+        translate_field = self.get_translate_field('name')
+        return getattr(product, translate_field, None) or product.name
+
 
 class ProductSerializer(LangSerializerMixin, serializers.ModelSerializer):
     marker = MarkerSerializer(many=False)
     details = ProductDetailSerializer(many=True)
+    reviews_count = serializers.SerializerMethodField(read_only=True)
     avg_rank = serializers.SerializerMethodField(read_only=True)
+    price = serializers.SerializerMethodField(read_only=True)
+    # promotions = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'image_url', 'description', 'brand_name', 'marker', 'details', 'avg_rank')
+        fields = ('id', 'name', 'price', 'image_url', 'description', 'brand_name', 'marker', 'details',
+                  'reviews_count', 'avg_rank',)
         translate_fields = ('name', 'description', 'brand_name',)
 
     def get_avg_rank(self, instance):
@@ -110,3 +121,17 @@ class ProductSerializer(LangSerializerMixin, serializers.ModelSerializer):
             ranks = list(reviews.values_list('rank', flat=True))
             return sum(ranks) / len(ranks)
         return 0
+
+    def get_reviews_count(self, instance):
+        return instance.reviews.filter(is_active=True).count()
+
+    def get_promotions(self, instance):
+        today = timezone.now().date()
+        promotions = instance.promotions.filter(start_date__gte=today, end_date__lt=today)
+        if not promotions.exists():
+            return []
+
+        return [
+            {'id': promotion.id, 'name': promotion.name, 'price': promotion.calc_price(instance.price)}
+            for promotion in promotions
+        ]
