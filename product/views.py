@@ -28,16 +28,38 @@ class GenreReadViewSet(LanguageMixin, viewsets.ReadOnlyModelViewSet):
     pagination_class = GenrePagination
     serializer_class = GenreSerializer
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        include_children = self.request.query_params.get('include_children')
+        if not include_children:
+            context['include_children'] = True
+            return context
+        if isinstance(include_children, str):
+            match include_children.lower():
+                case 'false':
+                    context['include_children'] = False
+                case 'true':
+                    context['include_children'] = True
+        elif isinstance(include_children, bool):
+            context['include_children'] = include_children
+        return context
+
     @extend_schema(
-        parameters=[OpenApiParameter(name='level', type=OpenApiTypes.INT, required=False, default=1),
-                    LANGUAGE_QUERY_SCHEMA_PARAM]
+        parameters=[
+            OpenApiParameter(name='level', type=OpenApiTypes.INT, required=False, default=1),
+            OpenApiParameter(name='include_children', type=OpenApiTypes.BOOL, required=False, default=False),
+            LANGUAGE_QUERY_SCHEMA_PARAM
+        ]
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
     @extend_schema(
-        parameters=[OpenApiParameter(name='level', type=OpenApiTypes.INT, required=False, default=1),
-                    LANGUAGE_QUERY_SCHEMA_PARAM]
+        parameters=[
+            OpenApiParameter(name='level', type=OpenApiTypes.INT, required=False, default=1),
+            OpenApiParameter(name='include_children', type=OpenApiTypes.BOOL, required=False, default=False),
+            LANGUAGE_QUERY_SCHEMA_PARAM
+        ]
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)

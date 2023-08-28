@@ -49,6 +49,10 @@ class GenreSerializer(LangSerializerMixin, serializers.ModelSerializer):
         translate_fields = ('name',)
 
     def get_children(self, instance):
+        include_children = self.context.get('include_children', True)
+        if include_children is False:
+            return []
+
         all_children = instance.children.filter(
             Q(child__deactivated__isnull=True) | Q(child__deactivated=False)
         )
