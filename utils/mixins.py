@@ -28,7 +28,6 @@ class LangSerializerMixin:
         return self.context.get('lang', 'ja')
 
     def get_field_by_lang(self, field_name: str):
-        assert self.context
         if field_name not in self.lang_fields:
             return field_name
         return self.get_translate_field(field_name)
