@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
-from product.filters import ProductRankAdminFilter
+from product.filters import ProductRankAdminFilter, ProductHasDetailAdminFilter
 from product.models import Genre, GenreChild, Product, Marker, ProductDetail, ProductReview
 
 
@@ -16,6 +16,8 @@ class GenreAdmin(admin.ModelAdmin):
         (_('General Info'), {'fields': ('id', 'name', 'level')}),
         (_('Another language names'), {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz')}),
     )
+    list_per_page = 30
+    list_max_show_all = 50
 
 
 @admin.register(GenreChild)
@@ -24,6 +26,8 @@ class GenreChildAdmin(admin.ModelAdmin):
     list_display_links = ('id', 'parent', 'child')
     search_fields = ('parent__id', 'child__id', 'parent__name', 'child__name')
     list_filter = ('child__level',)
+    list_per_page = 30
+    list_max_show_all = 50
 
 
 class ProductDetailInline(admin.TabularInline):
@@ -41,7 +45,7 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ('id', 'rakuten_id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'genres__name',
                      'brand_name', 'brand_name_tr', 'brand_name_ru', 'brand_name_en', 'brand_name_ky', 'brand_name_kz')
     search_help_text = _('Search by fields: ID, Rakuten ID, NAME, GENRE NAME')
-    list_filter = (ProductRankAdminFilter, 'is_active', 'release_date',)
+    list_filter = (ProductHasDetailAdminFilter, ProductRankAdminFilter, 'is_active', 'release_date',)
     readonly_fields = ('created_at', 'modified_at')
     fieldsets = (
         (
@@ -60,6 +64,8 @@ class ProductAdmin(admin.ModelAdmin):
         )
     )
     filter_horizontal = ("genres",)
+    list_per_page = 30
+    list_max_show_all = 50
 
 
 @admin.register(Marker)
