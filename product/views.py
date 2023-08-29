@@ -16,7 +16,7 @@ from utils.paginators import PagePagination
 from .filters import SearchFilterByLang, GenreProductsFilter, GenreLevelFilter
 from .models import Genre, Product
 from .paginators import GenrePagination
-from .serializers import ProductSerializer, GenreSerializer, ProductReviewSerializer
+from .serializers import ProductSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer
 
 
 @api_view(['GET'])
@@ -77,6 +77,13 @@ class GenreProductsListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
 
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
+class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView):
+    lookup_field = 'id'
+    queryset = Product.objects.filter(is_active=True)
+    serializer_class = ProductRetrieveSerializer
+
+
+@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
 class SearchProductView(LanguageMixin, generics.ListAPIView):
     queryset = Product.objects.filter(is_active=True)
     pagination_class = PagePagination
@@ -88,17 +95,6 @@ class SearchProductView(LanguageMixin, generics.ListAPIView):
     search_fields_tr = ['name_tr', 'genres__name_tr', 'brand_name_tr']
     search_fields_ky = ['name_ky', 'genres__name_ky', 'brand_name_ky']
     search_fields_kz = ['name_kz', 'genres__name_kz', 'brand_name_kz']
-
-
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
-class NewProductsView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
-    queryset = Product.objects.filter(is_active=True)
-    serializer_class = ProductSerializer
-    pagination_class = PagePagination
-
-    def get_queryset(self):
-        ten_days_ago = (timezone.now() - timezone.timedelta(days=10)).date()
-        return super().get_queryset().filter(Q(created_at__date__gte=ten_days_ago) | Q(release_date__gte=ten_days_ago))
 
 
 class ProductReviewView(generics.ListCreateAPIView):
@@ -128,6 +124,17 @@ class ProductReviewView(generics.ListCreateAPIView):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+
+@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
+class NewProductsView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
+    queryset = Product.objects.filter(is_active=True)
+    serializer_class = ProductSerializer
+    pagination_class = PagePagination
+
+    def get_queryset(self):
+        ten_days_ago = (timezone.now() - timezone.timedelta(days=10)).date()
+        return super().get_queryset().filter(Q(created_at__date__gte=ten_days_ago) | Q(release_date__gte=ten_days_ago))
 
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))

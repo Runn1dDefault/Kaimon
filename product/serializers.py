@@ -96,16 +96,14 @@ class ProductReviewSerializer(LangSerializerMixin, serializers.ModelSerializer):
 
 
 class ProductSerializer(CurrencySerializerMixin, LangSerializerMixin, serializers.ModelSerializer):
-    details = ProductDetailSerializer(many=True)
     reviews_count = serializers.SerializerMethodField(read_only=True)
     avg_rank = serializers.SerializerMethodField(read_only=True)
     discount_price = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'image_url', 'description', 'brand_name', 'details',
-                  'reviews_count', 'avg_rank', 'discount_price', 'count')
-        translate_fields = ('name', 'description', 'brand_name',)
+        fields = ('id', 'name', 'price', 'discount_price', 'image_url', 'avg_rank', 'reviews_count', 'count')
+        translate_fields = ('name',)
         currency_convert_fields = ('price',)
 
     def get_avg_rank(self, instance):
@@ -136,3 +134,14 @@ class ProductSerializer(CurrencySerializerMixin, LangSerializerMixin, serializer
         if self.get_currency() == 'yen':
             return discount_price
         return self.get_converted_price(discount_price)
+
+
+class ProductRetrieveSerializer(ProductSerializer):
+    details = ProductDetailSerializer(many=True)
+
+    class Meta:
+        model = Product
+        fields = ('id', 'name', 'description', 'price', 'discount_price', 'image_url', 'brand_name',
+                  'avg_rank', 'reviews_count', 'count', 'details')
+        translate_fields = ('name', 'description', 'brand_name',)
+        currency_convert_fields = ('price',)
