@@ -21,9 +21,17 @@ class UserDeliveryAddressAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'modified_at')
 
 
-class ProductReceiptInline(admin.TabularInline):
+class ProductReceiptInline(admin.StackedInline):
     model = ProductReceipt
     extra = 1
+    fieldsets = (
+        (
+            'R...', {
+                'classes': ['collapse'],
+                'fields': ('name', 'status', 'delivery_address', 'is_deleted', 'is_payed')
+            }
+        )
+    )
 
 
 @admin.register(Order)
