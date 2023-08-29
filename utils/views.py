@@ -1,11 +1,11 @@
-from rest_framework import views, parsers, serializers, status
+from rest_framework import views, parsers, status
 from rest_framework.response import Response
 
 
 class PostAPIView(views.APIView):
     throttle_classes = ()
     permission_classes = ()
-    parser_classes = (parsers.FormParser, parsers.MultiPartParser, parsers.JSONParser,)
+    parser_classes = (parsers.FormParser, parsers.MultiPartParser, parsers.JSONParser)
     serializer_class = None
 
     def get_serializer_context(self):
@@ -16,9 +16,7 @@ class PostAPIView(views.APIView):
         }
 
     def get_serializer(self, *args, **kwargs):
-        assert issubclass(self.serializer_class, serializers.BaseSerializer)
-
-        kwargs['context'] = self.get_serializer_context()
+        kwargs.setdefault('context', self.get_serializer_context())
         return self.serializer_class(*args, **kwargs)
 
     def post(self, request, *args, **kwargs):
