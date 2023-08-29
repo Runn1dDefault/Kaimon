@@ -48,8 +48,8 @@ class LangSerializerMixin:
             if field not in representation.keys():
                 continue
 
-            old_value = representation.pop(field)
+            representation.pop(field)
             field_name = self.get_field_by_lang(field)
-            representation[field] = getattr(self.valid_translate_instance(instance), field_name, None) or old_value
+            representation[field] = getattr(self.valid_translate_instance(instance), field_name, "")
         return representation
 
