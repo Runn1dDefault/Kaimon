@@ -24,16 +24,17 @@ class CurrencySerializerMixin:
         meta = getattr(self, 'Meta', None)
         return getattr(meta, 'currency_convert_fields', [])
 
+    def get_converted_price(self, price):
+        conversation_instance = self.get_conversation_instance()
+        if not conversation_instance:
+            return None
+        return conversation_instance.calc_price(price)
+
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         for field in self.get_convert_fields():
             value = representation.get(field, None)
             if not value or self.get_currency() == 'yen':
                 continue
-
-            conversation_instance = self.get_conversation_instance()
-            if not conversation_instance:
-                continue
-
-            representation[field] = conversation_instance.calc_price(value)
+            representation[field] = self.get_converted_price(value)
         return representation
