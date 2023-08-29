@@ -30,7 +30,7 @@ class ProductReceiptInline(admin.StackedInline):
                 'classes': ['collapse'],
                 'fields': ('name', 'status', 'delivery_address', 'is_deleted', 'is_payed')
             }
-        )
+        ),
     )
 
 
