@@ -17,7 +17,8 @@ urlpatterns = [
     path('api/v1/', include('product.urls')),
     path('api/v1/', include('order.urls')),
     path('api/v1/admin/', include('currency_conversion.external_admin.urls')),
-  ] + docs_urlpatterns
+    path('api/v1/', include('promotions.urls')),
+] + docs_urlpatterns
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += static(settings.STATIC_URL, docement_root=settings.STATIC_ROOT)

@@ -54,7 +54,8 @@ INSTALLED_APPS = [
     'product',
     'rakuten_scraping',
     'order',
-    'currency_conversion'
+    'currency_conversion',
+    'promotions'
 ]
 
 MIDDLEWARE = [
@@ -197,6 +198,7 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': '',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True
 }
 
 RESTORE_SETTINGS = {
