@@ -26,9 +26,7 @@ class AdminReviewView(mixins.DestroyModelMixin, mixins.ListModelMixin, viewsets.
     serializer_class = ProductReviewSerializer
     pagination_class = PagePagination
     lookup_field = 'id'
-    filter_fields = {
-        'is_read': {'db_field': 'is_read', 'type': 'boolean'}
-    }
+    filter_fields = {'is_read': {'db_field': 'is_read', 'type': 'boolean'}}
 
     def perform_destroy(self, instance):
         instance.is_active = False
@@ -39,4 +37,3 @@ class AdminReviewView(mixins.DestroyModelMixin, mixins.ListModelMixin, viewsets.
 @permission_classes([permissions.IsAuthenticated, permissions.IsAdminUser])
 def get_new_reviews_count(request):
     return Response({'count': ProductReview.objects.filter(is_active=True, is_read=False).count()})
-
