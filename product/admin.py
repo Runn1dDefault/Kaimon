@@ -30,11 +30,17 @@ class GenreChildAdmin(admin.ModelAdmin):
     list_max_show_all = 50
 
 
-class ProductDetailInline(admin.TabularInline):
+class ProductDetailInline(admin.StackedInline):
     verbose_name = _('Details')
     model = ProductDetail
-    fields = ('name', 'value')
     extra = 0
+    fieldsets = (
+        (
+            _('D...'),
+            {'classes': ['collapse'], 'fields': ('name', 'value', 'name_ru', 'value_ru', 'name_en', 'value_en',
+                                                 'name_tr', 'value_tr', 'name_ky', 'value_ky', 'name_kz', 'value_kz')}
+        ),
+    )
 
 
 @admin.register(Product)
@@ -52,15 +58,18 @@ class ProductAdmin(admin.ModelAdmin):
             _('General Info'),
             {'fields': ('rakuten_id', 'name', 'brand_name', 'description', 'price', 'genres', 'rank', 'count')}
         ),
-        (_('Dates'), {'fields': ('release_date', 'created_at', 'modified_at')}),
-        (_('Marker'), {'fields': ('marker', 'marker_code')}),
+        (_('Dates'), {'classes': ['collapse'], 'fields': ('release_date', 'created_at', 'modified_at')}),
+        (_('Marker'), {'classes': ['collapse'], 'fields': ('marker', 'marker_code')}),
         (_('Control'), {'fields': ('is_active',)}),
-        (_('Links'), {'fields': ('image_url', 'product_url')}),
+        (_('Links'), {'classes': ['collapse'], 'fields': ('image_url', 'product_url')}),
         (
             _('Another language fields'),
-            {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'description_tr', 'description_ru',
-                        'description_en', 'description_ky', 'description_kz', 'brand_name_tr',
-                        'brand_name_ru', 'brand_name_en', 'brand_name_ky', 'brand_name_kz')}
+            {
+                'classes': ['collapse'],
+                'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'description_tr', 'description_ru',
+                           'description_en', 'description_ky', 'description_kz', 'brand_name_tr',
+                           'brand_name_ru', 'brand_name_en', 'brand_name_ky', 'brand_name_kz')
+            }
         )
     )
     filter_horizontal = ("genres",)
@@ -74,22 +83,6 @@ class MarkerAdmin(admin.ModelAdmin):
     list_display_links = ('name',)
     search_fields = ('name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz',)
     search_help_text = _('Search by Marker name')
-
-
-@admin.register(ProductDetail)
-class ProductDetailAdmin(admin.ModelAdmin):
-    list_display = ('name', 'value', 'product')
-    list_display_links = ('name', 'value')
-    search_fields = ('product__id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'value', 'value_tr',
-                     'value_ru', 'value_en', 'value_ky', 'value_kz')
-    search_help_text = _('Search By fields: Product ID, Name, Value')
-    fieldsets = (
-        (None, {'fields': ('product', 'name', 'value')}),
-        (
-            _('Another language fields'),
-            {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'value_tr', 'value_ru', 'value_en',
-                        'value_ky', 'value_kz')})
-    )
 
 
 @admin.register(ProductReview)
