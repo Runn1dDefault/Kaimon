@@ -14,4 +14,4 @@ class Conversion(models.Model):
     created_at = models.DateTimeField(auto_now=True)
 
     def calc_price(self, current_price: float):
-        return current_price * self.price_per
+        return round(current_price * self.price_per, 2)
