@@ -234,7 +234,13 @@ EMAIL_USE_TLS = True
 
 SUPPORTED_LANG = ('ru', 'en', 'ja', 'tr', 'ky', 'kz')
 VERBOSE_LANGUAGES = {'ja': '日本語', 'ru': 'Русский', 'en': 'English', 'tr': 'Türkçe', 'ky': 'Кыргызча', 'kz': 'Қазақ'}
-TRANSLATE_LANGUAGES = {'ru': 'ru', 'en': 'en', 'tr': 'tr', 'ky': 'ky', 'kz': 'kk'}
+TRANSLATE_LANGUAGES = {
+    'ru': 'ru',
+    'en': 'en',
+    'tr': 'tr',
+    # 'ky': 'ky',
+    # 'kz': 'kk'
+}
 TRANSLATE_DELAY = 0.25
 LANGUAGE_QUERY_PARAM = 'lang'
 CURRENCY_QUERY_PARAM = 'currency'

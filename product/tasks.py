@@ -3,7 +3,7 @@ from typing import Iterable
 
 from django.conf import settings
 from django.db.models import Count, Q
-from translate import Translator
+from libretranslatepy import LibreTranslateAPI
 
 from kaimon.celery import app
 from utils.helpers import import_model
@@ -16,7 +16,9 @@ from .utils import get_last_children
 def translate_to_fields(instance_id: int, model_path: str, fields: Iterable[str], languages: Iterable[str] = ()):
     model = import_model(model_path)
     instance = model.objects.get(id=instance_id)
+    translator = LibreTranslateAPI("https://translate.argosopentech.com/")
     save = False
+
     for field in fields:
         for lang, to_lang in settings.TRANSLATE_LANGUAGES.items():
             if languages and lang not in languages:
@@ -30,13 +32,14 @@ def translate_to_fields(instance_id: int, model_path: str, fields: Iterable[str]
             time.sleep(settings.TRANSLATE_DELAY)  # waiting will increase the chances of success
             to_translate = getattr(instance, field)
             try:
-                translator = Translator(from_lang='ja', to_lang=to_lang)
+                translator.translate(to_translate, source='ja', target=to_lang)
                 translated = translator.translate(to_translate)
             except Exception as e:
                 print(str(e))
             else:
                 setattr(instance, field_name, translated)
                 save = True
+                time.sleep(0.1)
 
     if save:
         instance.save()
