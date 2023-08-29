@@ -1,12 +1,12 @@
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
-from django.utils import timezone
 from rest_framework import serializers
 
 from users.serializers import UserProfileSerializer
 from currency_conversion.mixins import CurrencySerializerMixin
 from utils.mixins import LangSerializerMixin
 
-from .models import Genre, Product, Marker, ProductDetail, GenreChild, ProductReview
+from .models import Genre, Product, ProductDetail, GenreChild, ProductReview
 from .utils import round_half_integer
 
 
@@ -99,12 +99,12 @@ class ProductSerializer(CurrencySerializerMixin, LangSerializerMixin, serializer
     details = ProductDetailSerializer(many=True)
     reviews_count = serializers.SerializerMethodField(read_only=True)
     avg_rank = serializers.SerializerMethodField(read_only=True)
-    # promotions = serializers.SerializerMethodField(read_only=True)
+    discount_price = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
         fields = ('id', 'name', 'price', 'image_url', 'description', 'brand_name', 'details',
-                  'reviews_count', 'avg_rank',)
+                  'reviews_count', 'avg_rank', 'discount_price', 'count')
         translate_fields = ('name', 'description', 'brand_name',)
         currency_convert_fields = ('price',)
 
@@ -118,13 +118,21 @@ class ProductSerializer(CurrencySerializerMixin, LangSerializerMixin, serializer
     def get_reviews_count(self, instance):
         return instance.reviews.filter(is_active=True).count()
 
-    def get_promotions(self, instance):
-        today = timezone.now().date()
-        promotions = instance.promotions.filter(start_date__gte=today, end_date__lt=today)
-        if not promotions.exists():
-            return []
+    def get_discount_price(self, instance):
+        if instance.price <= 0:
+            return None
 
-        return [
-            {'id': promotion.id, 'name': promotion.name, 'price': promotion.calc_price(instance.price)}
-            for promotion in promotions
-        ]
+        promotion = instance.promotions.active_promotions().first()
+        if not promotion:
+            return None
+
+        try:
+            discount = promotion.discount
+        except ObjectDoesNotExist:
+            # in the future here can be changed, when new promotion logic will be added
+            return None
+
+        discount_price = discount.calc_price(instance.price)
+        if self.get_currency() == 'yen':
+            return discount_price
+        return self.get_converted_price(discount_price)
