@@ -32,8 +32,7 @@ def translate_to_fields(instance_id: int, model_path: str, fields: Iterable[str]
             time.sleep(settings.TRANSLATE_DELAY)  # waiting will increase the chances of success
             to_translate = getattr(instance, field)
             try:
-                translator.translate(to_translate, source='ja', target=to_lang)
-                translated = translator.translate(to_translate)
+                translated = translator.translate(to_translate, source='ja', target=to_lang)
             except Exception as e:
                 print(str(e))
             else:
