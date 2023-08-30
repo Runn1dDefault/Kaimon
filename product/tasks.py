@@ -56,6 +56,9 @@ def translate_genres(genre_ids: Iterable[int] = None):
 
         if genre.children.exists():
             child_ids = list(genre.children.values_list('child__id', flat=True))
+            if not child_ids:
+                continue
+
             translate_genres.delay(child_ids)
 
 
