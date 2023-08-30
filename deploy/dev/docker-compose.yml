@@ -131,20 +131,20 @@ services:
     depends_on:
       - web-dev
 
-#  celery-translating-dev:
-#    container_name: celery-translating-dev
-#    hostname: celery-translating-dev
-#    restart: always
-#    build:
-#      context: ../../
-#    links:
-#      - "postgres:postgres_kaimono"
-#      - "redis:redis_kaimono"
-#    command: celery --app kaimon worker -Q translating -c 1 --loglevel=info
-#    env_file:
-#      - ../../.env
-#    depends_on:
-#      - web-kaimon-dev
+  celery-translating-dev:
+    container_name: celery-translating-dev
+    hostname: celery-translating-dev
+    restart: always
+    build:
+      context: ../../
+    links:
+      - "postgres:postgres_kaimono"
+      - "redis:redis_kaimono"
+    command: celery --app kaimon worker -Q translating -c 1 --loglevel=info
+    env_file:
+      - ../../.env
+    depends_on:
+      - web-kaimon-dev
 
 
 volumes:
