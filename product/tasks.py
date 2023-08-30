@@ -19,26 +19,29 @@ def translate_to_fields(instance_id: int, model_path: str, fields: Iterable[str]
     translator = LibreTranslateAPI("https://translate.argosopentech.com/")
     save = False
 
-    for field in fields:
-        for lang, to_lang in settings.TRANSLATE_LANGUAGES.items():
-            if languages and lang not in languages:
+    for lang, to_lang in settings.TRANSLATE_LANGUAGES.items():
+        if languages and lang not in languages:
+            continue
+
+        for field_name in fields:
+            to_translate_value = getattr(instance, field_name, None)
+            if not to_translate_value:
+                print('Not found field %s' % field_name)
                 continue
 
-            field_name = f'{field}_{lang}'
-            if not hasattr(instance, field) or not hasattr(instance, field_name):
-                print('Not found field to saving translated value %s or %s' % (field, field_name))
+            translate_field_name = f'{field_name}_{lang}'
+            if not hasattr(instance, field_name) or not hasattr(instance, translate_field_name):
+                print('Not found field to saving translated value %s or %s' % (field_name, translate_field_name))
                 continue
 
             time.sleep(settings.TRANSLATE_DELAY)  # waiting will increase the chances of success
-            to_translate = getattr(instance, field)
             try:
-                translated = translator.translate(to_translate, source='ja', target=to_lang)
+                translated_value = translator.translate(to_translate_value, source='ja', target=to_lang)
+                setattr(instance, translate_field_name, translated_value)
             except Exception as e:
                 print(str(e))
             else:
-                setattr(instance, field_name, translated)
                 save = True
-                time.sleep(0.1)
 
     if save:
         instance.save()
