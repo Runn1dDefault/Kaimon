@@ -48,7 +48,9 @@ class PromotionCreateSerializer(serializers.Serializer):
 
         products = attrs.pop('products', [])
         if products:
-            products = list(Product.objects.filter(id__in=products))
+            products_queryset = Product.objects.filter(id__in=products)
+            if not products_queryset.exists():
+                raise serializers.ValidationError({'detail': _('Products not found!')})
 
         discount = attrs.pop('discount')
         with transaction.atomic():
