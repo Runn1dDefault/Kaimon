@@ -2,7 +2,6 @@ from typing import Iterable
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy
-from libretranslatepy import LibreTranslateAPI
 from rest_framework import serializers
 
 from product.utils import get_field_by_lang
@@ -44,29 +43,16 @@ class LangSerializerMixin:
 
         return instance
 
-    def _translate(self, value):
-        lt = LibreTranslateAPI("https://translate.argosopentech.com/")
-        return lt.translate(value, source='ja', target=self.get_lang())
-
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         for field in self.lang_fields or []:
             if field not in representation.keys():
                 continue
 
-            old_value = representation.pop(field)
+            representation.pop(field)
             field_name = self.get_field_by_lang(field)
             obj = self.valid_translate_instance(instance)
-            translated_value = getattr(obj, field_name, None)
-            if not translated_value:
-                try:
-                    translated_value = self._translate(old_value)
-                    setattr(instance, field_name, translated_value)
-                    instance.save()
-                except Exception as e:
-                    print(str(e))
-
-            representation[field] = translated_value
+            representation[field] = getattr(obj, field_name, None) or ""
 
         return representation
 
