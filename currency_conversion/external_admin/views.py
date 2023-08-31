@@ -14,6 +14,7 @@ class AdminConversionListView(generics.ListAPIView):
 
 
 class AdminUpdateConversionView(generics.UpdateAPIView):
+    lookup_field = 'id'
     queryset = Conversion.objects.all()
     permission_classes = [permissions.IsAuthenticated, IsDirectorPermission]
     serializer_class = AdminConversionSerializer
