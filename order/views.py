@@ -37,9 +37,7 @@ class OrderViewSet(LanguageMixin, viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     pagination_class = PagePagination
     filter_backends = [FilterByFields]
-    filter_fields = {
-        'status': {'db_field': 'status', 'type': 'enum', 'choices': Order.Status.choices}
-    }
+    filter_fields = {'status': {'db_field': 'status', 'type': 'enum', 'choices': Order.Status.choices}}
 
     def get_queryset(self):
         return super().get_queryset()
