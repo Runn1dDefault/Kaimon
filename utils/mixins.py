@@ -32,7 +32,7 @@ class LangSerializerMixin:
             return field_name
         return self.get_translate_field(field_name)
 
-    def get_translate_field(self, field_name: str) -> str:
+    def get_translate_field(self, field_name: str, lang: str = None) -> str:
         lang = self.get_lang()
         translate_field = get_field_by_lang(field_name, lang)
         if not translate_field:

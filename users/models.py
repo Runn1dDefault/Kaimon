@@ -2,8 +2,6 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser, UserManager as BaseUserManager
 from django.utils.translation import gettext_lazy as _
 
-from users.validators import validate_full_name
-
 
 class UserManager(BaseUserManager):
     def create_user(self, username, email=None, password=None, **extra_fields):
@@ -27,7 +25,7 @@ class User(AbstractUser):
         MANAGER = 'manager', _('Manager')
         CLIENT = 'client', _('Client')
 
-    full_name = models.CharField(max_length=300, validators=[validate_full_name])
+    full_name = models.CharField(max_length=300)
     role = models.CharField(choices=Role.choices, max_length=10, default=Role.CLIENT)
     image = models.ImageField(upload_to='users/', blank=True, null=True)
     registration_payed = models.BooleanField(default=False)

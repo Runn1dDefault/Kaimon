@@ -8,7 +8,6 @@ from .exceptions import InvalidRestoreCode, RestoreCodeExist
 from .models import User
 from .tasks import send_code_template
 from .tokens import get_tokens_for_user, RestoreToken, RestoreCode
-from .validators import validate_full_name
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -47,7 +46,7 @@ class PasswordSerializer(serializers.Serializer):
 
 class RegistrationSerializer(PasswordSerializer):
     _user_serializer = UserProfileSerializer
-    full_name = serializers.CharField(max_length=300, required=True, validators=[validate_full_name])
+    full_name = serializers.CharField(max_length=300, required=True)
     email = serializers.EmailField(max_length=300, required=True)
     image = serializers.ImageField(required=False, allow_empty_file=False, write_only=True)
 

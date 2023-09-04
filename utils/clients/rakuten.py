@@ -3,8 +3,8 @@ from typing import Any
 
 from requests import Request, Response, HTTPError
 
-from services.clients.base import BaseClient
-from services.clients.types import ProductSort
+from utils.clients.base import BaseClient
+from utils.clients.types import ProductSort
 
 
 class RakutenClient(BaseClient):
@@ -123,6 +123,8 @@ if __name__ == '__main__':
 
     # Count of last categories: 13913
     rakuten = RakutenClient(app_id='1027393930619954222')
-    data = rakuten.product_search(genre_id="110729", keyword="クールーネックティアードTシャツマキシワンピ")
-    pprint(data)
+    pprint(rakuten.genres_search())
+
+    # data = rakuten.product_search(product_id='4589453011031')
+    # pprint(data)
 

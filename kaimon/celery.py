@@ -32,13 +32,12 @@ TRANSLATING_QUEUE_ROUTE = {'queue': 'translating', 'routing_key': 'translating'}
 # bind routing with queues
 app.conf.task_routes = {
     'users.tasks.*': MAILING_QUEUE_ROUTE,
-    'rakuten_scraping.tasks.parse_and_save_genres': RAKUTEN_REQUESTS_QUEUE_ROUTE,
-    'rakuten_scraping.tasks.parse_and_save_products': RAKUTEN_REQUESTS_QUEUE_ROUTE,
-    'rakuten_scraping.tasks.save_genre_from_search': ITEM_SAVING_QUEUE_ROUTE,
-    'rakuten_scraping.tasks.save_product_from_search': ITEM_SAVING_QUEUE_ROUTE,
-    'rakuten_scraping.tasks.update_product_after_scrape': ITEM_SAVING_QUEUE_ROUTE,
-    'rakuten_scraping.tasks.parse_products': BASE_DEFAULT_QUEUE_ROUTE,
-    'product.tasks.translate_to_fields': TRANSLATING_QUEUE_ROUTE,
-    'product.tasks.translate_genres': BASE_DEFAULT_QUEUE_ROUTE,
-    'product.tasks.deactivate_empty_genres': BASE_DEFAULT_QUEUE_ROUTE,
+    'rakuten_scraping.tasks.parse_genres': RAKUTEN_REQUESTS_QUEUE_ROUTE,
+    'rakuten_scraping.tasks.parse_items': RAKUTEN_REQUESTS_QUEUE_ROUTE,
+    'rakuten_scraping.tasks.save_genre': ITEM_SAVING_QUEUE_ROUTE,
+    'rakuten_scraping.tasks.save_items': ITEM_SAVING_QUEUE_ROUTE,
+    'rakuten_scraping.tasks.update_items': ITEM_SAVING_QUEUE_ROUTE,
+    # 'product.tasks.translate_to_fields': TRANSLATING_QUEUE_ROUTE,
+    # 'product.tasks.translate_genres': BASE_DEFAULT_QUEUE_ROUTE,
+    # 'product.tasks.deactivate_empty_genres': BASE_DEFAULT_QUEUE_ROUTE,
 }

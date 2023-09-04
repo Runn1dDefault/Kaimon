@@ -1,76 +1,19 @@
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
 from rest_framework import serializers
 
+from currencies.mixins import CurrencySerializerMixin
 from users.serializers import UserProfileSerializer
-from currency_conversion.mixins import CurrencySerializerMixin
 from utils.mixins import LangSerializerMixin
 
-from .models import Genre, Product, ProductDetail, GenreChild, ProductReview
+from .models import Genre, Product, ProductReview
 from .utils import round_half_integer
 
 
-class GenreChildSerializer(LangSerializerMixin, serializers.ModelSerializer):
-    id = serializers.SerializerMethodField(read_only=True)
-    name = serializers.SerializerMethodField(read_only=True)
-    level = serializers.SerializerMethodField(read_only=True)
-
-    class Meta:
-        model = GenreChild
-        fields = ('id', 'name', 'level')
-        translate_fields = ('name',)
-
-    def __init__(self, for_children: bool = False, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.for_children = for_children
-
-    def get_fk_field(self, instance):
-        if self.for_children:
-            return instance.child
-        return instance.parent
-
-    def valid_translate_instance(self, instance):
-        return self.get_fk_field(instance)
-
-    def get_id(self, instance):
-        return self.get_fk_field(instance).id
-
-    def get_name(self, instance):
-        return self.get_fk_field(instance).name
-
-    def get_level(self, instance):
-        return self.get_fk_field(instance).level
-
-
 class GenreSerializer(LangSerializerMixin, serializers.ModelSerializer):
-    children = serializers.SerializerMethodField(read_only=True)
-
     class Meta:
         model = Genre
-        fields = ('id', 'name', 'level', 'children')
+        fields = ('id', 'name', 'level')
         translate_fields = ('name',)
-
-    def get_children(self, instance):
-        include_children = self.context.get('include_children', True)
-        if include_children is False:
-            return []
-
-        all_children = instance.children.filter(
-            Q(child__deactivated__isnull=True) | Q(child__deactivated=False)
-        )
-
-        next_level_children = all_children.filter(child__level=instance.level + 1)
-        children = next_level_children
-        if not next_level_children.exists():
-            children = all_children
-        return GenreChildSerializer(instance=children, many=True, for_children=True, context=self.context).data
-
-
-class ProductDetailSerializer(LangSerializerMixin, serializers.ModelSerializer):
-    class Meta:
-        model = ProductDetail
-        fields = ('id', 'name', 'value')
-        translate_fields = ('name', 'value')
 
 
 class ProductReviewSerializer(LangSerializerMixin, serializers.ModelSerializer):
@@ -95,14 +38,15 @@ class ProductReviewSerializer(LangSerializerMixin, serializers.ModelSerializer):
         return getattr(product, translate_field, None) or product.name
 
 
-class ProductSerializer(CurrencySerializerMixin, LangSerializerMixin, serializers.ModelSerializer):
-    reviews_count = serializers.SerializerMethodField(read_only=True)
+class ProductListSerializer(CurrencySerializerMixin, LangSerializerMixin, serializers.ModelSerializer):
     avg_rank = serializers.SerializerMethodField(read_only=True)
-    discount_price = serializers.SerializerMethodField(read_only=True)
+    reviews_count = serializers.SerializerMethodField(read_only=True)
+    sale_price = serializers.SerializerMethodField(read_only=True)
+    image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'discount_price', 'image_url', 'avg_rank', 'reviews_count', 'count')
+        fields = ('name', 'price', 'sale_price', 'avg_rank', 'reviews_count', 'image_urls')
         translate_fields = ('name',)
         currency_convert_fields = ('price',)
 
@@ -116,7 +60,7 @@ class ProductSerializer(CurrencySerializerMixin, LangSerializerMixin, serializer
     def get_reviews_count(self, instance):
         return instance.reviews.filter(is_active=True).count()
 
-    def get_discount_price(self, instance):
+    def get_sale_price(self, instance):
         if instance.price <= 0:
             return None
 
@@ -136,12 +80,13 @@ class ProductSerializer(CurrencySerializerMixin, LangSerializerMixin, serializer
         return self.get_converted_price(discount_price)
 
 
-class ProductRetrieveSerializer(ProductSerializer):
-    details = ProductDetailSerializer(many=True)
+class ProductRetrieveSerializer(ProductListSerializer):
+    def __init__(self, *args, **kwargs):
+        kwargs['many'] = False
+        super().__init__(*args, **kwargs)
 
-    class Meta:
+    class Meta(ProductListSerializer.Meta):
         model = Product
-        fields = ('id', 'name', 'description', 'price', 'discount_price', 'image_url', 'brand_name',
-                  'avg_rank', 'reviews_count', 'count', 'details')
-        translate_fields = ('name', 'description', 'brand_name',)
-        currency_convert_fields = ('price',)
+        fields = ('id', 'name', 'price', 'description' 'sale_price', 'avg_rank', 'reviews_count', 'image_urls')
+        translate_fields = ('name', 'description',)
+

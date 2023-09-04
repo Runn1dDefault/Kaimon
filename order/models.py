@@ -57,7 +57,8 @@ class Order(BaseModel):
         success = 'success', _('Success')
 
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.pending)
-    delivery_address = models.ForeignKey(UserDeliveryAddress, on_delete=models.CASCADE, related_name='orders')
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='orders')
+    delivery_address = models.ForeignKey(UserDeliveryAddress, on_delete=models.RESTRICT, related_name='orders')
     is_deleted = models.BooleanField(default=False)
     is_payed = models.BooleanField(default=False)
 

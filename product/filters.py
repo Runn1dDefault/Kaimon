@@ -29,27 +29,6 @@ class GenreLevelFilter(BaseFilterBackend):
         return queryset.filter(**filter_kwargs)
 
 
-class ProductHasDetailAdminFilter(SimpleListFilter):
-    title = _('Has Details')
-    parameter_name = 'details'
-
-    def lookups(self, request, model_admin):
-        return [
-            ("yes", _("Yes")),
-            ("no", _("No"))
-        ]
-
-    def queryset(self, request, queryset):
-        base_queryset = queryset.annotate(details_count=Count('details'))
-        match self.value():
-            case "yes":
-                return base_queryset.filter(details_count__gt=0)
-            case "no":
-                return base_queryset.filter(details_count=0)
-            case _:
-                return queryset
-
-
 class ProductRankAdminFilter(SimpleListFilter):
     title = _('Rank')
     parameter_name = 'rank'

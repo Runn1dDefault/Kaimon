@@ -1,7 +1,7 @@
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics
 
-from currency_conversion.mixins import CurrencyMixin
+from currencies.mixins import CurrencyMixin
 from utils.mixins import LanguageMixin
 from utils.paginators import PagePagination
 from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM

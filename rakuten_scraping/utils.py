@@ -7,7 +7,7 @@ from typing import Any
 
 from product.models import Genre
 from rakuten_scraping.models import Oauth2Client
-from services.clients.rakuten import RakutenClient
+from utils.clients.rakuten import RakutenClient
 
 
 class RakutenRequest:
@@ -44,41 +44,32 @@ class RakutenRequest:
         self.close()
 
 
-def get_db_genre_by_data(data: dict[str, Any], fields: dict[str, str]):
+def build_genre_fields(data: dict[str, Any], fields: dict[str, str]):
     query = {}
     for db_field, rakuten_field in fields.items():
         query[db_field] = data[rakuten_field]
 
-    return Genre(**query)
+    return query
 
 
-def get_release_date_from_ja(ja_release_date: str):
-    release_date = None
-    date_format = None
-    if '年' in ja_release_date and '月' in ja_release_date:
-        date_format = "%Y年%m月"
-    if '日' in ja_release_date:
-        date_format = "%Y年%m月%d日"
-
-    if date_format:
-        release_date = datetime.strptime(ja_release_date, date_format).date()
-    return release_date
-
-
-def collect_product_fields(product_data: dict[str, Any]):
-    image_url = product_data.get('mediumImageUrl') or product_data.get('smallImageUrl')
-    release_date = get_release_date_from_ja(product_data['releaseDate'])
-
+def build_product_fields(item: dict[str, Any]):
+    asuraku_closing_time = (
+        datetime.strptime(item['asurakuClosingTime'], '%H:%M').time()
+        if item['asurakuClosingTime'] else None
+    )
     return dict(
-        number=product_data['productNo'],
-        name=product_data['productName'],
-        description=product_data['productCaption'],
-        brand_name=product_data['brandName'],
-        rank=product_data['rank'],
-        price=product_data['maxPrice'],
-        count=product_data['itemCount'],
-        image_url=image_url.split('?')[0] if image_url else None,
-        product_url=product_data['productUrlPC'],
-        release_date=release_date,
-        marker_code=product_data['makerCode'] or None
+        item_code=item['itemCode'],
+        name=item['itemName'],
+        description=item['itemCaption'],
+        catch_copy=item['catchcopy'],
+        price=item['itemPrice'],
+        product_url=item['itemUrl'],
+        availability=True if item['availability'] == 1 else False,
+        asuraku_area=item['asurakuArea'],
+        asuraku_closing_time=asuraku_closing_time,
+        shop_url=item.get('shopUrl'),
+        shop_name=item.get('shopName'),
+        shop_code=item.get('shopCode'),
+        affiliate_rate=item.get('affiliateRate', 0),
+        affiliate_url=item.get('affiliateUrl', ""),
     )

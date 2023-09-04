@@ -9,7 +9,6 @@ router.register('', OrderViewSet)
 
 
 urlpatterns = [
-    path('order/', include(router.urls)),
-    path('order/countries/', CountryListView.as_view(), name='order_countries'),
-    path('admin/', include('order.external_admin.urls'))
+    path('', include(router.urls)),
+    path('countries/', CountryListView.as_view(), name='order_countries')
 ]

@@ -11,7 +11,7 @@ class GenrePaseKeys(NamedTuple):
 
 
 class GenreParseSettings(NamedTuple):
-    PARSE_KEYS: GenrePaseKeys = GenrePaseKeys()
+    PARSE_KEYS: NamedTuple = GenrePaseKeys()
     CURRENT_KEY: str = 'current'
     PARENTS_KEY: str = 'parents'
     CHILDREN_KEY: str = 'children'

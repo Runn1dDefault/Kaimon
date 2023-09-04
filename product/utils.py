@@ -28,8 +28,7 @@ def get_genre_parents_tree(current_genre) -> list[int]:
 def get_last_children(current_genre) -> list[int]:
     last_children = []
 
-    for fk_child in current_genre.children.all():
-        child = fk_child.child
+    for child in current_genre.children.all():
         if not child.children.exists():
             last_children.append(child.id)
             continue

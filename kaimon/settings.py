@@ -32,6 +32,8 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",  # JS for testing
     "http://176.126.166.140:9010",
     "http://176.126.166.140",
+    "http://localhost:9010",
+
 ]
 # Application definition
 
@@ -54,8 +56,9 @@ INSTALLED_APPS = [
     'product',
     'rakuten_scraping',
     'order',
-    'currency_conversion',
-    'promotions'
+    'promotions',
+    'currencies',
+    'external_admin',
 ]
 
 MIDDLEWARE = [

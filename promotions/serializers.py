@@ -1,7 +1,7 @@
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
-from product.serializers import ProductSerializer
+from product.serializers import ProductListSerializer
 from utils.mixins import LangSerializerMixin
 
 from .models import Banner, Promotion
@@ -30,7 +30,7 @@ class PromotionSerializer(serializers.ModelSerializer):
 
 
 class PromotionDetailSerializer(PromotionSerializer):
-    product_serializer_class = ProductSerializer
+    product_serializer_class = ProductListSerializer
     products = serializers.SerializerMethodField(read_only=True)
 
     class Meta:

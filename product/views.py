@@ -7,7 +7,7 @@ from rest_framework import generics, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from currency_conversion.mixins import CurrencyMixin
+from currencies.mixins import CurrencyMixin
 from users.permissions import RegistrationPayedPermission
 from utils.mixins import LanguageMixin
 from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM
@@ -16,7 +16,7 @@ from utils.paginators import PagePagination
 from .filters import SearchFilterByLang, GenreProductsFilter, GenreLevelFilter
 from .models import Genre, Product
 from .paginators import GenrePagination
-from .serializers import ProductSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer
+from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer
 
 
 @api_view(['GET'])
@@ -73,7 +73,7 @@ class GenreProductsListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
     queryset = Genre.objects.filter(Q(deactivated__isnull=True) | Q(deactivated=False))
     filter_backends = [GenreProductsFilter]
     pagination_class = PagePagination
-    serializer_class = ProductSerializer
+    serializer_class = ProductListSerializer
 
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
@@ -87,7 +87,7 @@ class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView
 class SearchProductView(LanguageMixin, generics.ListAPIView):
     queryset = Product.objects.filter(is_active=True)
     pagination_class = PagePagination
-    serializer_class = ProductSerializer
+    serializer_class = ProductListSerializer
     filter_backends = [SearchFilterByLang]
     search_fields_ja = ['name', 'genres__name', 'brand_name']
     search_fields_ru = ['name_ru', 'genres__name_ru', 'brand_name_ru']
@@ -129,7 +129,7 @@ class ProductReviewView(generics.ListCreateAPIView):
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
 class NewProductsView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
     queryset = Product.objects.filter(is_active=True)
-    serializer_class = ProductSerializer
+    serializer_class = ProductListSerializer
     pagination_class = PagePagination
 
     def get_queryset(self):
@@ -140,5 +140,5 @@ class NewProductsView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
 class PopularProductsView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
     queryset = Product.objects.filter(is_active=True).popular_by_orders_qty()
-    serializer_class = ProductSerializer
+    serializer_class = ProductListSerializer
     pagination_class = PagePagination

@@ -78,7 +78,7 @@ class ProductReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer)
         validated_data['product'] = product
         validated_data['image_url'] = product.image_url
         validated_data['unit_price'] = product.price
-        validated_data['product_name'] = getattr(product, self.get_translate_field('name'), product.name)
+        validated_data['product_name'] = getattr(product, self.get_translate_field('name'), None) or ""
         return super().create(validated_data)
 
     def update(self, instance, validated_data):

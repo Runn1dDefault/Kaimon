@@ -18,6 +18,5 @@ urlpatterns = [
     path('product/search/', SearchProductView.as_view(), name='product_search'),
     re_path('^product/(?P<id>.+)/reviews/', ProductReviewView.as_view(), name='product_review_list'),
     path('product/new/', NewProductsView.as_view(), name='product_new_products_list'),
-    path('product/popular/', PopularProductsView.as_view(), name='product_popular_list'),
-    path('admin/', include('product.external_admin.urls')),
+    path('product/popular/', PopularProductsView.as_view(), name='product_popular_list')
 ]
