@@ -11,7 +11,7 @@ from utils.mixins import LanguageMixin
 from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM
 from utils.paginators import PagePagination
 
-from .filters import SearchFilterByLang, GenreProductsFilter, GenreLevelFilter, PopularProductOrdering
+from .filters import SearchFilterByLang, GenreLevelFilter, PopularProductOrdering
 from .models import Genre, Product
 from .paginators import GenrePagination
 from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer
@@ -23,7 +23,7 @@ def get_languages_view(request):
     return Response(settings.VERBOSE_LANGUAGES, status=status.HTTP_200_OK)
 
 
-# --------------------------------------------------- GENRE ------------------------------------------------------------
+# -------------------------------------------------- Genres ------------------------------------------------------------
 @extend_schema_view(
     get=extend_schema(
         parameters=[
@@ -74,17 +74,18 @@ class GenreParentsView(LanguageMixin, generics.ListAPIView):
         return Response(serializer.data)
 
 
+# ------------------------------------------------ Products ------------------------------------------------------------
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
-class GenreProductsView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
-    lookup_field = 'id'
-    queryset = Genre.objects.filter(deactivated=False)
-    filter_backends = [GenreProductsFilter, filters.OrderingFilter, PopularProductOrdering]
+class ProductsListByGenreView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
+    lookup_field = 'genres__id'
+    lookup_url_kwarg = 'id'
+    queryset = Product.objects.filter(is_active=True)
+    filter_backends = [filters.OrderingFilter, PopularProductOrdering]
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
     ordering_fields = ['created_at', 'price']
 
 
-# ------------------------------------------------- PRODUCT ------------------------------------------------------------
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
 class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView):
     lookup_field = 'id'
@@ -106,6 +107,7 @@ class SearchProductView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
     search_fields_kz = ['name_kz', 'genres__name_kz', 'tags__name_kz']
 
 
+# ------------------------------------------------- Reviews ------------------------------------------------------------
 class ProductReviewCreateView(generics.CreateAPIView):
     serializer_class = ProductReviewSerializer
     permission_classes = [RegistrationPayedPermission]
