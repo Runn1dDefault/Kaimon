@@ -19,9 +19,9 @@ def round_half_integer(number):
 
 def get_genre_parents_tree(current_genre) -> list[int]:
     collected_parents = [current_genre.id]
-    for fk_parent in current_genre.parents.all():
-        collected_parents.extend(get_genre_parents_tree(fk_parent.parent))
-
+    if not current_genre.parent:
+        return collected_parents
+    collected_parents.extend(get_genre_parents_tree(current_genre.parent))
     return collected_parents
 
 

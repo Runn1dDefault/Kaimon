@@ -45,18 +45,17 @@ class ProductAdmin(admin.ModelAdmin):
     fieldsets = (
         (
             _('General Info'),
-            {'fields': ('code', 'name', 'description', 'price', 'count')}
+            {'fields': ('code', 'name', 'description', 'price',)}
         ),
-        (_('Dates'), {'classes': ['collapse'], 'fields': ('release_date', 'created_at', 'modified_at')}),
+        (_('Dates'), {'classes': ['collapse'], 'fields': ('created_at', 'modified_at')}),
         (_('Control'), {'fields': ('is_active',)}),
-        (_('Links'), {'classes': ['collapse'], 'fields': ('image_url', 'product_url')}),
+        (_('Links'), {'classes': ['collapse'], 'fields': ('product_url',)}),
         (
             _('Another language fields'),
             {
                 'classes': ['collapse'],
                 'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'description_tr', 'description_ru',
-                           'description_en', 'description_ky', 'description_kz', 'brand_name_tr',
-                           'brand_name_ru', 'brand_name_en', 'brand_name_ky', 'brand_name_kz')
+                           'description_en', 'description_ky', 'description_kz',)
             }
         )
     )

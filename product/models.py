@@ -40,8 +40,7 @@ class Tag(models.Model):
 
 class Product(models.Model):
     objects = ProductQuerySet.as_manager()
-
-    code = models.CharField(max_length=255, unique=True)
+    id = models.CharField(max_length=255, primary_key=True)
     # Product Info
     name = models.CharField(max_length=255, verbose_name=_('Name') + '[ja]')
     description = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ja]')

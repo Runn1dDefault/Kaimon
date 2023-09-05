@@ -34,9 +34,13 @@ app.conf.task_routes = {
     'users.tasks.*': MAILING_QUEUE_ROUTE,
     'rakuten_scraping.tasks.parse_genres': RAKUTEN_REQUESTS_QUEUE_ROUTE,
     'rakuten_scraping.tasks.parse_items': RAKUTEN_REQUESTS_QUEUE_ROUTE,
+    'rakuten_scraping.tasks.parse_tags_for_product': RAKUTEN_REQUESTS_QUEUE_ROUTE,
     'rakuten_scraping.tasks.save_genre': ITEM_SAVING_QUEUE_ROUTE,
     'rakuten_scraping.tasks.save_items': ITEM_SAVING_QUEUE_ROUTE,
     'rakuten_scraping.tasks.update_items': ITEM_SAVING_QUEUE_ROUTE,
+    'rakuten_scraping.tasks.save_tags': ITEM_SAVING_QUEUE_ROUTE,
+    'rakuten_scraping.tasks.save_tags_for_product': ITEM_SAVING_QUEUE_ROUTE,
+
     # 'product.tasks.translate_to_fields': TRANSLATING_QUEUE_ROUTE,
     # 'product.tasks.translate_genres': BASE_DEFAULT_QUEUE_ROUTE,
     # 'product.tasks.deactivate_empty_genres': BASE_DEFAULT_QUEUE_ROUTE,

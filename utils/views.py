@@ -1,4 +1,4 @@
-from rest_framework import views, parsers, status
+from rest_framework import views, generics, parsers, status
 from rest_framework.response import Response
 
 

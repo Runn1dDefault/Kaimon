@@ -1,11 +1,9 @@
 import random
 import time
-from datetime import datetime
 
 import numpy as np
 from typing import Any
 
-from product.models import Genre
 from rakuten_scraping.models import Oauth2Client
 from utils.clients.rakuten import RakutenClient
 
@@ -48,28 +46,15 @@ def build_genre_fields(data: dict[str, Any], fields: dict[str, str]):
     query = {}
     for db_field, rakuten_field in fields.items():
         query[db_field] = data[rakuten_field]
-
     return query
 
 
 def build_product_fields(item: dict[str, Any]):
-    asuraku_closing_time = (
-        datetime.strptime(item['asurakuClosingTime'], '%H:%M').time()
-        if item['asurakuClosingTime'] else None
-    )
     return dict(
-        item_code=item['itemCode'],
+        id=item['itemCode'],
         name=item['itemName'],
         description=item['itemCaption'],
-        catch_copy=item['catchcopy'],
         price=item['itemPrice'],
         product_url=item['itemUrl'],
-        availability=True if item['availability'] == 1 else False,
-        asuraku_area=item['asurakuArea'],
-        asuraku_closing_time=asuraku_closing_time,
-        shop_url=item.get('shopUrl'),
-        shop_name=item.get('shopName'),
-        shop_code=item.get('shopCode'),
-        affiliate_rate=item.get('affiliateRate', 0),
-        affiliate_url=item.get('affiliateUrl', ""),
+        availability=True if item['availability'] == 1 else False
     )
