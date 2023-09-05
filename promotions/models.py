@@ -1,10 +1,9 @@
 from django.core.validators import MaxValueValidator
 from django.db import models
-from django.db.models import Count
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from product.models import Product
+from promotions.querysets import PromotionQueryset
 
 
 class Banner(models.Model):
@@ -30,16 +29,6 @@ class Banner(models.Model):
         return self.name
 
 
-class PromotionQueryset(models.QuerySet):
-    def all_with_products(self):
-        return self.annotate(products_count=Count('products', filter=models.Q(products__is_active=True)))\
-                   .filter(products_count__gt=0)
-
-    def active_promotions(self):
-        today = timezone.now()
-        return self.all_with_products().filter(start_date__lte=today, end_date__gt=today)
-
-
 class Promotion(models.Model):
     objects = PromotionQueryset.as_manager()
 
@@ -50,8 +39,9 @@ class Promotion(models.Model):
         related_name="promotions",
         related_query_name="promotion"
     )
-    start_date = models.DateField()
-    end_date = models.DateField()
+    deactivated = models.BooleanField(default=False)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
