@@ -160,9 +160,9 @@ def save_items(items: list[dict[str, Any]], genre_id: int):
         new_products.append(product)
 
         item_images = item['mediumImageUrls'] or item['smallImageUrls']
-        images = [ProductImageUrl(url=url, product_id=item_code) for url in item_images]
-        if images:
-            product_images.extend(images)
+        image_urls = list(map(lambda url: Product(product_id=item_code, url=url.split('?')[0]), item_images))
+        if image_urls:
+            product_images.extend(image_urls)
 
     if new_products:
         products = Product.objects.bulk_create(new_products)
