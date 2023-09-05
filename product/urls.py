@@ -13,13 +13,12 @@ urlpatterns = [
     # Genres
     path('genres/', GenreListView.as_view(), name='product_genre_list'),
     re_path('^genres/(?P<id>.+)/children/$', GenreChildrenView.as_view(), name='product_genre_children_list'),
-    re_path('^genres/(?P<id>.+)/parents/$', GenreParentsView.as_view(), name='product_genre_children_list'),
-    # Products
-    re_path('^genres/(?P<id>.+)/products/$', ProductsListByGenreView.as_view(), name='product_list'),
-    re_path('^/(?P<id>.+)/$', ProductRetrieveView.as_view(), name='product_retrieve'),
-    path('search/', SearchProductView.as_view(), name='product_search'),
+    re_path('^genres/(?P<id>.+)/parents/$', GenreParentsView.as_view(), name='product_genre_parents_list'),
     # Reviews
     path('review/', ProductReviewCreateView.as_view(), name='product_review_create'),
     re_path('^(?P<id>.+)/reviews/', ProductReviewListView.as_view(), name='product_review_list'),
-
+    # Products
+    re_path('^genres/(?P<id>.+)/products/$', ProductsListByGenreView.as_view(), name='product_list'),
+    path('search/', SearchProductView.as_view(), name='product_search'),
+    re_path('^(?P<id>.+)/$', ProductRetrieveView.as_view(), name='product_detail'),
 ]
