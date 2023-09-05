@@ -9,7 +9,7 @@ class PromotionQueryset(models.QuerySet):
 
     def active_promotions(self):
         today = timezone.now()
-        return self.with_active_products_qty().filter(products_count__gt=0, deactivated=False).filter(
+        return self.filter(deactivated=False).filter(
             models.Q(start_date__lte=today, end_date__gt=today) |
             models.Q(start_date__isnull=True) |
             models.Q(end_date__isnull=True)
