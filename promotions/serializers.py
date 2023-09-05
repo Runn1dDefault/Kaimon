@@ -17,10 +17,15 @@ class BannerSerializer(LangSerializerMixin, serializers.ModelSerializer):
 class PromotionSerializer(serializers.ModelSerializer):
     banner = BannerSerializer(many=False, read_only=True)
     discount = serializers.SerializerMethodField(read_only=True)
+    products_count = serializers.SerializerMethodField(read_only=True)
+
+    def __init__(self, *args, **kwargs):
+        kwargs['many'] = True
+        super().__init__(*args, **kwargs)
 
     class Meta:
         model = Promotion
-        fields = ('id', 'banner', 'discount', 'created_at')
+        fields = ('id', 'banner', 'discount', 'created_at', 'start_date', 'end_date', 'products_count')
 
     def get_discount(self, instance):
         try:
@@ -28,18 +33,6 @@ class PromotionSerializer(serializers.ModelSerializer):
         except ObjectDoesNotExist:
             return None
 
+    def get_products_count(self, instance) -> int:
+        return instance.products.filter(is_active=True).count()
 
-class PromotionDetailSerializer(PromotionSerializer):
-    product_serializer_class = ProductListSerializer
-    products = serializers.SerializerMethodField(read_only=True)
-
-    class Meta:
-        model = Promotion
-        fields = ('id', 'banner', 'discount', 'created_at', 'start_date', 'end_date', 'products')
-
-    def get_products(self, instance):
-        return self.product_serializer_class(
-            instance=instance.products.filter(is_active=True),
-            many=True,
-            context=self.context
-        ).data
