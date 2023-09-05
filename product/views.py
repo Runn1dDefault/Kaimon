@@ -117,7 +117,6 @@ class ProductReviewListView(generics.ListAPIView):
     lookup_field = 'id'
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductReviewSerializer
-    permission_classes = [RegistrationPayedPermission]
     pagination_class = PagePagination
 
     def list(self, request, *args, **kwargs):
