@@ -1,5 +1,5 @@
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import QuerySet, F, Count
+from django.db.models import QuerySet, F, Count, Avg, Q
 from django.db.models.functions import JSONObject
 
 
@@ -28,7 +28,8 @@ class GenreQuerySet(QuerySet):
 
 
 class ProductQuerySet(QuerySet):
-    def popular_by_orders_qty(self):
+    def order_by_popular(self):
         return self.annotate(
+            avg_rank=Avg('reviews__rank', filter=Q(reviews__is_active=True)),
             receipts_qty=Count('receipts__order_id', distinct=True)
-        ).filter(receipts_qty__gt=0).order_by('-receipts_qty')
+        ).order_by('receipts_qty', 'avg_rank')

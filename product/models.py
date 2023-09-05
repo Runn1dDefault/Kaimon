@@ -24,7 +24,7 @@ class Genre(models.Model):
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, related_name='children', null=True)
 
     def __str__(self):
-        return f'{self.id}{self.name}'
+        return str(self.id)
 
 
 class Tag(models.Model):

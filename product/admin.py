@@ -37,18 +37,20 @@ class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductImageInline]
     list_display = ('id', 'name', 'price', 'is_active', 'availability', 'created_at')
     list_display_links = ('id', 'name')
-    search_fields = ('id', 'code', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz',
-                     'tag__name', 'tag__name_ru', 'tag__name_en', 'tag__name_ky', 'tag__name_kz', 'tag__name_tr')
+    search_fields = ('id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz',
+                     'tags__name', 'tags__name_ru', 'tags__name_en', 'tags__name_ky', 'tags__name_kz', 'tags__name_tr',
+                     'genres__name', 'genres__name_ru', 'genres__name_en', 'genres__name_tr', 'genres__name_ky',
+                     'genres__name_kz')
     search_help_text = _('Search by fields: ID, Rakuten ID, NAME, GENRE NAME')
     list_filter = (ProductRankAdminFilter, 'is_active', 'created_at', 'modified_at')
-    readonly_fields = ('created_at', 'modified_at')
+    readonly_fields = ('created_at', 'modified_at', 'tags', 'genres')
     fieldsets = (
         (
             _('General Info'),
-            {'fields': ('code', 'name', 'description', 'price',)}
+            {'fields': ('id', 'name', 'description', 'price',)}
         ),
         (_('Dates'), {'classes': ['collapse'], 'fields': ('created_at', 'modified_at')}),
-        (_('Control'), {'fields': ('is_active',)}),
+        (_('Control'), {'fields': ('is_active', 'tags', 'genres')}),
         (_('Links'), {'classes': ['collapse'], 'fields': ('product_url',)}),
         (
             _('Another language fields'),

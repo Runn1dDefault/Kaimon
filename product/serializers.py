@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
@@ -46,7 +48,7 @@ class ProductListSerializer(CurrencySerializerMixin, LangSerializerMixin, serial
 
     class Meta:
         model = Product
-        fields = ('name', 'price', 'sale_price', 'avg_rank', 'reviews_count', 'image_urls')
+        fields = ('id', 'name', 'price', 'sale_price', 'avg_rank', 'reviews_count', 'image_urls', 'created_at')
         translate_fields = ('name',)
         currency_convert_fields = ('price',)
 
@@ -87,6 +89,6 @@ class ProductRetrieveSerializer(ProductListSerializer):
 
     class Meta(ProductListSerializer.Meta):
         model = Product
-        fields = ('id', 'name', 'price', 'description' 'sale_price', 'avg_rank', 'reviews_count', 'image_urls')
+        fields = ('id', 'name', 'price', 'description', 'sale_price', 'avg_rank', 'reviews_count', 'image_urls')
         translate_fields = ('name', 'description',)
 

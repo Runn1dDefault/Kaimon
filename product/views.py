@@ -1,9 +1,7 @@
 from django.conf import settings
-from django.db.models import Q
-from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter, extend_schema_view
-from rest_framework import generics, status, viewsets
+from rest_framework import generics, status, filters
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
@@ -13,10 +11,11 @@ from utils.mixins import LanguageMixin
 from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM
 from utils.paginators import PagePagination
 
-from .filters import SearchFilterByLang, GenreProductsFilter, GenreLevelFilter
+from .filters import SearchFilterByLang, GenreProductsFilter, GenreLevelFilter, PopularProductOrdering
 from .models import Genre, Product
 from .paginators import GenrePagination
 from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer
+from .utils import get_genre_parents_tree
 
 
 @api_view(['GET'])
@@ -24,58 +23,68 @@ def get_languages_view(request):
     return Response(settings.VERBOSE_LANGUAGES, status=status.HTTP_200_OK)
 
 
-class GenreReadViewSet(LanguageMixin, viewsets.ReadOnlyModelViewSet):
-    queryset = Genre.objects.filter(Q(deactivated__isnull=True) | Q(deactivated=False))
+# --------------------------------------------------- GENRE ------------------------------------------------------------
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[
+            OpenApiParameter(name='level', type=OpenApiTypes.INT, required=False, default=1),
+            LANGUAGE_QUERY_SCHEMA_PARAM
+        ]
+    )
+)
+class GenreListView(LanguageMixin, generics.ListAPIView):
+    queryset = Genre.objects.filter(deactivated=False)
     filter_backends = [GenreLevelFilter]
     pagination_class = GenrePagination
     serializer_class = GenreSerializer
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        include_children = self.request.query_params.get('include_children')
-        if not include_children:
-            context['include_children'] = True
-            return context
-        if isinstance(include_children, str):
-            match include_children.lower():
-                case 'false':
-                    context['include_children'] = False
-                case 'true':
-                    context['include_children'] = True
-        elif isinstance(include_children, bool):
-            context['include_children'] = include_children
-        return context
 
-    @extend_schema(
-        parameters=[
-            OpenApiParameter(name='level', type=OpenApiTypes.INT, required=False, default=1),
-            OpenApiParameter(name='include_children', type=OpenApiTypes.BOOL, required=False, default=False),
-            LANGUAGE_QUERY_SCHEMA_PARAM
-        ]
-    )
+@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
+class GenreChildrenView(LanguageMixin, generics.ListAPIView):
+    lookup_field = 'id'
+    queryset = Genre.objects.filter(deactivated=False)
+    serializer_class = GenreSerializer
+
     def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+        children = self.filter_queryset(self.get_object().children.filter(deactivated=False))
+        page = self.paginate_queryset(children)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
 
-    @extend_schema(
-        parameters=[
-            OpenApiParameter(name='level', type=OpenApiTypes.INT, required=False, default=1),
-            OpenApiParameter(name='include_children', type=OpenApiTypes.BOOL, required=False, default=False),
-            LANGUAGE_QUERY_SCHEMA_PARAM
-        ]
-    )
-    def retrieve(self, request, *args, **kwargs):
-        return super().retrieve(request, *args, **kwargs)
+        serializer = self.get_serializer(children, many=True)
+        return Response(serializer.data)
+
+
+@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
+class GenreParentsView(LanguageMixin, generics.ListAPIView):
+    lookup_field = 'id'
+    queryset = Genre.objects.filter(deactivated=False)
+    serializer_class = GenreSerializer
+
+    def list(self, request, *args, **kwargs):
+        parents_queryset = self.get_queryset().exclude(level=0).filter(id__in=get_genre_parents_tree(self.get_object()))
+        parents = self.filter_queryset(parents_queryset)
+        page = self.paginate_queryset(parents)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(parents, many=True)
+        return Response(serializer.data)
 
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
-class GenreProductsListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
+class GenreProductsView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
     lookup_field = 'id'
-    queryset = Genre.objects.filter(Q(deactivated__isnull=True) | Q(deactivated=False))
-    filter_backends = [GenreProductsFilter]
+    queryset = Genre.objects.filter(deactivated=False)
+    filter_backends = [GenreProductsFilter, filters.OrderingFilter, PopularProductOrdering]
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
+    ordering_fields = ['created_at', 'price']
 
 
+# ------------------------------------------------- PRODUCT ------------------------------------------------------------
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
 class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView):
     lookup_field = 'id'
@@ -84,34 +93,30 @@ class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView
 
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
-class SearchProductView(LanguageMixin, generics.ListAPIView):
+class SearchProductView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
     queryset = Product.objects.filter(is_active=True)
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
     filter_backends = [SearchFilterByLang]
-    search_fields_ja = ['name', 'genres__name', 'brand_name']
-    search_fields_ru = ['name_ru', 'genres__name_ru', 'brand_name_ru']
-    search_fields_en = ['name_en', 'genres__name_en', 'brand_name_en']
-    search_fields_tr = ['name_tr', 'genres__name_tr', 'brand_name_tr']
-    search_fields_ky = ['name_ky', 'genres__name_ky', 'brand_name_ky']
-    search_fields_kz = ['name_kz', 'genres__name_kz', 'brand_name_kz']
+    search_fields_ja = ['name', 'genres__name', 'tags__name']
+    search_fields_ru = ['name_ru', 'genres__name_ru', 'tags__name_ru']
+    search_fields_en = ['name_en', 'genres__name_en', 'tags__name_en']
+    search_fields_tr = ['name_tr', 'genres__name_tr', 'tags__name_tr']
+    search_fields_ky = ['name_ky', 'genres__name_ky', 'tags__name_ky']
+    search_fields_kz = ['name_kz', 'genres__name_kz', 'tags__name_kz']
 
 
-class ProductReviewView(generics.ListCreateAPIView):
+class ProductReviewCreateView(generics.CreateAPIView):
+    serializer_class = ProductReviewSerializer
+    permission_classes = [RegistrationPayedPermission]
+
+
+class ProductReviewListView(generics.ListAPIView):
     lookup_field = 'id'
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductReviewSerializer
     permission_classes = [RegistrationPayedPermission]
     pagination_class = PagePagination
-
-    def create(self, request, *args, **kwargs):
-        product = self.get_object()
-        data = {'product': product.id, **request.data}
-        serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     def list(self, request, *args, **kwargs):
         product = self.get_object()
@@ -124,21 +129,3 @@ class ProductReviewView(generics.ListCreateAPIView):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
-
-
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
-class NewProductsView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
-    queryset = Product.objects.filter(is_active=True)
-    serializer_class = ProductListSerializer
-    pagination_class = PagePagination
-
-    def get_queryset(self):
-        ten_days_ago = (timezone.now() - timezone.timedelta(days=10)).date()
-        return super().get_queryset().filter(Q(created_at__date__gte=ten_days_ago) | Q(release_date__gte=ten_days_ago))
-
-
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
-class PopularProductsView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
-    queryset = Product.objects.filter(is_active=True).popular_by_orders_qty()
-    serializer_class = ProductListSerializer
-    pagination_class = PagePagination

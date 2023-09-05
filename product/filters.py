@@ -1,10 +1,45 @@
 from django.contrib.admin import SimpleListFilter
 from django.db.models import Avg, Q, Count
+from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 from rest_framework.filters import SearchFilter, BaseFilterBackend
 from rest_framework.generics import get_object_or_404
 
+from product.querysets import ProductQuerySet
 from utils.mixins import LanguageMixin
+
+
+class PopularProductOrdering(BaseFilterBackend):
+    popular_param = 'popular'
+    popular_description = _("Ordering by popular (enabled when equal to 1)")
+
+    def get_popular_param(self, request, view):
+        return request.query_params.get(self.popular_param, '0')
+
+    def ordering_included(self, request, view) -> bool:
+        popular_param = self.get_popular_param(request, view)
+        if popular_param == '1':
+            return True
+        return False
+
+    def filter_queryset(self, request, queryset, view):
+        if self.ordering_included(request, view):
+            assert isinstance(queryset, ProductQuerySet)
+            return queryset.order_by_popular()
+        return queryset
+
+    def get_schema_operation_parameters(self, view):
+        return [
+            {
+                'name': self.popular_param,
+                'required': False,
+                'in': 'query',
+                'description': force_str(self.popular_description),
+                'schema': {
+                    'type': 'number',
+                },
+            },
+        ]
 
 
 class SearchFilterByLang(SearchFilter):
