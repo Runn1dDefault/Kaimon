@@ -3,7 +3,7 @@ from typing import Any
 from django.core.exceptions import ObjectDoesNotExist
 
 from kaimon.celery import app
-from product.models import Genre, Product, Tag, ProductImageUrl
+from product.models import Genre, Product, Tag, ProductImageUrl, TagGroup
 from product.utils import get_genre_parents_tree, get_last_children
 
 from .settings import app_settings
@@ -66,53 +66,6 @@ def save_tags(tags: list[dict]):
 
 
 @app.task()
-def save_tags_for_product(product_id: int, new_tags: list[dict[str, Any]], exists_tag_ids: list[int] = None):
-    product = Product.objects.get(id=product_id)
-    save = False
-    if exists_tag_ids:
-        product.tags.add(*exists_tag_ids)
-        save = True
-
-    new_tags = [
-        Tag(
-            id=tag['tagGroups'][0]['tags'][0]['tagId'],
-            name=tag['tagGroups'][0]['tags'][0]['tagName']
-        )
-        for tag in new_tags
-    ]
-    if new_tags:
-        tags = Tag.objects.bulk_create(new_tags)
-        product.tags.add(*tags)
-        save = True
-
-    if save is True:
-        product.save()
-
-
-@app.task()
-def parse_tags_for_product(product_id: int, tags_ids: list[int]):
-    db_tag_ids = Tag.objects.filter(id__in=tags_ids).values_list('id', flat=True)
-    new_tags = []
-    exists_tag_ids = []
-
-    for tag_id in tags_ids:
-        if tag_id in db_tag_ids:
-            exists_tag_ids.append(tag_id)
-            continue
-
-        with RakutenRequest(delay=app_settings.DELAY) as rakuten:
-            tag_data = rakuten.client.tag_search(tag_id)
-            new_tags.append(tag_data)
-
-    if new_tags:
-        save_tags_for_product.delay(
-            product_id=product_id,
-            new_tags=new_tags,
-            exists_tag_ids=exists_tag_ids or None
-        )
-
-
-@app.task()
 def update_items(items: list[dict[str, Any]]):
     updated_products = []
     update_fields = set()
@@ -140,11 +93,67 @@ def update_items(items: list[dict[str, Any]]):
 
 
 @app.task()
-def save_items(items: list[dict[str, Any]], genre_id: int):
+def save_tags_from_groups(tag_groups: list[dict[str, Any]]):
+    db_group_ids = list(TagGroup.objects.values_list('id', flat=True))
+    db_tag_ids = list(Tag.objects.values_list('id', flat=True))
+    new_tags, collected_tag_ids = [], []
+    new_groups, collected_group_ids = [], []
+
+    for group in tag_groups:
+        group_id = group['tagGroupId']
+        if group_id not in db_group_ids and group_id not in collected_group_ids:
+            new_groups.append(TagGroup(id=group_id, name=group['tagGroupName']))
+            collected_group_ids.append(group_id)
+
+        for tag in group['tags'] or []:
+            tag_id = tag['tagId']
+            if tag_id in collected_tag_ids:
+                continue
+
+            if tag_id not in db_tag_ids:
+                new_db_tag = Tag(id=tag_id, name=tag['tagName'], group_id=group_id)
+                new_tags.append(new_db_tag)
+            collected_tag_ids.append(tag_id)
+
+    if new_groups:
+        TagGroup.objects.bulk_create(new_groups)
+
+    if new_tags:
+        Tag.objects.bulk_create(new_tags)
+
+
+@app.task()
+def update_or_create_tag(tag_data: dict[str, Any]):
+    group = tag_data['tagGroups'][0]
+    db_group = TagGroup.objects.get_or_create(id=group['tagGroupId'], name=group['tagGroupName'])
+    tag = group['tags'][0]
+    db_tag, _ = Tag.objects.get_or_create(id=tag['tagId'])
+    if db_tag.group is None or db_tag.group.id != db_group.id:
+        db_tag.group = db_group
+    db_tag.name = tag['tagName']
+    db_tag.save()
+
+
+@app.task()
+def parse_and_update_tag(tag_id: int):
+    with RakutenRequest(delay=app_settings.DELAY) as rakuten:
+        tag_data = rakuten.client.tag_search(tag_id)
+    update_or_create_tag.delay(tag_data)
+
+
+@app.task()
+def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict[str, Any]] = None):
+    if tag_groups:
+        save_tags_from_groups(tag_groups)
+
     db_product_ids = list(Product.objects.values_list('id', flat=True))
-    genres_ids = list(set(get_genre_parents_tree(Genre.objects.get(id=genre_id))))
+    db_tag_ids = list(Tag.objects.values_list('id', flat=True))
+    db_genres_ids = list(set(get_genre_parents_tree(Genre.objects.get(id=genre_id))))
+
     to_update_items = []
     new_products, product_images = [], []
+    new_tags, new_tag_ids = [], []
+
     product_tags = {}
 
     for item in items:
@@ -154,23 +163,37 @@ def save_items(items: list[dict[str, Any]], genre_id: int):
             to_update_items.append(item)
             continue
 
-        tags = item['tagIds']
-        product_tags[item_code] = tags
+        tag_ids = item['tagIds']
+        if tag_ids:
+            for tag_id in tag_ids:
+                if tag_id not in db_tag_ids and tag_id not in new_tag_ids:
+                    new_tags.append(Tag(id=tag_id, name='in_scraping'))
+                    new_tag_ids.append(tag_id)
+
+            product_tags[item_code] = tag_ids
+
         product = Product(**build_product_fields(item))
         new_products.append(product)
 
         item_images = item['mediumImageUrls'] or item['smallImageUrls']
-        image_urls = list(map(lambda url: Product(product_id=item_code, url=url.split('?')[0]), item_images))
+        image_urls = list(map(lambda url: ProductImageUrl(product_id=item_code, url=url.split('?')[0]), item_images))
         if image_urls:
             product_images.extend(image_urls)
 
+    if new_tags:
+        Tag.objects.bulk_create(new_tags)
+
+        for tag in new_tags:
+            parse_and_update_tag.delay(tag.id)
+
     if new_products:
         products = Product.objects.bulk_create(new_products)
+
         for product in products:
-            product.genres.add(*genres_ids)
+            product.genres.add(*db_genres_ids)
+            if product.id in product_tags:
+                product.tags.add(*product_tags[product.id])
             product.save()
-            tags = product_tags.get(product.id)
-            parse_tags_for_product.delay(product_id=product.id, tags_ids=tags)
 
     if product_images:
         ProductImageUrl.objects.bulk_create(product_images)
@@ -184,11 +207,7 @@ def parse_items(genre_id: int, parse_all: bool = False, page: int = None):
     with RakutenRequest(delay=app_settings.DELAY) as rakuten:
         search_items_data = rakuten.client.item_search(genre_id=genre_id, page=page)
 
-    tag_groups = search_items_data.get('TagInformation')
-    for tag_group in tag_groups or []:
-        save_tags.delay(tag_group['tags'])
-
-    save_items.delay(search_items_data['Items'], genre_id)
+    save_items.delay(search_items_data['Items'], genre_id, tag_groups=search_items_data.get('TagInformation'))
 
     for page_num in range(2, search_items_data['pageCount']) if parse_all else []:
         parse_items.delay(genre_id=genre_id, page=page_num)
