@@ -27,8 +27,8 @@ class ProductImageInline(admin.TabularInline):
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
-    search_fields = ('id', 'name',)
+    list_display = ('id', 'name', 'group')
+    search_fields = ('id', 'name', 'group__name', 'group__id')
     list_filter = ('created_at',)
 
 

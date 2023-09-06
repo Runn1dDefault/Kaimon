@@ -27,7 +27,7 @@ class Genre(models.Model):
         return str(self.id)
 
 
-class Tag(models.Model):
+class BaseTagModel(models.Model):
     id = models.BigIntegerField(primary_key=True)
     name = models.CharField(max_length=255)
     name_tr = models.CharField(max_length=500, blank=True, null=True, verbose_name=_('Name') + '[tr]')
@@ -36,6 +36,23 @@ class Tag(models.Model):
     name_ky = models.CharField(max_length=500, blank=True, null=True, verbose_name=_('Name') + '[ky]')
     name_kz = models.CharField(max_length=500, blank=True, null=True, verbose_name=_('Name') + '[kz]')
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        abstract = True
+
+
+class TagGroup(BaseTagModel):
+    def __str__(self):
+        return f'Tag-group-{self.id}-{self.name}'
+
+
+class Tag(BaseTagModel):
+    group = models.ForeignKey(TagGroup, on_delete=models.CASCADE, related_name='tags', null=True, blank=True)
+
+    def __str__(self):
+        if self.group:
+            return f'#{self.group.name}-{self.id}-{self.name}'
+        return f'#{self.id}-{self.name}'
 
 
 class Product(models.Model):

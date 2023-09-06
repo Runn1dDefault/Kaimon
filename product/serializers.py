@@ -1,11 +1,12 @@
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
 from rest_framework import serializers
 
 from currencies.mixins import CurrencySerializerMixin
 from users.serializers import UserProfileSerializer
 from utils.mixins import LangSerializerMixin
 
-from .models import Genre, Product, ProductReview
+from .models import Genre, Product, ProductReview, TagGroup, Tag
 from .utils import round_half_integer
 
 
@@ -81,7 +82,34 @@ class ProductListSerializer(CurrencySerializerMixin, LangSerializerMixin, serial
         return self.get_converted_price(discount_price)
 
 
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ('id', 'name')
+
+
+class TagByGroupSerializer(serializers.ModelSerializer):
+    tags = serializers.SerializerMethodField(read_only=True)
+
+    def __init__(self, tag_ids: list[int] = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tag_ids = tag_ids
+
+    class Meta:
+        model = TagGroup
+        fields = ('id', 'name', 'tags')
+
+    def get_tags(self, instance):
+        if self.tag_ids:
+            queryset = instance.tags.filter(id__in=self.tag_ids)
+        else:
+            queryset = instance.tags.all()
+        return TagSerializer(instance=queryset, many=True).data
+
+
 class ProductRetrieveSerializer(ProductListSerializer):
+    tags_info = serializers.SerializerMethodField(read_only=True)
+
     def __init__(self, *args, **kwargs):
         kwargs['many'] = False
         super().__init__(*args, **kwargs)
@@ -89,6 +117,13 @@ class ProductRetrieveSerializer(ProductListSerializer):
     class Meta(ProductListSerializer.Meta):
         model = Product
         fields = ('id', 'name', 'price', 'description', 'sale_price', 'availability', 'avg_rank', 'reviews_count',
-                  'image_urls')
+                  'image_urls', 'tags_info')
         translate_fields = ('name', 'description',)
 
+    def get_tags_info(self, instance):
+        if not instance.tags.exists():
+            return
+        group_ids = list(instance.tags.all().order_by('group_id').distinct('group_id').values_list('group_id', flat=True))
+        tag_ids = list(instance.tags.values_list('id', flat=True))
+        groups_queryset = TagGroup.objects.filter(id__in=group_ids)
+        return TagByGroupSerializer(tag_ids=tag_ids, instance=groups_queryset, many=True).data
