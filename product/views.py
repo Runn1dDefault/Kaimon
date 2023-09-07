@@ -11,7 +11,7 @@ from utils.mixins import LanguageMixin
 from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM
 from utils.paginators import PagePagination
 
-from .filters import SearchFilterByLang, GenreLevelFilter, PopularProductOrdering
+from .filters import SearchFilterByLang, GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter
 from .models import Genre, Product
 from .paginators import GenrePagination
 from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer
@@ -44,6 +44,7 @@ class GenreChildrenView(LanguageMixin, generics.ListAPIView):
     lookup_field = 'id'
     queryset = Genre.objects.filter(deactivated=False)
     serializer_class = GenreSerializer
+    pagination_class = None
 
     def list(self, request, *args, **kwargs):
         children = self.filter_queryset(self.get_object().children.filter(deactivated=False))
@@ -79,12 +80,14 @@ class GenreParentsView(LanguageMixin, generics.ListAPIView):
 class ProductsListByGenreView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
     lookup_field = 'genres__id'
     lookup_url_kwarg = 'id'
-    queryset = Product.objects.filter(is_active=True)
-    filter_backends = [filters.OrderingFilter, PopularProductOrdering]
+    queryset = Product.objects.filter(is_active=True, availability=True)
+    filter_backends = [PopularProductOrdering, filters.OrderingFilter]  # TODO: add FilterByTag
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
     ordering_fields = ['created_at', 'price']
 
+
+# TODO: add view to getting Tags By Genre
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
 class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView):
@@ -95,7 +98,7 @@ class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
 class SearchProductView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
-    queryset = Product.objects.filter(is_active=True)
+    queryset = Product.objects.filter(is_active=True, availability=True)
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
     filter_backends = [SearchFilterByLang]
@@ -130,3 +133,12 @@ class ProductReviewListView(generics.ListAPIView):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+
+# -------------------------------------------- Recommendations ---------------------------------------------------------
+@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
+class ReferenceListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
+    queryset = Product.objects.filter(is_active=True, availability=True)
+    filter_backends = [ProductReferenceFilter]
+    serializer_class = ProductListSerializer
+    pagination_class = PagePagination

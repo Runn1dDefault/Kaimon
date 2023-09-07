@@ -82,6 +82,7 @@ class Product(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
+    reference_rank = models.IntegerField(null=True, blank=True)
 
     # translating fields
     name_tr = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[tr]')
@@ -105,7 +106,7 @@ class ProductImageUrl(models.Model):
 
 
 class ProductReview(models.Model):
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='product_reviews')
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='reviews')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
     rank = models.FloatField(validators=[MinValueValidator(0), MaxValueValidator(5)], default=0)
     comment = models.TextField(blank=True, null=True)

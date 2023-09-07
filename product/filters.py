@@ -1,12 +1,65 @@
 from django.contrib.admin import SimpleListFilter
-from django.db.models import Avg, Q, Count
+from django.db.models import Avg, Q, F, Sum, Count, Case, When, Value, IntegerField
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 from rest_framework.filters import SearchFilter, BaseFilterBackend
 from rest_framework.generics import get_object_or_404
 
-from product.querysets import ProductQuerySet
 from utils.mixins import LanguageMixin
+
+from .querysets import ProductQuerySet
+
+
+class ProductReferenceFilter(BaseFilterBackend):
+    min_filter_qty = 1
+    reference_qty = 10
+    exclude_genre_levels = [0, 1]
+    product_id_param = 'product_id'
+    product_id_description = _('Recommendations by product meta')
+
+    @staticmethod
+    def filter_by_purchases_count(queryset, min_count: int = 0) -> ProductQuerySet:
+        return queryset.annotate(
+            purchases_count=Sum('receipts__purchases_count', output_field=IntegerField())
+        ).filter(purchases_count__gt=min_count)
+
+    @staticmethod
+    def filter_by_reviews_count(queryset, min_count: int = 0) -> ProductQuerySet:
+        return queryset.annotate(reviews_count=Count('reviews__id')).filter(reviews_count__gt=min_count)
+
+    def filter_queryset(self, request, queryset, view):
+        product_id = request.query_params.get('product_id')
+        if product_id:
+            # recommendations by product instance genres and tags
+            product = get_object_or_404(queryset, id=product_id)
+            genre_ids = product.genres.exclude(level__in=self.exclude_genre_levels).values_list('id', flat=True)
+            tag_ids = product.tags.values_list('id', flat=True)
+            return queryset.exclude(id=product_id).filter(Q(genres__id__in=genre_ids) | Q(tags__id__in=tag_ids))
+        # recommendations by products purchases and reviews
+        by_purchases_filtered = self.filter_by_purchases_count(queryset, min_count=self.min_filter_qty)
+        by_reviews_filtered = self.filter_by_reviews_count(queryset, min_count=self.min_filter_qty)
+        purchases_product_ids = list(by_purchases_filtered.values_list('id', flat=True))
+        reviewed_product_ids = list(by_reviews_filtered.values_list('id', flat=True))
+        reference_product_ids = purchases_product_ids + reviewed_product_ids
+        return queryset.annotate(
+            in_reference=Case(
+                When(id__in=reference_product_ids, then=Value(True)),
+                When(~Q(id__in=reference_product_ids), then=Value(False))
+            )
+        ).order_by('in_reference', F('reference_rank').desc(nulls_last=True))
+
+    def get_schema_operation_parameters(self, view):
+        return [
+            {
+                'name': self.product_id_param,
+                'required': False,
+                'in': 'query',
+                'description': force_str(self.product_id_description),
+                'schema': {
+                    'type': 'string',
+                },
+            },
+        ]
 
 
 class PopularProductOrdering(BaseFilterBackend):
