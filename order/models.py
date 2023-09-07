@@ -3,7 +3,8 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from product.models import Product
+from product.models import Product, Tag
+from users.utils import get_sentinel_user
 
 
 class BaseModel(models.Model):
@@ -31,12 +32,16 @@ class Country(BaseModel):
 
 
 class UserDeliveryAddress(BaseModel):
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='delivery_addresses')
-    country = models.ForeignKey(Country, on_delete=models.CASCADE, related_name='delivery_addresses')
+    user = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.SET(get_sentinel_user),
+        related_name='delivery_addresses'
+    )
+    country = models.ForeignKey(Country, on_delete=models.PROTECT, related_name='delivery_addresses')
     city = models.CharField(max_length=255)
     address = models.TextField()
     phone = models.CharField(max_length=15)
-    zip_code = models.CharField(max_length=50, blank=True, null=True)
+    zip_code = models.CharField(max_length=50)
 
     is_deleted = models.BooleanField(default=False)
 
@@ -56,16 +61,19 @@ class Order(BaseModel):
         delivered = 'delivered', _('Delivered')
         success = 'success', _('Success')
 
+    # for correct analytics, the value of conversions for two currencies with yen will be saved here
+    yen_to_usd = models.FloatField()
+    yen_to_som = models.FloatField()
+
+    delivery_address = models.ForeignKey(UserDeliveryAddress, on_delete=models.PROTECT, related_name='orders')
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.pending)
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='orders')
-    delivery_address = models.ForeignKey(UserDeliveryAddress, on_delete=models.RESTRICT, related_name='orders')
+    shipping_weight = models.BigIntegerField(verbose_name=_('Shipping weight'))
+
+    comment = models.TextField(null=True, blank=True)
+    disclaimer_comment = models.TextField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
-    is_payed = models.BooleanField(default=False)
 
     def delete_receipts(self):
-        if self.status == self.Status.pending:
-            return
-
         receipts = self.receipts.filter(is_canceled=False)
         for receipt in receipts:
             receipt.is_canceled = True
@@ -75,13 +83,15 @@ class Order(BaseModel):
 
 
 class ProductReceipt(BaseModel):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='receipts')
-    product = models.ForeignKey(Product, on_delete=models.SET_NULL, related_name='receipts', blank=True, null=True)
-    p_id = models.BigIntegerField()
-    product_name = models.CharField(max_length=500)
-    image_url = models.TextField(blank=True, null=True)
+    order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name='receipts')
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='receipts')
+    # product tags of client choice will be saved in field tags,
+    # for a better understanding of what the client wants to order
+    tags = models.ManyToManyField(
+        Tag,
+        blank=True,
+        related_name='receipts'
+    )
     unit_price = models.FloatField()
-    total_qty = models.PositiveIntegerField(validators=[MinValueValidator(1)])
-    qty = models.PositiveIntegerField(validators=[MinValueValidator(0)])
-    returns = models.PositiveIntegerField(default=0)
-    is_canceled = models.BooleanField(default=False)
+    discount = models.FloatField(null=True)
+    purchases_count = models.PositiveIntegerField(validators=[MinValueValidator(1)])
