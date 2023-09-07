@@ -82,29 +82,32 @@ class ProductListSerializer(CurrencySerializerMixin, LangSerializerMixin, serial
         return self.get_converted_price(discount_price)
 
 
-class TagSerializer(serializers.ModelSerializer):
+class TagSerializer(LangSerializerMixin, serializers.ModelSerializer):
     class Meta:
         model = Tag
         fields = ('id', 'name')
+        translate_fields = ('name',)
 
 
-class TagByGroupSerializer(serializers.ModelSerializer):
+class TagByGroupSerializer(LangSerializerMixin, serializers.ModelSerializer):
     tags = serializers.SerializerMethodField(read_only=True)
 
-    def __init__(self, tag_ids: list[int] = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, instance=None, data=None, tag_ids: list[int] = None, **kwargs):
+        super().__init__(instance=instance, data=data, **kwargs)
         self.tag_ids = tag_ids
 
     class Meta:
         model = TagGroup
         fields = ('id', 'name', 'tags')
+        translate_fields = ('name',)
 
     def get_tags(self, instance):
         if self.tag_ids:
+            print(self.tag_ids)
             queryset = instance.tags.filter(id__in=self.tag_ids)
         else:
             queryset = instance.tags.all()
-        return TagSerializer(instance=queryset, many=True).data
+        return TagSerializer(instance=queryset, many=True, context=self.context).data
 
 
 class ProductRetrieveSerializer(ProductListSerializer):
@@ -123,7 +126,8 @@ class ProductRetrieveSerializer(ProductListSerializer):
     def get_tags_info(self, instance):
         if not instance.tags.exists():
             return
-        group_ids = list(instance.tags.all().order_by('group_id').distinct('group_id').values_list('group_id', flat=True))
+        group_ids = list(
+            instance.tags.all().order_by('group_id').distinct('group_id').values_list('group_id', flat=True))
         tag_ids = list(instance.tags.values_list('id', flat=True))
         groups_queryset = TagGroup.objects.filter(id__in=group_ids)
         return TagByGroupSerializer(tag_ids=tag_ids, instance=groups_queryset, many=True).data

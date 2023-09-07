@@ -11,10 +11,11 @@ from utils.mixins import LanguageMixin
 from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM
 from utils.paginators import PagePagination
 
-from .filters import SearchFilterByLang, GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter
-from .models import Genre, Product
+from .filters import SearchFilterByLang, GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter, FilterByTag
+from .models import Genre, Product, TagGroup
 from .paginators import GenrePagination
-from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer
+from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer, \
+    TagByGroupSerializer
 from .utils import get_genre_parents_tree
 
 
@@ -81,13 +82,20 @@ class ProductsListByGenreView(CurrencyMixin, LanguageMixin, generics.ListAPIView
     lookup_field = 'genres__id'
     lookup_url_kwarg = 'id'
     queryset = Product.objects.filter(is_active=True, availability=True)
-    filter_backends = [PopularProductOrdering, filters.OrderingFilter]  # TODO: add FilterByTag
+    filter_backends = [PopularProductOrdering, filters.OrderingFilter, FilterByTag]
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
     ordering_fields = ['created_at', 'price']
 
 
-# TODO: add view to getting Tags By Genre
+@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
+class TagByGenreListView(LanguageMixin, generics.ListAPIView):
+    lookup_field = 'tags__product_set__genres__id'
+    lookup_url_kwarg = 'id'
+    queryset = TagGroup.objects.groups_with_tags()
+    serializer_class = TagByGroupSerializer
+    pagination_class = None
+
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
 class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView):

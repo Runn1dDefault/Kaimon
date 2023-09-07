@@ -10,6 +10,30 @@ from utils.mixins import LanguageMixin
 from .querysets import ProductQuerySet
 
 
+class FilterByTag(BaseFilterBackend):
+    param = 'tag_id'
+    description = _('Filter by tag id')
+
+    def filter_queryset(self, request, queryset, view):
+        tag_id = request.query_params.get(self.param)
+        if tag_id:
+            return queryset.filter(tags__id__in=[tag_id])
+        return queryset
+
+    def get_schema_operation_parameters(self, view):
+        return [
+            {
+                'name': self.param,
+                'required': False,
+                'in': 'query',
+                'description': force_str(self.description),
+                'schema': {
+                    'type': 'integer',
+                },
+            },
+        ]
+
+
 class ProductReferenceFilter(BaseFilterBackend):
     min_filter_qty = 1
     reference_qty = 10
@@ -28,7 +52,7 @@ class ProductReferenceFilter(BaseFilterBackend):
         return queryset.annotate(reviews_count=Count('reviews__id')).filter(reviews_count__gt=min_count)
 
     def filter_queryset(self, request, queryset, view):
-        product_id = request.query_params.get('product_id')
+        product_id = request.query_params.get(self.product_id_param)
         if product_id:
             # recommendations by product instance genres and tags
             product = get_object_or_404(queryset, id=product_id)

@@ -3,7 +3,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from product.querysets import GenreQuerySet, ProductQuerySet
+from product.querysets import GenreQuerySet, ProductQuerySet, TagQuerySet
 from product.utils import round_half_integer
 
 
@@ -42,6 +42,8 @@ class BaseTagModel(models.Model):
 
 
 class TagGroup(BaseTagModel):
+    objects = TagQuerySet.as_manager()
+
     def __str__(self):
         return f'Tag-group-{self.id}-{self.name}'
 

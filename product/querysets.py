@@ -3,6 +3,11 @@ from django.db.models import QuerySet, F, Count, Avg, Q
 from django.db.models.functions import JSONObject
 
 
+class TagQuerySet(QuerySet):
+    def groups_with_tags(self):
+        return self.annotate(tags_qty=Count('tags__id')).filter(tags_qty__gt=0)
+
+
 class GenreQuerySet(QuerySet):
     def genre_info_with_relations(self, name_field: str = 'name'):
         return self.values(

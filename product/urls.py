@@ -2,7 +2,7 @@ from django.urls import path, re_path
 
 from .views import (
     get_languages_view,
-    GenreListView, GenreChildrenView, GenreParentsView,
+    GenreListView, GenreChildrenView, GenreParentsView, TagByGenreListView,
     ProductsListByGenreView, SearchProductView, ProductRetrieveView,
     ProductReviewCreateView, ProductReviewListView,
     ReferenceListView,
@@ -12,6 +12,7 @@ genres_urlpatterns = [
     path('genres/', GenreListView.as_view(), name='product_genre_list'),
     re_path('^genres/(?P<id>.+)/children/$', GenreChildrenView.as_view(), name='product_genre_children_list'),
     re_path('^genres/(?P<id>.+)/parents/$', GenreParentsView.as_view(), name='product_genre_parents_list'),
+    re_path('^genres/(?P<id>.+)/tags/$', TagByGenreListView.as_view(), name='product_genre_tags_list'),
 ]
 
 reviews_urlpatterns = [
