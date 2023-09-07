@@ -7,7 +7,7 @@ from rest_framework import serializers
 from currencies.models import Conversion
 from product.models import Product
 from promotions.models import Banner, Promotion, Discount
-from promotions.serializers import PromotionDetailSerializer
+from promotions.serializers import PromotionSerializer
 from order.models import Order
 from order.serializers import ProductReceiptSerializer
 from users.models import User
@@ -76,7 +76,7 @@ class BannerAdminSerializer(serializers.ModelSerializer):
                   'description_ru', 'description_en', 'description_ky', 'description_kz', 'description_tr', 'image')
 
 
-class PromotionAdminSerializer(PromotionDetailSerializer):
+class PromotionAdminSerializer(PromotionSerializer):
     banner = BannerAdminSerializer(many=False)
 
 
