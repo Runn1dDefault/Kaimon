@@ -4,7 +4,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from product.querysets import GenreQuerySet, ProductQuerySet, TagQuerySet
-from product.utils import round_half_integer
+from product.utils import round_half_integer, internal_product_id_generation
 
 
 class Genre(models.Model):
@@ -59,7 +59,7 @@ class Tag(BaseTagModel):
 
 class Product(models.Model):
     objects = ProductQuerySet.as_manager()
-    id = models.CharField(max_length=255, primary_key=True)
+    id = models.CharField(max_length=255, primary_key=True, default=internal_product_id_generation)
     # Product Info
     name = models.CharField(max_length=255, verbose_name=_('Name') + '[ja]')
     description = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ja]')
@@ -73,13 +73,13 @@ class Product(models.Model):
         Genre,
         blank=True,
         related_name="product_set",
-        related_query_name="product",
+        related_query_name="products",
     )
     tags = models.ManyToManyField(
         Tag,
         blank=True,
         related_name='product_set',
-        related_query_name='product'
+        related_query_name='products'
     )
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)

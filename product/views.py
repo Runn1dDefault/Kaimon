@@ -7,6 +7,7 @@ from rest_framework.response import Response
 
 from currencies.mixins import CurrencyMixin
 from users.permissions import RegistrationPayedPermission
+from utils.filters import FilterByLookup
 from utils.mixins import LanguageMixin
 from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM
 from utils.paginators import PagePagination
@@ -82,7 +83,7 @@ class ProductsListByGenreView(CurrencyMixin, LanguageMixin, generics.ListAPIView
     lookup_field = 'genres__id'
     lookup_url_kwarg = 'id'
     queryset = Product.objects.filter(is_active=True, availability=True)
-    filter_backends = [PopularProductOrdering, filters.OrderingFilter, FilterByTag]
+    filter_backends = [FilterByLookup, PopularProductOrdering, filters.OrderingFilter, FilterByTag]
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
     ordering_fields = ['created_at', 'price']
@@ -90,9 +91,10 @@ class ProductsListByGenreView(CurrencyMixin, LanguageMixin, generics.ListAPIView
 
 @extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
 class TagByGenreListView(LanguageMixin, generics.ListAPIView):
-    lookup_field = 'tags__product_set__genres__id'
+    lookup_field = 'tags__products__genres__id'
     lookup_url_kwarg = 'id'
     queryset = TagGroup.objects.groups_with_tags()
+    filter_backends = [FilterByLookup]
     serializer_class = TagByGroupSerializer
     pagination_class = None
 

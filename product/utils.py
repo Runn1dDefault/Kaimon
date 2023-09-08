@@ -1,6 +1,10 @@
+import uuid
+
 from django.conf import settings
-from django.utils.translation import gettext_lazy as _
-from rest_framework.exceptions import ParseError
+
+
+def internal_product_id_generation():
+    return 'internal:' + str(uuid.uuid4())
 
 
 def round_half_integer(number):

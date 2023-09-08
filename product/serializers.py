@@ -1,5 +1,4 @@
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
 from rest_framework import serializers
 
 from currencies.mixins import CurrencySerializerMixin
@@ -44,13 +43,18 @@ class ProductListSerializer(CurrencySerializerMixin, LangSerializerMixin, serial
     reviews_count = serializers.SerializerMethodField(read_only=True)
     sale_price = serializers.SerializerMethodField(read_only=True)
     image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
+    genre = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'image_urls',
-                  'created_at')
-        translate_fields = ('name',)
-        currency_convert_fields = ('price',)
+        # list type is mutable so that you can expand
+        fields = ['id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'image_urls',
+                  'created_at', 'genre']
+        translate_fields = ['name']
+        currency_convert_fields = ['price']
+
+    def get_genre(self, instance):
+        return instance.genres.all().order_by('-level').first().id
 
     def get_avg_rank(self, instance):
         reviews = instance.reviews.filter(is_active=True)
@@ -118,10 +122,8 @@ class ProductRetrieveSerializer(ProductListSerializer):
         super().__init__(*args, **kwargs)
 
     class Meta(ProductListSerializer.Meta):
-        model = Product
-        fields = ('id', 'name', 'price', 'description', 'sale_price', 'availability', 'avg_rank', 'reviews_count',
-                  'image_urls', 'tags_info')
-        translate_fields = ('name', 'description',)
+        fields = ProductListSerializer.Meta.fields + ['description', 'tags_info']
+        translate_fields = ProductListSerializer.Meta.translate_fields + ['description']
 
     def get_tags_info(self, instance):
         if not instance.tags.exists():
@@ -130,4 +132,4 @@ class ProductRetrieveSerializer(ProductListSerializer):
             instance.tags.all().order_by('group_id').distinct('group_id').values_list('group_id', flat=True))
         tag_ids = list(instance.tags.values_list('id', flat=True))
         groups_queryset = TagGroup.objects.filter(id__in=group_ids)
-        return TagByGroupSerializer(tag_ids=tag_ids, instance=groups_queryset, many=True).data
+        return TagByGroupSerializer(tag_ids=tag_ids, instance=groups_queryset, many=True, context=self.context).data
