@@ -46,9 +46,11 @@ class ProductListSerializer(CurrencySerializerMixin, LangSerializerMixin, serial
         currency_convert_fields = ('price',)
 
     def get_sale_price(self, instance):
-        if self.get_currency() == 'yen':
+        currency = self.get_currency()
+        if currency == 'yen':
             return instance.sale_price
-        return self.get_converted_price(instance.sale_price)
+        if instance.sale_price:
+            return self.get_converted_price(instance.sale_price, currency)
 
 
 class TagSerializer(LangSerializerMixin, serializers.ModelSerializer):
@@ -72,7 +74,6 @@ class TagByGroupSerializer(LangSerializerMixin, serializers.ModelSerializer):
 
     def get_tags(self, instance):
         if self.tag_ids:
-            print(self.tag_ids)
             queryset = instance.tags.filter(id__in=self.tag_ids)
         else:
             queryset = instance.tags.all()
