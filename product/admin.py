@@ -49,15 +49,15 @@ class ProductAdmin(admin.ModelAdmin):
                      'genres__name', 'genres__name_ru', 'genres__name_en', 'genres__name_tr', 'genres__name_ky',
                      'genres__name_kz')
     search_help_text = _('Search by fields: ID, Rakuten ID, NAME, GENRE NAME')
-    list_filter = (ProductRankAdminFilter, 'is_active', 'created_at', 'modified_at')
+    list_filter = (ProductRankAdminFilter, 'is_active', 'created_at', 'modified_at', 'reference_rank')
     readonly_fields = ('id', 'created_at', 'modified_at', 'tags', 'genres')
     fieldsets = (
         (
             _('General Info'),
-            {'fields': ('id', 'name', 'description', 'price',)}
+            {'fields': ('id', 'name', 'description', 'price', 'tags', 'genres')}
         ),
         (_('Dates'), {'classes': ['collapse'], 'fields': ('created_at', 'modified_at')}),
-        (_('Control'), {'fields': ('is_active', 'tags', 'genres')}),
+        (_('Control'), {'fields': ('is_active', 'reference_rank')}),
         (_('Links'), {'classes': ['collapse'], 'fields': ('product_url',)}),
         (
             _('Another language fields'),
@@ -78,4 +78,4 @@ class ProductReview(admin.ModelAdmin):
     list_display_links = ('id', 'product', 'user')
     search_fields = ('id', 'product_id', 'user__email')
     list_filter = ('is_active', 'created_at')
-    readonly_fields = ('created_at', 'modified_at')
+    readonly_fields = ('created_at', 'modified_at', 'product')
