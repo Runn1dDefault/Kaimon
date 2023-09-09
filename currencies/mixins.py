@@ -17,15 +17,16 @@ class CurrencySerializerMixin:
     def get_currency(self) -> str:
         return self.context.get('currency', 'yen')
 
-    def get_conversation_instance(self) -> Conversion | None:
-        return Conversion.objects.filter(currency_to=self.get_currency()).order_by('created_at').first()
+    @staticmethod
+    def get_conversation_instance(currency: str) -> Conversion | None:
+        return Conversion.objects.filter(currency_to=currency).order_by('created_at').first()
 
     def get_convert_fields(self) -> list[str]:
         meta = getattr(self, 'Meta', None)
         return getattr(meta, 'currency_convert_fields', [])
 
-    def get_converted_price(self, price):
-        conversation_instance = self.get_conversation_instance()
+    def get_converted_price(self, price, currency: str):
+        conversation_instance = self.get_conversation_instance(currency)
         if not conversation_instance:
             return None
         return conversation_instance.calc_price(price)
@@ -36,5 +37,5 @@ class CurrencySerializerMixin:
             value = representation.get(field, None)
             if not value or self.get_currency() == 'yen':
                 continue
-            representation[field] = self.get_converted_price(value)
+            representation[field] = self.get_converted_price(value, self.get_currency())
         return representation

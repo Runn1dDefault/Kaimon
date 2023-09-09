@@ -1,10 +1,13 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from product.querysets import GenreQuerySet, ProductQuerySet, TagQuerySet
-from product.utils import round_half_integer, internal_product_id_generation
+from utils.helpers import round_half_integer
+
+from .querysets import GenreQuerySet, ProductQuerySet, TagQuerySet
+from .utils import internal_product_id_generation
 
 
 class Genre(models.Model):
@@ -97,6 +100,44 @@ class Product(models.Model):
     description_en = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[en]')
     description_ky = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ky]')
     description_kz = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[kz]')
+
+    @property
+    def avg_rank(self) -> float:
+        reviews = self.reviews.filter(is_active=True)
+        if reviews.exists():
+            ranks = list(reviews.values_list('rank', flat=True))
+            return sum(ranks) / len(ranks)
+        return 0.0
+
+    @property
+    def genre(self):
+        return self.genres.all().order_by('-level').first()
+
+    @property
+    def genre_id(self):
+        if self.genre:
+            return self.genre.id
+
+    @property
+    def reviews_count(self) -> int:
+        return self.reviews.filter(is_active=True).count()
+
+    @property
+    def sale_price(self) -> float | None:
+        if not self.availability or self.price <= 0:
+            return None
+
+        promotion = self.promotions.active_promotions().first()
+        if not promotion:
+            return None
+
+        try:
+            discount = promotion.discount
+        except ObjectDoesNotExist:
+            # in the future here can be changed, when new promotion logic will be added
+            return None
+
+        return discount.calc_price(self.price)
 
 
 class ProductImageUrl(models.Model):

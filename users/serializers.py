@@ -80,7 +80,7 @@ class RestoreSerializer(serializers.Serializer):
     def _get_user_by_email(email):
         user = User.objects.filter(email=email).first()
         if not user:
-            raise serializers.ValidationError({'detail': _('User with email %s not exist!') % email})
+            raise serializers.ValidationError({'email': _('User with email %s not exist!') % email})
         return user
 
     def create_token(self, user_id: int, code):
@@ -96,7 +96,7 @@ class RestoreSerializer(serializers.Serializer):
         try:
             code = self.RESTORE_CODE_CLASS.for_user(user_id=user_id, raise_on_exist=raise_on_exist)
         except RestoreCodeExist as e:
-            raise serializers.ValidationError({'detail': _(str(e))})
+            raise serializers.ValidationError({'code': _(str(e))})
         else:
             return code
 
@@ -108,7 +108,7 @@ class RestoreSerializer(serializers.Serializer):
 
         if not code and not send_new_code:
             raise serializers.ValidationError(
-                {'detail': _('When send_new_code is false code field become required!')}
+                {'send_new_code': _('When send_new_code is false code field become required!')}
             )
         if code:
             token = self.create_token(user_id=user.id, code=code)

@@ -49,3 +49,7 @@ class User(AbstractUser):
     @property
     def is_client(self) -> bool:
         return self.role == self.Role.CLIENT
+
+    @property
+    def is_developer(self) -> bool:
+        return self.role == self.Role.DEVELOPER

@@ -7,20 +7,6 @@ def internal_product_id_generation():
     return 'internal:' + str(uuid.uuid4())
 
 
-def round_half_integer(number):
-    integer_part = int(number)
-    decimal_part = number - integer_part
-
-    if decimal_part < 0.3:
-        rounded_decimal_part = 0
-    elif decimal_part < 0.6:
-        rounded_decimal_part = 0.5
-    else:
-        rounded_decimal_part = 1.0
-
-    return integer_part + rounded_decimal_part
-
-
 def get_genre_parents_tree(current_genre) -> list[int]:
     collected_parents = [current_genre.id]
     if not current_genre.parent:

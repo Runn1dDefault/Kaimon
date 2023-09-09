@@ -1,73 +1,96 @@
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema_view, extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import generics, mixins, viewsets, permissions, status, filters, parsers
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
 from currencies.models import Conversion
-from product.filters import SearchFilterByLang
+from product.filters import PopularProductOrdering
 from product.models import Product, ProductReview, Genre, Tag
-from product.serializers import ProductReviewSerializer, GenreSerializer, TagSerializer
 from promotions.models import Promotion
 from users.models import User
+from users.permissions import IsDirectorPermission, IsStaffUser
 from order.models import Order
-from utils.filters import FilterByFields
+from utils.filters import FilterByFields, DateRangeFilter
 from utils.mixins import LanguageMixin
 from utils.paginators import PagePagination
-from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM
 from .paginators import UserListPagination
 
 from .serializers import ConversionAdminSerializer, PromotionAdminSerializer, \
     ProductAdminSerializer, ProductDetailAdminSerializer, OrderAdminSerializer, \
-    ProductImageAdminSerializer, UserAdminSerializer
+    ProductImageAdminSerializer, UserAdminSerializer, GenreAdminSerializer, TagAdminSerializer, \
+    ProductReviewAdminSerializer
 
 
-class AdminViewMixin:
+class DirectorViewMixin:
     pass
-    # permission_classes = (permissions.IsAuthenticated, permissions.IsAdminUser,)
+    # permission_classes = (permissions.IsAuthenticated, IsDirectorPermission,)
+
+
+class StaffViewMixin:
+    pass
+    # permission_classes = (permissions.IsAuthenticated, IsStaffUser,)
 
 
 # ---------------------------------------------- Users -----------------------------------------------------------------
-class UserAdminView(AdminViewMixin, viewsets.ReadOnlyModelViewSet):
-    queryset = User.objects.exclude(role=User.Role.DEVELOPER)
+class UserAdminView(DirectorViewMixin, viewsets.ReadOnlyModelViewSet):
+    queryset = User.objects.filter(role=User.Role.CLIENT)
     pagination_class = UserListPagination
     serializer_class = UserAdminSerializer
-    filter_backends = [SearchFilter]
+    filter_backends = [SearchFilter, DateRangeFilter]
     search_fields = ['email', 'full_name', 'id']
+    start_field = 'date_joined__date'
+    start_param = 'start_date'
+    end_field = 'date_joined__date'
+    end_param = 'end_date'
 
     @action(methods=['GET'], detail=True)
-    def block_or_unblock_user(self):
+    def block_or_unblock_user(self, request, **kwargs):
         user = self.get_object()
         user.is_active = not user.is_active
         user.save()
         return Response(status=status.HTTP_202_ACCEPTED)
 
 
-# --------------------------------------------- Product ----------------------------------------------------------------
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
-class ProductListAdminView(AdminViewMixin, LanguageMixin, generics.ListAPIView):
-    queryset = Product.objects.all()
-    serializer_class = ProductAdminSerializer
+# ------------------------------------------------ Genre ---------------------------------------------------------------
+class GenreSearchAdminView(StaffViewMixin, generics.ListAPIView):
+    queryset = Genre.objects.all()
+    serializer_class = GenreAdminSerializer
     pagination_class = PagePagination
-    filter_backends = [SearchFilterByLang, filters.OrderingFilter]
-    search_fields_ja = ['name', 'genres__name', 'tags__name']
-    search_fields_ru = ['name_ru', 'genres__name_ru', 'tags__name_ru']
-    search_fields_en = ['name_en', 'genres__name_en', 'tags__name_en']
-    search_fields_tr = ['name_tr', 'genres__name_tr', 'tags__name_tr']
-    search_fields_ky = ['name_ky', 'genres__name_ky', 'tags__name_ky']
-    search_fields_kz = ['name_kz', 'genres__name_kz', 'tags__name_kz']
-    ordering_fields = ['created_at', 'price', 'name', 'id', 'is_active']
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz']
 
 
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
-class ProductAdminViewSet(AdminViewMixin, mixins.RetrieveModelMixin, mixins.CreateModelMixin, mixins.UpdateModelMixin,
-                          mixins.DestroyModelMixin, LanguageMixin, viewsets.GenericViewSet):
+# -------------------------------------------------- Tag ---------------------------------------------------------------
+class TagSearchAdminView(StaffViewMixin, generics.ListAPIView):
+    queryset = Tag.objects.all()
+    pagination_class = PagePagination
+    serializer_class = TagAdminSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz']
+
+
+# ----------------------------------------------- Product --------------------------------------------------------------
+class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     lookup_url_kwarg = 'product_id'
     lookup_field = 'id'
     queryset = Product.objects.all()
     serializer_class = ProductDetailAdminSerializer
+    list_serializer_class = ProductAdminSerializer
     pagination_class = PagePagination
+    parser_classes = (parsers.JSONParser,)
+    filter_backends = [filters.SearchFilter, PopularProductOrdering, filters.OrderingFilter]
+    search_fields_ja = ['name', 'genres__name', 'tags__name', 'name_ru', 'genres__name_ru', 'tags__name_ru', 'name_en',
+                        'genres__name_en', 'tags__name_en', 'name_tr', 'genres__name_tr', 'tags__name_tr', 'name_ky',
+                        'genres__name_ky', 'tags__name_ky', 'name_kz', 'genres__name_kz', 'tags__name_kz']
+    ordering_fields = ['created_at', 'price', 'name', 'id', 'is_active']
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET' and self.detail is False:
+            return self.list_serializer_class or self.serializer_class
+        return self.serializer_class
 
     def destroy(self, request, *args, **kwargs):
         product = self.get_object()
@@ -85,7 +108,7 @@ class ProductAdminViewSet(AdminViewMixin, mixins.RetrieveModelMixin, mixins.Crea
     @action(
         methods=['DELETE'],
         detail=True,
-        url_path=r'^remove-image/(?P<image_id>.+)'
+        url_path=r'remove-image/(?P<image_id>.+)'
     )
     def remove_image(self, request, **kwargs):
         product = self.get_object()
@@ -114,7 +137,7 @@ class ProductAdminViewSet(AdminViewMixin, mixins.RetrieveModelMixin, mixins.Crea
     @action(
         methods=['DELETE'],
         detail=True,
-        url_path=r'^remove-tag/(?P<tag_id>.+)'
+        url_path=r'remove-tag/(?P<tag_id>.+)'
     )
     def remove_tag(self, request, **kwargs):
         self.get_object().tags.remove(self.kwargs['tag_id'])
@@ -124,7 +147,7 @@ class ProductAdminViewSet(AdminViewMixin, mixins.RetrieveModelMixin, mixins.Crea
     @action(
         methods=['GET'],
         detail=True,
-        url_path=r'^add-tag/(?P<tag_id>.+)'
+        url_path=r'add-tag/(?P<tag_id>.+)'
     )
     def add_tag(self, request, **kwargs):
         tag_id = self.kwargs['tag_id']
@@ -136,38 +159,22 @@ class ProductAdminViewSet(AdminViewMixin, mixins.RetrieveModelMixin, mixins.Crea
         return Response(status=status.HTTP_202_ACCEPTED)
 
 
-# ------------------------------------------------ Genre ---------------------------------------------------------------
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
-class GenreSearchAdminView(AdminViewMixin, LanguageMixin, generics.ListAPIView):
-    queryset = Genre.objects.all()
-    serializer_class = GenreSerializer
-    pagination_class = PagePagination
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz']
-
-
-# -------------------------------------------------- Tag ---------------------------------------------------------------
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
-class TagSearchAdminView(AdminViewMixin, LanguageMixin, generics.ListAPIView):
-    queryset = Tag.objects.all()
-    pagination_class = PagePagination
-    serializer_class = TagSerializer
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz']
-
-
 # ---------------------------------------------- Reviews ---------------------------------------------------------------
-class ProductReviewAdminView(AdminViewMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, mixins.ListModelMixin,
+class ProductReviewAdminView(StaffViewMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, mixins.ListModelMixin,
                              viewsets.GenericViewSet):
     queryset = ProductReview.objects.all()
-    serializer_class = ProductReviewSerializer
+    serializer_class = ProductReviewAdminSerializer
     pagination_class = PagePagination
     lookup_field = 'id'
     lookup_url_kwarg = 'review_id'
-    filter_backends = [FilterByFields, filters.SearchFilter]
+    filter_backends = [FilterByFields, filters.SearchFilter, DateRangeFilter]
+    start_field = 'created_at__date'
+    start_param = 'start_date'
+    end_field = 'created_at__date'
+    end_param = 'end_date'
     filter_fields = {
         'is_read': {'db_field': 'is_read', 'type': 'boolean'},
-        'is_active': {'db_field': 'is_active', 'type': 'boolean'},
+        'is_active': {'db_field': 'is_active', 'type': 'boolean'}
     }
     search_fields = ('user__email', 'product__id', 'comment')
 
@@ -185,18 +192,17 @@ class ProductReviewAdminView(AdminViewMixin, mixins.RetrieveModelMixin, mixins.D
         review.save()
         return Response(status=status.HTTP_202_ACCEPTED)
 
-    @action(methods=['GET'], detail=False, url_path='new-reviews-count')
-    def new_reviews_count(self, request, **kwargs):
-        return Response({'count': self.get_queryset().filter(is_active=True, is_read=False).count()})
-
 
 # ---------------------------------------------- Order -----------------------------------------------------------------
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
-class OrderAdminViewSet(AdminViewMixin, LanguageMixin, viewsets.ReadOnlyModelViewSet):
+class OrderAdminViewSet(StaffViewMixin, LanguageMixin, viewsets.ReadOnlyModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderAdminSerializer
     pagination_class = PagePagination
-    filter_backends = [filters.SearchFilter, FilterByFields, filters.OrderingFilter]
+    filter_backends = [filters.SearchFilter, FilterByFields, filters.OrderingFilter, DateRangeFilter]
+    start_field = 'created_at__date'
+    start_param = 'start_date'
+    end_field = 'created_at__date'
+    end_param = 'end_date'
     filter_fields = {
         'status': {'db_field': 'status', 'type': 'enum', 'choices': Order.Status.choices},
         'payed': {'db_field': 'is_payed', 'type': 'boolean'},
@@ -230,12 +236,15 @@ class OrderAdminViewSet(AdminViewMixin, LanguageMixin, viewsets.ReadOnlyModelVie
         return Response(status=status.HTTP_202_ACCEPTED)
 
 
+# TODO: add analytics view
+
+
 # ----------------------------------------------- Promotions -----------------------------------------------------------
-class PromotionAdminViewSet(AdminViewMixin, viewsets.ModelViewSet):
+class PromotionAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     queryset = Promotion.objects.filter(is_deleted=False)
     pagination_class = PagePagination
     serializer_class = PromotionAdminSerializer
-    parser_classes = (parsers.FormParser, parsers.MultiPartParser, parsers.JSONParser)
+    parser_classes = (parsers.JSONParser,)
     filter_backends = [filters.SearchFilter, FilterByFields, filters.OrderingFilter]
     search_fields = ['banner__name', 'banner__name_ru', 'banner__name_en', 'banner__name_tr', 'banner__name_ky',
                      'banner__name_kz']
@@ -249,11 +258,11 @@ class PromotionAdminViewSet(AdminViewMixin, viewsets.ModelViewSet):
 
 
 # ----------------------------------------- Currencies conversion ------------------------------------------------------
-class ConversionListAdminView(AdminViewMixin, generics.ListAPIView):
+class ConversionListAdminView(DirectorViewMixin, generics.ListAPIView):
     queryset = Conversion.objects.all().order_by('-id')
     serializer_class = ConversionAdminSerializer
 
 
-class UpdateConversionAdminView(AdminViewMixin, generics.UpdateAPIView):
+class UpdateConversionAdminView(DirectorViewMixin, generics.UpdateAPIView):
     queryset = Conversion.objects.all()
     serializer_class = ConversionAdminSerializer

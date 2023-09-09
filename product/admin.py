@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
 from product.filters import ProductRankAdminFilter
-from product.models import Genre, Product, ProductImageUrl, ProductReview, Tag
+from product.models import Genre, Product, ProductImageUrl, ProductReview, Tag, TagGroup
 
 
 @admin.register(Genre)
@@ -25,9 +25,16 @@ class ProductImageInline(admin.TabularInline):
     extra = 0
 
 
+@admin.register(TagGroup)
+class TagGroupAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'created_at')
+    search_fields = ('id', 'name', 'created_at')
+    list_filter = ('created_at',)
+
+
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'group')
+    list_display = ('id', 'name', 'group', 'created_at')
     search_fields = ('id', 'name', 'group__name', 'group__id')
     list_filter = ('created_at',)
 
@@ -43,7 +50,7 @@ class ProductAdmin(admin.ModelAdmin):
                      'genres__name_kz')
     search_help_text = _('Search by fields: ID, Rakuten ID, NAME, GENRE NAME')
     list_filter = (ProductRankAdminFilter, 'is_active', 'created_at', 'modified_at')
-    readonly_fields = ('created_at', 'modified_at', 'tags', 'genres')
+    readonly_fields = ('id', 'created_at', 'modified_at', 'tags', 'genres')
     fieldsets = (
         (
             _('General Info'),

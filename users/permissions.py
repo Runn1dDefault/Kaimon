@@ -11,4 +11,11 @@ class RegistrationPayedPermission(IsAuthenticated):
 
 class IsDirectorPermission(BasePermission):
     def has_permission(self, request, view):
-        return request.user and request.user.role == request.user.Role.DIRECTOR
+        return request.user and request.user.is_director
+
+
+class IsStaffUser(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated or not request.user.is_active:
+            return False
+        return request.user.is_developer or request.user.is_director or request.user.is_manager

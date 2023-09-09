@@ -1,11 +1,83 @@
 from collections import OrderedDict
+from datetime import datetime
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
-
+from rest_framework import serializers
 from rest_framework.filters import BaseFilterBackend
 from rest_framework.compat import coreapi, coreschema
+
+
+class DateRangeFilter(BaseFilterBackend):
+    start_field_attr = 'start_field'
+    start_param_attr = 'start_param'
+    description = _('Filter by date')
+
+    end_field_attr = 'end_field'
+    end_param_attr = 'end_param'
+
+    def get_start_field(self, view):
+        return getattr(view, self.start_field_attr)
+
+    def get_start_param_attribute(self, view):
+        return getattr(view, self.start_param_attr)
+
+    def get_start_param(self, request, view):
+        attr_name = self.get_start_param_attribute(view)
+        return request.query_params.get(attr_name)
+
+    def get_end_field(self, view):
+        return getattr(view, self.end_field_attr)
+
+    def get_end_param_attribute(self, view):
+        return getattr(view, self.end_param_attr)
+
+    def get_end_param(self, request, view):
+        attr_name = self.get_end_param_attribute(view)
+        return request.query_params.get(attr_name)
+
+    def filter_queryset(self, request, queryset, view):
+        start = self.get_start_param(request, view)
+        end = self.get_end_param(request, view)
+
+        if not start and not end:
+            return queryset
+
+        range_queries = {}
+        if start:
+            range_queries[self.get_start_field(view) + '__gte'] = start
+        if end:
+            range_queries[self.get_end_field(view) + '__lte'] = end
+        print(range_queries)
+        try:
+            return queryset.filter(**range_queries)
+        except ValidationError as e:
+            raise serializers.ValidationError(str(e))
+
+    def get_schema_operation_parameters(self, view):
+        description = force_str(self.description)
+        return [
+            {
+                'name': self.get_start_param_attribute(view),
+                'required': False,
+                'in': 'query',
+                'description': description,
+                'schema': {
+                    'type': 'date',
+                },
+            },
+            {
+                'name': self.get_end_param_attribute(view),
+                'required': False,
+                'in': 'query',
+                'description': description,
+                'schema': {
+                    'type': 'date',
+                },
+            },
+        ]
 
 
 class FilterByLookup(BaseFilterBackend):

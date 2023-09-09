@@ -4,73 +4,25 @@ from django.core.validators import MaxValueValidator
 from django.db import transaction
 from django.db.models import F
 from django.utils.timezone import localtime
-from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from currencies.mixins import CurrencySerializerMixin
 from currencies.models import Conversion
-from product.models import Product, Genre, Tag, ProductImageUrl
-from product.serializers import ProductListSerializer, ProductRetrieveSerializer
+from product.models import Product, Genre, Tag, ProductImageUrl, TagGroup, ProductReview
+from product.serializers import TagByGroupSerializer
 from product.utils import get_genre_parents_tree
 from promotions.models import Banner, Promotion, Discount
-from order.models import Order
+from order.models import Order, Country
 from order.serializers import ProductReceiptSerializer
 from users.models import User
-from utils.mixins import LangSerializerMixin
+from utils.helpers import round_half_integer
 
 
 class UserAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('email', 'full_name', 'role', 'is_active', 'date_joined', 'last_login', 'registration_payed')
+        fields = ('id', 'email', 'full_name', 'role', 'is_active', 'date_joined', 'last_login', 'registration_payed')
         extra_kwargs = {'role': {'read_only': True}}
-
-
-class OrderAdminSerializer(LangSerializerMixin, serializers.ModelSerializer):
-    email = serializers.SerializerMethodField(read_only=True)
-    full_name = serializers.SerializerMethodField(read_only=True)
-    total_price = serializers.SerializerMethodField(read_only=True)
-    date = serializers.SerializerMethodField(read_only=True)
-    country = serializers.SerializerMethodField(read_only=True)
-    city = serializers.SerializerMethodField(read_only=True)
-    address = serializers.SerializerMethodField(read_only=True)
-    phone = serializers.SerializerMethodField(read_only=True)
-    zip_code = serializers.SerializerMethodField(read_only=True)
-    receipts = ProductReceiptSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = Order
-        fields = ('id', 'status', 'email', 'full_name', 'total_price', 'date', 'country', 'city', 'phone', 'zip_code',
-                  'address', 'receipts')
-
-    def get_email(self, instance):
-        return instance.delivery_address.user.email
-
-    def get_full_name(self, instance):
-        return instance.delivery_address.user.full_name
-
-    def get_total_price(self, instance):
-        receipts = instance.receipts.filter(is_canceled=False, qty__gt=0, unit_price__gt=0)
-        return sum(
-            receipts.annotate(
-                total_price=F('unit_price') * F('qty')
-            ).values_list('total_price', flat=True)
-        )
-
-    def get_date(self, instance):
-        return localtime(instance.created_at).date()
-
-    def get_country(self, instance):
-        country = instance.delivery_address.country
-        return getattr(country, self.get_translate_field('name')) or country.name
-
-    def get_city(self, instance):
-        return instance.delivery_address.city
-
-    def get_address(self, instance):
-        return instance.delivery_address.address
-
-    def get_phone(self, instance):
-        return instance.delivery_address.phone
 
 
 class ConversionAdminSerializer(serializers.ModelSerializer):
@@ -80,70 +32,107 @@ class ConversionAdminSerializer(serializers.ModelSerializer):
         extra_kwargs = {'currency_from': {'read_only': True}, 'currency_to': {'read_only': True}}
 
 
-class ProductAdminSerializer(ProductListSerializer):
-    class Meta(ProductListSerializer.Meta):
-        fields = ProductListSerializer.Meta.fields + ['description']
-        translate_fields = ProductListSerializer.Meta.translate_fields + ['description']
+class TagAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = '__all__'
+
+
+class GenreAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Genre
+        fields = '__all__'
 
 
 class ProductImageAdminSerializer(serializers.ModelSerializer):
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), write_only=True, required=True)
     url = serializers.URLField(required=True)
 
     class Meta:
         model = ProductImageUrl
         fields = ('id', 'product', 'url')
-        extra_fields = {'product': {'write_only': True, 'required': True}}
-
-    def validate(self, attrs):
-        if not Product.objects.filter(id=attrs['product']).exists():
-            raise serializers.ValidationError({'product': _('Does not exist!')})
-        return attrs
 
 
-class ProductDetailAdminSerializer(ProductRetrieveSerializer):
-    product_url = serializers.URLField(required=False)
-    genre = serializers.IntegerField(write_only=True, required=True)
-    tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(), write_only=True, required=False)
-    image_urls = ProductImageAdminSerializer(many=True, read_only=True)
-    set_image_urls = serializers.ListSerializer(child=serializers.URLField(), many=True, required=False,
-                                                write_only=True)
-    # TODO: change!
+class ProductAdminSerializer(CurrencySerializerMixin, serializers.ModelSerializer):
+    sale_price = serializers.SerializerMethodField(read_only=True)
+    image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'sale_price', 'is_active', 'availability', 'avg_rank', 'reviews_count',
-                  'image_urls', 'created_at', 'description', 'tags_info', 'reference_rank', 'genre', 'tags',
-                  'product_url',)
-        extra_kwargs = {'id': {'read_only': True}}
+        fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'image_urls',
+                  'created_at', 'description')
 
-    def validate(self, attrs):
-        genre_id = attrs.get('genre')
-        if genre_id:
-            genre_search = Genre.objects.exlude(level=0).filter(id=genre_id)
-            if not genre_search.exists():
-                raise serializers.ValidationError({'genre': _('Genre does not exists!')})
-            attrs['genre'] = genre_search.first()
-        tag_ids = attrs.get('tags')
-        if tag_ids and not Tag.objects.filter(id__in=tag_ids).exists():
-            raise serializers.ValidationError({'tags': _('Some tags not exists!')})
-        return attrs
+    def get_sale_price(self, instance):
+        sale_price = instance.sale_price
+        if not sale_price:
+            return
+
+        som_conversion = self.get_conversation_instance(Conversion.Currencies.som)
+        dollar_conversion = self.get_conversation_instance(Conversion.Currencies.dollar)
+        return {
+            Conversion.Currencies.yen: sale_price,
+            Conversion.Currencies.som: som_conversion.calc_price(sale_price),
+            Conversion.Currencies.dollar: dollar_conversion.calc_price(sale_price)
+        }
+
+
+class TagByGroupAdminSerializer(TagByGroupSerializer):
+    class Meta:
+        model = TagGroup
+        fields = '__all__'
+
+
+class ProductDetailAdminSerializer(ProductAdminSerializer):
+    product_url = serializers.URLField(required=False)
+    genre = serializers.PrimaryKeyRelatedField(queryset=Genre.objects.exclude(level=0), many=False, write_only=True,
+                                               required=True)
+    tags = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.all(),
+        write_only=True,
+        required=False,
+        many=True
+    )
+    image_urls = ProductImageAdminSerializer(many=True, read_only=True)
+    images = serializers.ListField(child=serializers.URLField(), write_only=True, required=False)
+    tags_info = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Product
+        fields = (
+            *ProductAdminSerializer.Meta.fields, 'name_ru', 'name_en', 'name_tr', 'name_ky', 'name_kz',
+            'description_ru', 'description_en', 'description_tr', 'description_ky', 'description_kz',
+            'is_active', 'tags_info', 'reference_rank', 'genre', 'tags', 'images', 'product_url'
+        )
+        extra_kwargs = {'id': {'read_only': True}, 'price': {'required': True}}
+
+    def get_tags_info(self, instance):
+        if not instance.tags.exists():
+            return
+        group_ids = list(instance.tags.all().order_by('group_id')
+                                            .distinct('group_id')
+                                            .values_list('group_id', flat=True))
+        return TagByGroupAdminSerializer(
+            tag_ids=list(instance.tags.values_list('id', flat=True)),
+            instance=TagGroup.objects.filter(id__in=group_ids),
+            many=True,
+            context=self.context
+        ).data
 
     def create(self, validated_data):
-        images = validated_data.pop('image_urls', None)
+        images = validated_data.pop('images', None)
         genre = validated_data.pop('genre')
-        tags = validated_data.pop('tags')
+        tags = validated_data.pop('tags', None)
         genres_tree = get_genre_parents_tree(genre)
 
         with transaction.atomic():
             product = super().create(validated_data)
-            if images:
-                images_data = [{'product': product.id} | image_data for image_data in images]
-                serializer = ProductImageAdminSerializer(data=images_data, many=True)
-                serializer.is_valid(raise_exception=True)
-                serializer.save()
             product.genres.add(*genres_tree)
-            product.tags.add(*tags)
-            return product
+            if images:
+                ProductImageUrl.objects.bulk_create([ProductImageUrl(product=product, url=url) for url in images])
+            if tags:
+                product.tags.add(*tags)
+            product.save()
+        return product
 
     def update(self, instance, validated_data):
         genre = validated_data.pop('genre', None)
@@ -162,6 +151,16 @@ class ProductDetailAdminSerializer(ProductRetrieveSerializer):
         if save:
             product.save()
         return product
+
+
+class ProductReviewAdminSerializer(serializers.ModelSerializer):
+    user = UserAdminSerializer(read_only=True)
+    product = ProductAdminSerializer(many=False, read_only=True)
+    product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), write_only=True, required=True)
+
+    class Meta:
+        model = ProductReview
+        fields = ('id', 'user', 'product', 'product_id', 'rank', 'is_read', 'is_active', 'comment', 'created_at')
 
 
 class BannerAdminSerializer(serializers.ModelSerializer):
@@ -194,11 +193,11 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Promotion
-        banner_fields = ['name', 'name_ru', 'name_en', 'name_tr', 'name_ky', 'name_kz', 'description',
+        banner_fields = ('name', 'name_ru', 'name_en', 'name_tr', 'name_ky', 'name_kz', 'description',
                          'description_ru', 'description_en', 'description_tr', 'description_ky', 'description_kz',
-                         'image']
-        fields = ['id', 'discount', 'set_discount', 'banner', 'products', 'set_products', 'start_date', 'end_date',
-                  'deactivated', 'created_at'] + banner_fields
+                         'image')
+        fields = ('id', 'discount', 'set_discount', 'banner', 'products', 'set_products', 'start_date', 'end_date',
+                  'deactivated', 'created_at', *banner_fields)
 
     def collect_banner_data(self, validated_data) -> dict[str, Any]:
         banner_data = {}
@@ -246,3 +245,53 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
         banner_serializer.is_valid(raise_exception=True)
         banner_serializer.save()
         return super().update(instance, validated_data)
+
+
+class CountryAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Country
+        fields = '__all__'
+
+
+class OrderAdminSerializer(serializers.ModelSerializer):
+    email = serializers.SerializerMethodField(read_only=True)
+    full_name = serializers.SerializerMethodField(read_only=True)
+    total_price = serializers.SerializerMethodField(read_only=True)
+    date = serializers.SerializerMethodField(read_only=True)
+    country = CountryAdminSerializer(many=False, read_only=True)
+    city = serializers.SerializerMethodField(read_only=True)
+    address = serializers.SerializerMethodField(read_only=True)
+    phone = serializers.SerializerMethodField(read_only=True)
+    zip_code = serializers.SerializerMethodField(read_only=True)
+    receipts = ProductReceiptSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Order
+        fields = ('id', 'status', 'email', 'full_name', 'total_price', 'date', 'country', 'city', 'phone', 'zip_code',
+                  'address', 'receipts')
+
+    def get_email(self, instance):
+        return instance.delivery_address.user.email
+
+    def get_full_name(self, instance):
+        return instance.delivery_address.user.full_name
+
+    def get_total_price(self, instance):
+        receipts = instance.receipts.filter(is_canceled=False, qty__gt=0, unit_price__gt=0)
+        return sum(
+            receipts.annotate(
+                total_price=F('unit_price') * F('qty')
+            ).values_list('total_price', flat=True)
+        )
+
+    def get_date(self, instance):
+        return localtime(instance.created_at).date()
+
+    def get_city(self, instance):
+        return instance.delivery_address.city
+
+    def get_address(self, instance):
+        return instance.delivery_address.address
+
+    def get_phone(self, instance):
+        return instance.delivery_address.phone
