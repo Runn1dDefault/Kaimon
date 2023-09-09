@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_view, extend_schema
 from rest_framework import generics, viewsets
 
 from users.filters import FilterByUser
@@ -5,18 +6,21 @@ from users.permissions import RegistrationPayedPermission
 from utils.mixins import LanguageMixin
 from utils.filters import FilterByFields
 from utils.paginators import PagePagination
+from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM
 
 from .models import Country, UserDeliveryAddress, Order
 from .permissions import OrderPermission
 from .serializers import CountrySerializer, DeliveryAddressSerializer, OrderSerializer
 
 
+@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
 class CountryListView(LanguageMixin, generics.ListAPIView):
     queryset = Country.objects.filter(is_active=True)
     serializer_class = CountrySerializer
     permission_classes = [RegistrationPayedPermission]
 
 
+@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
 class DeliveryAddressViewSet(LanguageMixin, viewsets.ModelViewSet):
     queryset = UserDeliveryAddress.objects.filter(is_deleted=False)
     permission_classes = [RegistrationPayedPermission]

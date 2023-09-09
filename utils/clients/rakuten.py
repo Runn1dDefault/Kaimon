@@ -161,7 +161,8 @@ if __name__ == '__main__':
     # Count of last categories: 13913
     rakuten = RakutenClient(app_id='1027393930619954222')
     # pprint(rakuten.genres_search())
-    pprint(rakuten.item_search(genre_id=568674))
+    # pprint(rakuten.item_search(genre_id=568674))
+    pprint(rakuten.tag_search(1000319))
+
     # data = rakuten.product_search(product_id='4589453011031')
     # pprint(data)
-

@@ -41,12 +41,15 @@ class FilterByFields(BaseFilterBackend):
 
         for query_field, db_field in filter_fields.items():
             value = request.query_params.get(query_field, None)
+            print(value)
             if not value:
                 continue
 
             if isinstance(db_field, str):
                 filter_kwargs[db_field] = value
             elif isinstance(db_field, dict):
+                if db_field.get('type') == 'boolean':
+                    value = True if value == 'true' else False
                 filter_kwargs[db_field['db_field']] = value
 
         return filtered_queryset.filter(**filter_kwargs)

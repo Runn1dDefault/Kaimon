@@ -4,6 +4,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from product.models import Product, Tag
+from promotions.models import Promotion
 from users.utils import get_sentinel_user
 
 
@@ -83,6 +84,7 @@ class Order(BaseModel):
 
 
 class ProductReceipt(BaseModel):
+    # promotion = models.ForeignKey(Promotion, on_delete=models.SET_NULL, related_name='receipts', null=True)
     order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name='receipts')
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='receipts')
     # product tags of client choice will be saved in field tags,

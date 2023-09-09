@@ -40,6 +40,8 @@ class Promotion(models.Model):
         related_query_name="promotion"
     )
     deactivated = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -55,3 +57,6 @@ class Discount(models.Model):
         if price <= 0:
             return 0
         return price - (self.percentage * price / 100)
+
+    def __str__(self):
+        return self.percentage
