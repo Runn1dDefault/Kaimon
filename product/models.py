@@ -102,14 +102,6 @@ class Product(models.Model):
     description_kz = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[kz]')
 
     @property
-    def avg_rank(self) -> float:
-        reviews = self.reviews.filter(is_active=True)
-        if reviews.exists():
-            ranks = list(reviews.values_list('rank', flat=True))
-            return sum(ranks) / len(ranks)
-        return 0.0
-
-    @property
     def genre(self):
         return self.genres.all().order_by('-level').first()
 

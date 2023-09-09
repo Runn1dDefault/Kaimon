@@ -10,7 +10,7 @@ from currencies.mixins import CurrencySerializerMixin
 from currencies.models import Conversion
 from product.models import Product, Genre, Tag, ProductImageUrl, TagGroup, ProductReview
 from product.serializers import TagByGroupSerializer
-from product.utils import get_genre_parents_tree
+from product.utils import get_genre_parents_tree, get_product_avg_rank
 from promotions.models import Banner, Promotion, Discount
 from order.models import Order, Country
 from order.serializers import ProductReceiptSerializer
@@ -55,12 +55,16 @@ class ProductImageAdminSerializer(serializers.ModelSerializer):
 
 class ProductAdminSerializer(CurrencySerializerMixin, serializers.ModelSerializer):
     sale_price = serializers.SerializerMethodField(read_only=True)
+    avg_rank = serializers.SerializerMethodField(read_only=True)
     image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
 
     class Meta:
         model = Product
         fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'image_urls',
                   'created_at', 'description')
+
+    def get_avg_rank(self, instance):
+        return get_product_avg_rank(instance)
 
     def get_sale_price(self, instance):
         sale_price = instance.sale_price

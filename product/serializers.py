@@ -6,6 +6,7 @@ from utils.mixins import LangSerializerMixin
 from utils.helpers import round_half_integer
 
 from .models import Genre, Product, ProductReview, TagGroup, Tag
+from .utils import get_product_avg_rank
 
 
 class GenreSerializer(LangSerializerMixin, serializers.ModelSerializer):
@@ -36,6 +37,7 @@ class ProductReviewSerializer(LangSerializerMixin, serializers.ModelSerializer):
 
 class ProductListSerializer(CurrencySerializerMixin, LangSerializerMixin, serializers.ModelSerializer):
     sale_price = serializers.SerializerMethodField(read_only=True)
+    avg_rank = serializers.SerializerMethodField(read_only=True)
     image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
 
     class Meta:
@@ -44,6 +46,9 @@ class ProductListSerializer(CurrencySerializerMixin, LangSerializerMixin, serial
                   'created_at', 'genre_id')
         translate_fields = ('name',)
         currency_convert_fields = ('price',)
+
+    def get_avg_rank(self, instance):
+        return get_product_avg_rank(instance)
 
     def get_sale_price(self, instance):
         currency = self.get_currency()
