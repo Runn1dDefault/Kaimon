@@ -78,4 +78,4 @@ class ProductReview(admin.ModelAdmin):
     list_display_links = ('id', 'product', 'user')
     search_fields = ('id', 'product_id', 'user__email')
     list_filter = ('is_active', 'created_at')
-    readonly_fields = ('created_at', 'modified_at', 'product')
+    readonly_fields = ('created_at', 'modified_at',)
