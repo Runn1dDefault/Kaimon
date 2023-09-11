@@ -37,7 +37,8 @@ class ProductReceiptInline(admin.StackedInline):
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     inlines = [ProductReceiptInline]
-    list_display = ('id', 'status', 'is_deleted', 'delivery_address', 'created_at')
+    list_display = ('id', 'delivery_address', 'status', 'is_deleted', 'created_at')
+    list_display_links = ('id', 'delivery_address')
     search_fields = ('id', 'is_deleted')
     list_filter = ('is_deleted', 'status', 'created_at')
     readonly_fields = ('created_at', 'modified_at')
