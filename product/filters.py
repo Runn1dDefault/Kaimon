@@ -11,13 +11,13 @@ from .querysets import ProductQuerySet
 
 
 class FilterByTag(BaseFilterBackend):
-    param = 'tag_id'
-    description = _('Filter by tag id')
+    param = 'tag_ids'
+    description = _('Filter by tag ids')
 
     def filter_queryset(self, request, queryset, view):
-        tag_id = request.query_params.get(self.param)
-        if tag_id:
-            return queryset.filter(tags__id__in=[tag_id])
+        tag_ids = request.query_params.get(self.param, '').split(',')
+        if tag_ids:
+            return queryset.filter(tags__id__in=tag_ids)
         return queryset
 
     def get_schema_operation_parameters(self, view):
