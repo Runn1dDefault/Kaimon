@@ -1,13 +1,18 @@
-from typing import Any
+import calendar
+from copy import deepcopy
+from datetime import datetime, timedelta, timezone
+from typing import Any, OrderedDict
 
+import pandas as pd
 from django.core.validators import MaxValueValidator
 from django.db import transaction
-from django.db.models import F, Model
+from django.db.models import F
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
+from pandas import DataFrame
+from pytz import tzinfo
 from rest_framework import serializers
-from rest_framework.utils.serializer_helpers import ReturnList
+from rest_framework.utils.serializer_helpers import ReturnDict
 
 from currencies.mixins import CurrencySerializerMixin
 from currencies.models import Conversion
@@ -16,10 +21,9 @@ from product.models import Product, Genre, Tag, ProductImageUrl, TagGroup, Produ
 from product.serializers import TagByGroupSerializer
 from product.utils import get_genre_parents_tree, get_product_avg_rank
 from promotions.models import Banner, Promotion, Discount
-from order.models import Order, Country, BaseModel
+from order.models import Order, Country
 from order.serializers import ProductReceiptSerializer
 from users.models import User
-from utils.helpers import round_half_integer
 
 
 class UserAdminSerializer(serializers.ModelSerializer):
@@ -318,6 +322,8 @@ class AnalyticsSerializer(serializers.Serializer):
     class Meta:
         model = None
         fields = ('start', 'end', 'filter_by')
+        hide_fields = ()
+        empty_data_template = {}
 
     def validate_filter_by(self, filter_by: str):
         try:
@@ -341,27 +347,120 @@ class AnalyticsSerializer(serializers.Serializer):
     def _model(self):
         return self.Meta.model
 
-    def filter_queryset(self, validated_data):
+    def filter_queryset(self, start, end, filter_by):
         return self._model.objects.all()
 
     @property
     def data(self):
-        ret = self.to_representation(self.validated_data)
-        return ReturnList(ret, serializer=self)
+        start, end = self.validated_data['start'], self.validated_data['end']
+        filter_by = self.validated_data['filter_by']
+        analytics_queryset = self.filter_queryset(start, end, filter_by)
+        df = analytics_queryset.to_df() if analytics_queryset.exists() else DataFrame()
+        ret = self.to_representation(df)
+        return ReturnDict(ret, serializer=self)
 
-    def to_representation(self, validated_data):
-        return self.filter_queryset(validated_data)
+    @property
+    def empty_data_template(self):
+        return getattr(self.Meta, 'empty_data_template', {})
+
+    def add_empty_rows(self, found_dates, start, end, filter_by):
+        match filter_by:
+            case AnalyticsFilter.MONTH:
+                iters = (end.month - start.month) + 1
+                iter_date = datetime(day=1, month=start.month, year=start.year, hour=0, minute=0, second=0,
+                                     tzinfo=timezone.utc)
+            case AnalyticsFilter.YEAR:
+                iters = (end.year - start.year) + 1
+                iter_date = datetime(day=1, month=1, year=start.year, hour=0, minute=0, second=0, tzinfo=timezone.utc)
+            case _:
+                iters = (end - start).days + 1
+                iter_date = start
+
+        not_found_dates = []
+        for _ in range(iters):
+            if iter_date not in found_dates:
+                template = deepcopy(self.empty_data_template)
+                template['date'] = iter_date
+                not_found_dates.append(template)
+
+            match filter_by:
+                case AnalyticsFilter.MONTH:
+                    _, days = calendar.monthrange(iter_date.year, iter_date.month)
+                    iter_date += timedelta(days=days)
+                case AnalyticsFilter.YEAR:
+                    first = datetime(year=iter_date.year, day=1, month=1)
+                    second = datetime(year=iter_date.year + 1, day=1, month=1)
+                    iter_date += timedelta(days=(second - first).days)
+                case _:
+                    iter_date += timedelta(days=1)
+        return not_found_dates
+
+    @property
+    def hide_fields(self):
+        return getattr(self.Meta, 'hide_fields', None)
+
+    def to_representation(self, df):
+        dates = df['date'].tolist() if df.empty is False else []
+        start, end = self.validated_data['start'], self.validated_data['end']
+        filter_by = self.validated_data['filter_by']
+        empty_rows = self.add_empty_rows(dates, start, end, filter_by)
+        if empty_rows:
+            df = pd.concat([df, DataFrame.from_records(empty_rows)], ignore_index=True)
+            df = df.sort_values(by='date')
+        if df.empty is False:
+            df['date'] = df['date'].apply(lambda x: str(x))
+            df.set_index('date', inplace=True)
+            if self.hide_fields:
+                df = df.drop(columns=list(self.hide_fields))
+        return df.to_dict('index')
 
 
 class OrderAnalyticsSerializer(AnalyticsSerializer):
     class Meta:
         model = Order
+        hide_fields = ('sale_prices_yen', 'sale_prices_som', 'sale_prices_dollar')
+        empty_data_template = {"receipts_info": [], "yen": 0, "som": 0, "dollar": 0}
 
-    def filter_queryset(self, validated_data):
-        start = validated_data['start']
-        end = validated_data['end']
-        filter_by = validated_data['filter_by']
-        return self._model.analytics.filter(
-            created_at__date__gte=start,
-            created_at__date__lte=end
-        ).collected_total_prices(filter_by)
+    def filter_queryset(self, start, end, filter_by):
+        return self._model.analytics.filter(created_at__date__gte=start, created_at__date__lte=end)\
+                                    .get_analytics(filter_by)
+
+    def to_representation(self, df):
+        if df.empty is False:
+            df['yen'] = df['sale_prices_yen'].apply(lambda x: sum(x))
+            df['som'] = df['sale_prices_som'].apply(lambda x: sum(x))
+            df['dollar'] = df['sale_prices_dollar'].apply(lambda x: sum(x))
+        return super().to_representation(df)
+
+
+class UserAnalyticsSerializer(AnalyticsSerializer):
+    class Meta:
+        model = User
+        empty_data_template = {"users": [], "count": 0}
+
+    def filter_queryset(self, start, end, filter_by):
+        queryset = self._model.analytics.filter(date_joined__date__gte=start, date_joined__date__lte=end)
+        return queryset.get_joined_analytics(filter_by)
+
+    def users_representation(self, users):
+        request = self.context['request']
+        for user in users:
+            image = user.get('image')
+            if image:
+                user['image'] = request.build_absolute_uri(image)
+        return users
+
+    def to_representation(self, df):
+        if df.empty is False:
+            df['users'] = df['users'].apply(lambda x: self.users_representation(x))
+        return super().to_representation(df)
+
+
+class ReviewAnalyticsSerializer(AnalyticsSerializer):
+    class Meta:
+        model = ProductReview
+        empty_data_template = {'info': [], 'count': 0, 'avg_rank': 0.0}
+
+    def filter_queryset(self, start, end, filter_by):
+        queryset = self._model.analytics.filter(created_at__date__gte=start, created_at__date__lte=end)
+        return queryset.get_date_analytics(filter_by)

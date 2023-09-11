@@ -21,17 +21,15 @@ from .paginators import UserListPagination
 from .serializers import ConversionAdminSerializer, PromotionAdminSerializer, \
     ProductAdminSerializer, ProductDetailAdminSerializer, OrderAdminSerializer, \
     ProductImageAdminSerializer, UserAdminSerializer, GenreAdminSerializer, TagAdminSerializer, \
-    ProductReviewAdminSerializer, OrderAnalyticsSerializer
+    ProductReviewAdminSerializer, OrderAnalyticsSerializer, UserAnalyticsSerializer, ReviewAnalyticsSerializer
 
 
 class DirectorViewMixin:
-    pass
-    # permission_classes = (permissions.IsAuthenticated, IsDirectorPermission,)
+    permission_classes = (permissions.IsAuthenticated, IsDirectorPermission,)
 
 
 class StaffViewMixin:
-    pass
-    # permission_classes = (permissions.IsAuthenticated, IsStaffUser,)
+    permission_classes = (permissions.IsAuthenticated, IsStaffUser,)
 
 
 # ---------------------------------------------- Users -----------------------------------------------------------------
@@ -242,15 +240,10 @@ class AnalyticsView(StaffViewMixin, generics.GenericAPIView):
     def get_analytics(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        print(serializer.data)
         return Response(serializer.data)
 
     def post(self, request, *args, **kwargs):
         return self.get_analytics(request, *args, **kwargs)
-
-
-class OrderAnalyticsView(AnalyticsView):
-    serializer_class = OrderAnalyticsSerializer
 
 
 # ----------------------------------------------- Promotions -----------------------------------------------------------
@@ -280,3 +273,16 @@ class ConversionListAdminView(DirectorViewMixin, generics.ListAPIView):
 class UpdateConversionAdminView(DirectorViewMixin, generics.UpdateAPIView):
     queryset = Conversion.objects.all()
     serializer_class = ConversionAdminSerializer
+
+
+# ------------------------------------------------ Analytics -----------------------------------------------------------
+class OrderAnalyticsView(AnalyticsView):
+    serializer_class = OrderAnalyticsSerializer
+
+
+class UserAnalyticsView(AnalyticsView):
+    serializer_class = UserAnalyticsSerializer
+
+
+class ReviewAnalyticsView(AnalyticsView):
+    serializer_class = ReviewAnalyticsSerializer
