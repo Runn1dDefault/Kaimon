@@ -1,8 +1,8 @@
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter
-from rest_framework import generics, mixins, viewsets, permissions, status, filters, parsers
-from rest_framework.decorators import action
+from rest_framework import generics, mixins, viewsets, permissions, status, filters, parsers, views
+from rest_framework.decorators import action, api_view
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
@@ -21,7 +21,7 @@ from .paginators import UserListPagination
 from .serializers import ConversionAdminSerializer, PromotionAdminSerializer, \
     ProductAdminSerializer, ProductDetailAdminSerializer, OrderAdminSerializer, \
     ProductImageAdminSerializer, UserAdminSerializer, GenreAdminSerializer, TagAdminSerializer, \
-    ProductReviewAdminSerializer
+    ProductReviewAdminSerializer, OrderAnalyticsSerializer
 
 
 class DirectorViewMixin:
@@ -236,7 +236,21 @@ class OrderAdminViewSet(StaffViewMixin, LanguageMixin, viewsets.ReadOnlyModelVie
         return Response(status=status.HTTP_202_ACCEPTED)
 
 
-# TODO: add analytics view
+class AnalyticsView(StaffViewMixin, generics.GenericAPIView):
+    parser_classes = (parsers.FormParser, parsers.MultiPartParser, parsers.JSONParser)
+
+    def get_analytics(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        print(serializer.data)
+        return Response(serializer.data)
+
+    def post(self, request, *args, **kwargs):
+        return self.get_analytics(request, *args, **kwargs)
+
+
+class OrderAnalyticsView(AnalyticsView):
+    serializer_class = OrderAnalyticsSerializer
 
 
 # ----------------------------------------------- Promotions -----------------------------------------------------------

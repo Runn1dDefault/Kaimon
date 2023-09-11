@@ -3,6 +3,7 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from order.querysets import OrderAnalyticsQuerySet
 from product.models import Product, Tag
 from promotions.models import Promotion
 from users.utils import get_sentinel_user
@@ -55,6 +56,9 @@ class UserDeliveryAddress(BaseModel):
 
 
 class Order(BaseModel):
+    objects = models.Manager()
+    analytics = OrderAnalyticsQuerySet.as_manager()
+
     class Status(models.TextChoices):
         pending = 'pending', _('Pending')
         rejected = 'rejected', _('Rejected')
@@ -95,5 +99,5 @@ class ProductReceipt(BaseModel):
         related_name='receipts'
     )
     unit_price = models.FloatField()
-    discount = models.FloatField(null=True)
+    discount = models.FloatField(default=0.0)
     purchases_count = models.PositiveIntegerField(validators=[MinValueValidator(1)])

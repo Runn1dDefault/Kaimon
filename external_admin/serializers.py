@@ -2,17 +2,21 @@ from typing import Any
 
 from django.core.validators import MaxValueValidator
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Model
 from django.utils.timezone import localtime
+from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 from rest_framework import serializers
+from rest_framework.utils.serializer_helpers import ReturnList
 
 from currencies.mixins import CurrencySerializerMixin
 from currencies.models import Conversion
+from order.querysets import AnalyticsFilter
 from product.models import Product, Genre, Tag, ProductImageUrl, TagGroup, ProductReview
 from product.serializers import TagByGroupSerializer
 from product.utils import get_genre_parents_tree, get_product_avg_rank
 from promotions.models import Banner, Promotion, Discount
-from order.models import Order, Country
+from order.models import Order, Country, BaseModel
 from order.serializers import ProductReceiptSerializer
 from users.models import User
 from utils.helpers import round_half_integer
@@ -299,3 +303,65 @@ class OrderAdminSerializer(serializers.ModelSerializer):
 
     def get_phone(self, instance):
         return instance.delivery_address.phone
+
+
+class AnalyticsSerializer(serializers.Serializer):
+    FILTER_BY = (
+        ('day', 'day'),
+        ('month', 'month'),
+        ('year', 'year')
+    )
+    start = serializers.DateField(required=True, write_only=True)
+    end = serializers.DateField(required=True, write_only=True)
+    filter_by = serializers.ChoiceField(choices=FILTER_BY, write_only=True, required=True)
+
+    class Meta:
+        model = None
+        fields = ('start', 'end', 'filter_by')
+
+    def validate_filter_by(self, filter_by: str):
+        try:
+            return AnalyticsFilter.get_by_string(filter_by)
+        except ValueError as e:
+            raise serializers.ValidationError({'filter_by': _(str(e))})
+
+    def validate(self, attrs):
+        start, end = attrs['start'], attrs['end']
+        if start >= end:
+            raise serializers.ValidationError({'start': _(f'Cannot be equal or grater than {end}')})
+        return attrs
+
+    def update(self, instance, validated_data):
+        return None
+
+    def create(self, validated_data):
+        return None
+
+    @property
+    def _model(self):
+        return self.Meta.model
+
+    def filter_queryset(self, validated_data):
+        return self._model.objects.all()
+
+    @property
+    def data(self):
+        ret = self.to_representation(self.validated_data)
+        return ReturnList(ret, serializer=self)
+
+    def to_representation(self, validated_data):
+        return self.filter_queryset(validated_data)
+
+
+class OrderAnalyticsSerializer(AnalyticsSerializer):
+    class Meta:
+        model = Order
+
+    def filter_queryset(self, validated_data):
+        start = validated_data['start']
+        end = validated_data['end']
+        filter_by = validated_data['filter_by']
+        return self._model.analytics.filter(
+            created_at__date__gte=start,
+            created_at__date__lte=end
+        ).collected_total_prices(filter_by)

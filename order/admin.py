@@ -28,7 +28,7 @@ class ProductReceiptInline(admin.StackedInline):
         (
             'R...', {
                 'classes': ['collapse'],
-                'fields': ('name', 'status', 'delivery_address', 'is_deleted', 'is_payed')
+                'fields': ('product', 'tags', 'unit_price', 'discount', 'purchases_count')
             }
         ),
     )

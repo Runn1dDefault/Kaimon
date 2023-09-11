@@ -6,7 +6,7 @@ from users.permissions import RegistrationPayedPermission
 from utils.mixins import LanguageMixin
 from utils.filters import FilterByFields
 from utils.paginators import PagePagination
-from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM
+from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM
 
 from .models import Country, UserDeliveryAddress, Order
 from .permissions import OrderPermission
