@@ -28,7 +28,7 @@ class FilterByTag(BaseFilterBackend):
                 'in': 'query',
                 'description': force_str(self.description),
                 'schema': {
-                    'type': 'integer',
+                    'type': 'string',
                 },
             },
         ]
