@@ -234,18 +234,6 @@ class OrderAdminViewSet(StaffViewMixin, LanguageMixin, viewsets.ReadOnlyModelVie
         return Response(status=status.HTTP_202_ACCEPTED)
 
 
-class AnalyticsView(StaffViewMixin, generics.GenericAPIView):
-    parser_classes = (parsers.FormParser, parsers.MultiPartParser, parsers.JSONParser)
-
-    def get_analytics(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        return Response(serializer.data)
-
-    def post(self, request, *args, **kwargs):
-        return self.get_analytics(request, *args, **kwargs)
-
-
 # ----------------------------------------------- Promotions -----------------------------------------------------------
 class PromotionAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     queryset = Promotion.objects.filter(is_deleted=False)
@@ -276,6 +264,18 @@ class UpdateConversionAdminView(DirectorViewMixin, generics.UpdateAPIView):
 
 
 # ------------------------------------------------ Analytics -----------------------------------------------------------
+class AnalyticsView(StaffViewMixin, generics.GenericAPIView):
+    parser_classes = (parsers.FormParser, parsers.MultiPartParser, parsers.JSONParser)
+
+    def get_analytics(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.data)
+
+    def post(self, request, *args, **kwargs):
+        return self.get_analytics(request, *args, **kwargs)
+
+
 class OrderAnalyticsView(AnalyticsView):
     serializer_class = OrderAnalyticsSerializer
 
