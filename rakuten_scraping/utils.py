@@ -54,7 +54,7 @@ def build_product_fields(item: dict[str, Any]):
         id=item['itemCode'],
         name=item['itemName'],
         description=item['itemCaption'],
-        price=item['itemPrice'],
+        rakuten_price=item['itemPrice'],
         product_url=item['itemUrl'],
         availability=True if item['availability'] == 1 else False
     )

@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from utils.helpers import round_half_integer
 
 from .querysets import GenreQuerySet, ProductQuerySet, TagQuerySet, ReviewAnalyticsQuerySet
-from .utils import internal_product_id_generation
+from .utils import internal_product_id_generation, increase_price
 
 
 class Genre(models.Model):
@@ -66,7 +66,9 @@ class Product(models.Model):
     # Product Info
     name = models.CharField(max_length=255, verbose_name=_('Name') + '[ja]')
     description = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ja]')
+    rakuten_price = models.FloatField(null=True)
     price = models.FloatField(null=True)
+    increased_price = models.FloatField(null=True)
     product_url = models.TextField(blank=True, null=True)
     availability = models.BooleanField(default=True)
     # Genres and tags
@@ -100,6 +102,11 @@ class Product(models.Model):
     description_en = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[en]')
     description_ky = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ky]')
     description_kz = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[kz]')
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.rakuten_price and not self.price:
+            self.price = increase_price(self.rakuten_price)
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
     @property
     def genre(self):

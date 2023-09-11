@@ -256,3 +256,6 @@ PRODUCT_DETAIL_MODEL_PATH = 'product.models.ProductDetail'
 PRODUCT_DETAIL_TRANSLATE_FIELDS = ('name', 'value',)
 MARKER_MODEL_PATH = 'product.models.Marker'
 MARKER_TRANSLATE_FIELDS = ('name',)
+
+INCREASE_PRICE_PERCENTAGE = 10
+

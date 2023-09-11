@@ -3,6 +3,10 @@ import uuid
 from django.conf import settings
 
 
+def increase_price(price):
+    return price + (settings.INCREASE_PRICE_PERCENTAGE * price / 100)
+
+
 def internal_product_id_generation():
     return 'internal:' + str(uuid.uuid4())
 
