@@ -1,7 +1,7 @@
 import calendar
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
-from typing import Any, OrderedDict
+from typing import Any
 
 import pandas as pd
 from django.core.validators import MaxValueValidator
@@ -10,7 +10,6 @@ from django.db.models import F
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
 from pandas import DataFrame
-from pytz import tzinfo
 from rest_framework import serializers
 from rest_framework.utils.serializer_helpers import ReturnDict
 

@@ -1,8 +1,7 @@
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, OpenApiParameter
-from rest_framework import generics, mixins, viewsets, permissions, status, filters, parsers, views
-from rest_framework.decorators import action, api_view
+from drf_spectacular.utils import extend_schema
+from rest_framework import generics, mixins, viewsets, permissions, status, filters, parsers
+from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
