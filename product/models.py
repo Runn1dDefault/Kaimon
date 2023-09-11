@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from utils.helpers import round_half_integer
 
-from .querysets import GenreQuerySet, ProductQuerySet, TagQuerySet
+from .querysets import GenreQuerySet, ProductQuerySet, TagQuerySet, ReviewAnalyticsQuerySet
 from .utils import internal_product_id_generation
 
 
@@ -141,6 +141,9 @@ class ProductImageUrl(models.Model):
 
 
 class ProductReview(models.Model):
+    analytics = ReviewAnalyticsQuerySet.as_manager()
+    objects = models.Manager()
+
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='reviews')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
     rank = models.FloatField(validators=[MinValueValidator(0), MaxValueValidator(5)], default=0)

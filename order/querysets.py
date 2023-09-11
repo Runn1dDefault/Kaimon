@@ -1,42 +1,25 @@
-from enum import Enum
-
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import QuerySet, F, Case, When, Value
-from django.db.models.functions import TruncMonth, TruncDate, TruncDay, TruncYear, JSONObject, Round
-from pandas import DataFrame
+from django.db.models import F, Case, When, Value
+from django.db.models.functions import JSONObject, Round
+
+from utils.queryset import AnalyticsQuerySet
+from utils.types import AnalyticsFilter
 
 
-class AnalyticsFilter(Enum):
-    DATE = TruncDate
-    MONTH = TruncMonth
-    YEAR = TruncYear
-    DAY = TruncDay
-
-    @classmethod
-    def get_by_string(cls, by: str):
-        check_field = by.lower()
-        if check_field not in ('day', 'month', 'year'):
-            raise ValueError('this filtering not supported %s' % by)
-
-        match check_field:
-            case 'day':
-                return AnalyticsFilter.DAY
-            case 'month':
-                return AnalyticsFilter.MONTH
-            case 'year':
-                return AnalyticsFilter.YEAR
-
-
-class OrderAnalyticsQuerySet(QuerySet):
+class OrderAnalyticsQuerySet(AnalyticsQuerySet):
     sale_formula = F('receipts__unit_price') - (F('receipts__discount') * F('receipts__unit_price') / Value(100.0))
 
-    def total_prices_by_date(self, by: AnalyticsFilter):
-        return self.values(date=by.value('created_at'), order_id=F('id')).annotate(
+    def get_analytics(self, by: AnalyticsFilter):
+        return self.values(date=by.value('created_at')).annotate(
             receipts_info=ArrayAgg(
                 JSONObject(
+                    order_id=F('id'),
+                    product_id=F('receipts__product_id'),
                     unit_price=F("receipts__unit_price"),
                     discount=F("receipts__discount"),
-                    purchases_count=F('receipts__purchases_count')
+                    purchases_count=F('receipts__purchases_count'),
+                    yen_to_som=F('yen_to_som'),
+                    yen_to_dollar=F('yen_to_usd'),
                 )
             ),
             sale_prices_yen=ArrayAgg(
@@ -88,17 +71,3 @@ class OrderAnalyticsQuerySet(QuerySet):
                 )
             )
         )
-
-    def collected_total_prices(self, by: AnalyticsFilter):
-        df = self.total_prices_by_date(by).to_df()
-        df['total_price_yen'] = df['sale_prices_yen'].apply(lambda x: sum(x))
-        df['total_price_som'] = df['sale_prices_som'].apply(lambda x: sum(x))
-        df['total_price_dollar'] = df['sale_prices_dollar'].apply(lambda x: sum(x))
-        df.set_index('date', inplace=True)
-        df = df.stack().reset_index()
-        # df.columns = ['order_id', 'receipts_info', 'total_price_yen', 'total_price_som', 'total_price_dollar']
-        print(df)
-        return df.to_dict()
-
-    def to_df(self) -> DataFrame:
-        return DataFrame(self)

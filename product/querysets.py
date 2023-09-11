@@ -1,7 +1,10 @@
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import QuerySet, F, Count, Avg, Q
-from django.db.models.functions import JSONObject
+from django.db.models.functions import JSONObject, Round
+from django.forms import FloatField
 
+from utils.queryset import AnalyticsQuerySet
+from utils.types import AnalyticsFilter
 
 class TagQuerySet(QuerySet):
     def groups_with_tags(self):
@@ -38,3 +41,22 @@ class ProductQuerySet(QuerySet):
             avg_rank=Avg('reviews__rank', filter=Q(reviews__is_active=True)),
             receipts_qty=Count('receipts__order_id', distinct=True)
         ).order_by('receipts_qty', 'avg_rank')
+
+
+class ReviewAnalyticsQuerySet(AnalyticsQuerySet):
+    def get_date_analytics(self, by: AnalyticsFilter):
+        return self.values(date=by.value('created_at')).annotate(
+            info=ArrayAgg(
+                JSONObject(
+                    user_id=F('user__id'),
+                    user_email=F('user__email'),
+                    comment=F('comment'),
+                    rank=F('rank'),
+                    created_at=F('created_at'),
+                    is_active=F('is_active'),
+                    is_read=F('is_read')
+                )
+            ),
+            count=Count('id'),
+            avg_rank=Round(Avg('rank'), precision=1)
+        )

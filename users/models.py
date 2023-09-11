@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser, UserManager as BaseUserManager
 from django.utils.translation import gettext_lazy as _
 
+from users.querysets import UserAnalyticsQuerySet
+
 
 class UserManager(BaseUserManager):
     def create_user(self, username, email=None, password=None, **extra_fields):
@@ -23,6 +25,7 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractUser):
+    analytics = UserAnalyticsQuerySet.as_manager()
     objects = UserManager()
 
     class Role(models.TextChoices):
