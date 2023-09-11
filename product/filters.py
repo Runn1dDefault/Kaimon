@@ -16,6 +16,7 @@ class FilterByTag(BaseFilterBackend):
 
     def filter_queryset(self, request, queryset, view):
         tag_ids = request.query_params.get(self.param, '').split(',')
+        tag_ids = [tag_id for tag_id in tag_ids if tag_id.strip()]
         if tag_ids:
             return queryset.filter(tags__id__in=tag_ids)
         return queryset
