@@ -50,7 +50,6 @@ class DateRangeFilter(BaseFilterBackend):
             range_queries[self.get_start_field(view) + '__gte'] = start
         if end:
             range_queries[self.get_end_field(view) + '__lte'] = end
-        print(range_queries)
         try:
             return queryset.filter(**range_queries)
         except ValidationError as e:
@@ -113,7 +112,6 @@ class FilterByFields(BaseFilterBackend):
 
         for query_field, db_field in filter_fields.items():
             value = request.query_params.get(query_field, None)
-            print(value)
             if not value:
                 continue
 
