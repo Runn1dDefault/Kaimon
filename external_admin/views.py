@@ -18,9 +18,10 @@ from utils.paginators import PagePagination
 from .paginators import UserListPagination
 
 from .serializers import ConversionAdminSerializer, PromotionAdminSerializer, \
-    ProductAdminSerializer, ProductDetailAdminSerializer, OrderAdminSerializer, \
+    ProductAdminSerializer, ProductDetailAdminSerializer, \
     ProductImageAdminSerializer, UserAdminSerializer, GenreAdminSerializer, TagAdminSerializer, \
-    ProductReviewAdminSerializer, OrderAnalyticsSerializer, UserAnalyticsSerializer, ReviewAnalyticsSerializer
+    ProductReviewAdminSerializer, OrderAnalyticsSerializer, UserAnalyticsSerializer, ReviewAnalyticsSerializer, \
+    OrderAdminSerializer
 
 
 class DirectorViewMixin:
@@ -28,8 +29,8 @@ class DirectorViewMixin:
 
 
 class StaffViewMixin:
-    permission_classes = (permissions.IsAuthenticated, IsStaffUser,)
-
+    # permission_classes = (permissions.IsAuthenticated, IsStaffUser,)
+    pass
 
 # ---------------------------------------------- Users -----------------------------------------------------------------
 class UserAdminView(DirectorViewMixin, viewsets.ReadOnlyModelViewSet):
@@ -191,7 +192,7 @@ class ProductReviewAdminView(StaffViewMixin, mixins.RetrieveModelMixin, mixins.D
 
 
 # ---------------------------------------------- Order -----------------------------------------------------------------
-class OrderAdminViewSet(StaffViewMixin, LanguageMixin, viewsets.ReadOnlyModelViewSet):
+class OrderAdminViewSet(StaffViewMixin, viewsets.ReadOnlyModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderAdminSerializer
     pagination_class = PagePagination

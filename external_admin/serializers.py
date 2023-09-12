@@ -6,7 +6,8 @@ from typing import Any
 import pandas as pd
 from django.core.validators import MaxValueValidator
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Case, When, Value
+from django.db.models.functions import Round
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
 from pandas import DataFrame
@@ -20,8 +21,8 @@ from product.models import Product, Genre, Tag, ProductImageUrl, TagGroup, Produ
 from product.serializers import TagByGroupSerializer
 from product.utils import get_genre_parents_tree, get_product_avg_rank
 from promotions.models import Banner, Promotion, Discount
-from order.models import Order, Country
-from order.serializers import ProductReceiptSerializer
+from order.models import Order, Customer, DeliveryAddress, OrderReceipt
+from order.serializers import OrderReceiptSerializer
 from users.models import User
 
 
@@ -258,54 +259,56 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class CountryAdminSerializer(serializers.ModelSerializer):
+class OrderCustomerAdminSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Country
+        model = Customer
+        fields = ('id', 'name', 'email', 'phone')
+
+
+class DeliveryAddressAdminSerializer(serializers.ModelSerializer):
+    user = UserAdminSerializer(read_only=True)
+
+    class Meta:
+        model = DeliveryAddress
+        fields = '__all__'
+
+
+class OrderReceiptAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderReceipt
         fields = '__all__'
 
 
 class OrderAdminSerializer(serializers.ModelSerializer):
-    email = serializers.SerializerMethodField(read_only=True)
-    full_name = serializers.SerializerMethodField(read_only=True)
+    customer = OrderCustomerAdminSerializer(read_only=True)
+    delivery_address = DeliveryAddressAdminSerializer(read_only=True)
+    receipts = OrderReceiptAdminSerializer(many=True, read_only=True)
     total_price = serializers.SerializerMethodField(read_only=True)
-    date = serializers.SerializerMethodField(read_only=True)
-    country = CountryAdminSerializer(many=False, read_only=True)
-    city = serializers.SerializerMethodField(read_only=True)
-    address = serializers.SerializerMethodField(read_only=True)
-    phone = serializers.SerializerMethodField(read_only=True)
-    zip_code = serializers.SerializerMethodField(read_only=True)
-    receipts = ProductReceiptSerializer(many=True, read_only=True)
 
     class Meta:
         model = Order
-        fields = ('id', 'status', 'email', 'full_name', 'total_price', 'date', 'country', 'city', 'phone', 'zip_code',
-                  'address', 'receipts')
-
-    def get_email(self, instance):
-        return instance.delivery_address.user.email
-
-    def get_full_name(self, instance):
-        return instance.delivery_address.user.full_name
+        fields = ('id', 'customer', 'delivery_address', 'status', 'receipts', 'total_price')
 
     def get_total_price(self, instance):
-        receipts = instance.receipts.filter(is_canceled=False, qty__gt=0, unit_price__gt=0)
+        receipts = instance.receipts.filter(quantity__gt=0, unit_price__gt=0)
+        sale_formula = F('unit_price') - (F('discount') * F('unit_price') / Value(100.0))
         return sum(
             receipts.annotate(
-                total_price=F('unit_price') * F('qty')
+                total_price=Case(
+                    When(
+                        discount=0,
+                        then=Round(
+                            F('unit_price') * F('quantity'),
+                            precision=2
+                        )
+                    ),
+                    When(
+                        discount__gt=0,
+                        then=Round(sale_formula * F('quantity'), precision=2)
+                    )
+                )
             ).values_list('total_price', flat=True)
         )
-
-    def get_date(self, instance):
-        return localtime(instance.created_at).date()
-
-    def get_city(self, instance):
-        return instance.delivery_address.city
-
-    def get_address(self, instance):
-        return instance.delivery_address.address
-
-    def get_phone(self, instance):
-        return instance.delivery_address.phone
 
 
 class AnalyticsSerializer(serializers.Serializer):

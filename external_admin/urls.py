@@ -6,13 +6,13 @@ from .views import (
     GenreSearchAdminView, TagSearchAdminView,
     OrderAnalyticsView, UserAnalyticsView, ReviewAnalyticsView,
     PromotionAdminViewSet,
-    ConversionListAdminView, UpdateConversionAdminView, UserAdminView
+    ConversionListAdminView, UpdateConversionAdminView, UserAdminView, OrderAdminViewSet
 )
 
 router = SimpleRouter()
 router.register('reviews', ProductReviewAdminView)
 router.register('products', ProductAdminViewSet)
-# router.register('orders', OrderAdminViewSet)
+router.register('orders', OrderAdminViewSet)
 router.register('promotions', PromotionAdminViewSet)
 router.register('users', UserAdminView)
 
