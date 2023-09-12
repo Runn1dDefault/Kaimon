@@ -4,8 +4,8 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from order.querysets import OrderAnalyticsQuerySet
+from order.validators import only_digit_validator
 from product.models import Product, Tag
-from promotions.models import Promotion
 from users.utils import get_sentinel_user
 
 
@@ -17,38 +17,30 @@ class BaseModel(models.Model):
         abstract = True
 
 
-class Country(BaseModel):
-    name = models.CharField(max_length=100, verbose_name=_('Name') + '[ja]', unique=True)
-    name_tr = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[tr]')
-    name_ru = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ru]')
-    name_en = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[en]')
-    name_ky = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ky]')
-    name_kz = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[kz]')
-    is_active = models.BooleanField(default=True)
+class Customer(BaseModel):
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20, validators=[only_digit_validator])
 
     def __str__(self):
         return self.name
 
-    class Meta:
-        verbose_name_plural = _('Countries')
 
+class DeliveryAddress(BaseModel):
+    user = models.ForeignKey(get_user_model(), on_delete=models.SET(get_sentinel_user),
+                             related_name='delivery_addresses')
+    recipient_name = models.CharField(max_length=100)
+    address_line1 = models.CharField(max_length=255)
+    address_line2 = models.CharField(max_length=255, blank=True, null=True)
+    city = models.CharField(max_length=100)
+    state = models.CharField(max_length=100)
+    postal_code = models.CharField(max_length=20)
+    country = models.CharField(max_length=100)
 
-class UserDeliveryAddress(BaseModel):
-    user = models.ForeignKey(
-        get_user_model(),
-        on_delete=models.SET(get_sentinel_user),
-        related_name='delivery_addresses'
-    )
-    country = models.ForeignKey(Country, on_delete=models.PROTECT, related_name='delivery_addresses')
-    city = models.CharField(max_length=255)
-    address = models.TextField()
-    phone = models.CharField(max_length=15)
-    zip_code = models.CharField(max_length=50)
-
-    is_deleted = models.BooleanField(default=False)
+    as_deleted = models.BooleanField(default=False)
 
     def __str__(self):
-        return f'{self.user.email}'
+        return f"{self.recipient_name}'s Address"
 
     class Meta:
         verbose_name = _('Delivery Address')
@@ -66,31 +58,24 @@ class Order(BaseModel):
         delivered = 'delivered', _('Delivered')
         success = 'success', _('Success')
 
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='delivery_addresses')
+    delivery_address = models.ForeignKey(DeliveryAddress, on_delete=models.RESTRICT, related_name='orders')
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.pending)
+    # important!: when updating an address, create a new address and mark the old one as deleted
+    shipping_carrier = models.CharField(max_length=50, default='FedEx')
+    shipping_weight = models.IntegerField(verbose_name=_('Shipping weight'), blank=True, null=True)
+    comment = models.TextField(null=True, blank=True)
     # for correct analytics, the value of conversions for two currencies with yen will be saved here
     yen_to_usd = models.FloatField()
     yen_to_som = models.FloatField()
 
-    delivery_address = models.ForeignKey(UserDeliveryAddress, on_delete=models.PROTECT, related_name='orders')
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.pending)
-    shipping_weight = models.BigIntegerField(verbose_name=_('Shipping weight'))
 
-    comment = models.TextField(null=True, blank=True)
-    disclaimer_comment = models.TextField(null=True, blank=True)
-    is_deleted = models.BooleanField(default=False)
-
-    def delete_receipts(self):
-        receipts = self.receipts.filter(is_canceled=False)
-        for receipt in receipts:
-            receipt.is_canceled = True
-            receipt.returns = receipt.total_qty
-            receipt.qty = 0
-        self.__class__.objects.bulk_update(receipts, {'is_canceled', 'returns', 'qty'})
-
-
-class ProductReceipt(BaseModel):
-    # promotion = models.ForeignKey(Promotion, on_delete=models.SET_NULL, related_name='receipts', null=True)
-    order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name='receipts')
-    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='receipts')
+class OrderReceipt(BaseModel):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='receipts')
+    product = models.ForeignKey(Product, on_delete=models.RESTRICT, related_name='receipts')
+    unit_price = models.FloatField()
+    discount = models.FloatField(default=0.0)
+    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)], default=1)
     # product tags of client choice will be saved in field tags,
     # for a better understanding of what the client wants to order
     tags = models.ManyToManyField(
@@ -98,6 +83,3 @@ class ProductReceipt(BaseModel):
         blank=True,
         related_name='receipts'
     )
-    unit_price = models.FloatField()
-    discount = models.FloatField(default=0.0)
-    purchases_count = models.PositiveIntegerField(validators=[MinValueValidator(1)])
