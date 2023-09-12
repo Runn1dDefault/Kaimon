@@ -17,9 +17,10 @@ class OrderAnalyticsQuerySet(AnalyticsQuerySet):
                     product_id=F('receipts__product_id'),
                     unit_price=F("receipts__unit_price"),
                     discount=F("receipts__discount"),
-                    purchases_count=F('receipts__purchases_count'),
+                    quantity=F('receipts__quantity'),
                     yen_to_som=F('yen_to_som'),
                     yen_to_dollar=F('yen_to_usd'),
+                    status=F('status')
                 )
             ),
             sale_prices_yen=ArrayAgg(
@@ -27,13 +28,13 @@ class OrderAnalyticsQuerySet(AnalyticsQuerySet):
                   When(
                       receipts__discount=0,
                       then=Round(
-                          F('receipts__unit_price') * F('receipts__purchases_count'),
+                          F('receipts__unit_price') * F('receipts__quantity'),
                           precision=2
                       )
                   ),
                   When(
                       receipts__discount__gt=0,
-                      then=Round(self.sale_formula * F('receipts__purchases_count'), precision=2)
+                      then=Round(self.sale_formula * F('receipts__quantity'), precision=2)
                   )
 
               )
@@ -43,13 +44,13 @@ class OrderAnalyticsQuerySet(AnalyticsQuerySet):
                     When(
                         receipts__discount=0,
                         then=Round(
-                            F('receipts__unit_price') * F('receipts__purchases_count') * F('yen_to_som'),
+                            F('receipts__unit_price') * F('receipts__quantity') * F('yen_to_som'),
                             precision=2
                         )
                     ),
                     When(
                         receipts__discount__gt=0,
-                        then=Round(self.sale_formula * F('receipts__purchases_count') * F('yen_to_som'), precision=2)
+                        then=Round(self.sale_formula * F('receipts__quantity') * F('yen_to_som'), precision=2)
                     )
 
                 )
@@ -59,13 +60,13 @@ class OrderAnalyticsQuerySet(AnalyticsQuerySet):
                     When(
                         receipts__discount=0,
                         then=Round(
-                            F('receipts__unit_price') * F('receipts__purchases_count') * F('yen_to_usd'),
+                            F('receipts__unit_price') * F('receipts__quantity') * F('yen_to_usd'),
                             precision=2
                         )
                     ),
                     When(
                         receipts__discount__gt=0,
-                        then=Round(self.sale_formula * F('receipts__purchases_count') * F('yen_to_usd'), precision=2)
+                        then=Round(self.sale_formula * F('receipts__quantity') * F('yen_to_usd'), precision=2)
                     )
 
                 )
