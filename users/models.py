@@ -25,8 +25,8 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractUser):
-    analytics = UserAnalyticsQuerySet.as_manager()
     objects = UserManager()
+    analytics = UserAnalyticsQuerySet.as_manager()
 
     class Role(models.TextChoices):
         DEVELOPER = 'dev', _('Developer')
