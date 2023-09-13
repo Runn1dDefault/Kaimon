@@ -1,4 +1,4 @@
-from rest_framework import viewsets, mixins, generics
+from rest_framework import viewsets, mixins
 from rest_framework.decorators import action
 
 from product.models import Product
