@@ -37,8 +37,7 @@ services:
     expose:
       - "8334"
     volumes:
-      - static:/app/static
-      - media:/app/media
+      - ../../:/app
     depends_on:
       - postgres
       - redis
@@ -54,8 +53,8 @@ services:
     depends_on:
       - web-dev
     volumes:
-      - static:/app/static
-      - media:/app/media
+      - ../../static:/app/static
+      - ../../media:/app/media
 
   celery-beat-dev:
     container_name: celery-beat-dev
@@ -66,6 +65,8 @@ services:
       - "postgres:postgres_kaimono"
       - "redis:redis_kaimono"
     command: celery --app kaimon beat --loglevel=info
+    volumes:
+      - ../../:/app
     env_file:
       - ../../.env
     depends_on:
@@ -81,6 +82,8 @@ services:
       - "postgres:postgres_kaimono"
       - "redis:redis_kaimono"
     command: celery --app kaimon worker -Q mailing -c 1 --loglevel=info
+    volumes:
+      - ../../:/app
     env_file:
       - ../../.env
     depends_on:
@@ -95,7 +98,9 @@ services:
     links:
       - "postgres:postgres_kaimono"
       - "redis:redis_kaimono"
-    command: celery --app kaimon worker -Q rakuten_requests -c 3 --loglevel=info
+    command: celery --app kaimon worker -Q rakuten_requests -c 4 --loglevel=info
+    volumes:
+      - ../../:/app
     env_file:
       - ../../.env
     depends_on:
@@ -110,7 +115,9 @@ services:
     links:
       - "postgres:postgres_kaimono"
       - "redis:redis_kaimono"
-    command: celery --app kaimon worker -Q item_saving -c 10 --loglevel=info
+    command: celery --app kaimon worker -Q item_saving -c 4 --loglevel=info
+    volumes:
+      - ../../:/app
     env_file:
       - ../../.env
     depends_on:
@@ -126,6 +133,8 @@ services:
       - "postgres:postgres_kaimono"
       - "redis:redis_kaimono"
     command: celery --app kaimon worker -Q default -c 4 --loglevel=info
+    volumes:
+      - ../../:/app
     env_file:
       - ../../.env
     depends_on:
@@ -141,6 +150,8 @@ services:
       - "postgres:postgres_kaimono"
       - "redis:redis_kaimono"
     command: celery --app kaimon worker -Q translating -c 1 --loglevel=info
+    volumes:
+      - ../../:/app
     env_file:
       - ../../.env
     depends_on:
@@ -150,5 +161,3 @@ services:
 volumes:
   redis_data:
   postgres_data:
-  static:
-  media:
