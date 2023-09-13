@@ -10,22 +10,22 @@ from .views import (
 )
 
 router = SimpleRouter()
-router.register('reviews', ProductReviewAdminView)
-router.register('products', ProductAdminViewSet)
-router.register('orders', OrderAdminViewSet)
-router.register('promotions', PromotionAdminViewSet)
-router.register('users', UserAdminView)
+router.register('reviews', ProductReviewAdminView, basename='admin-reviews')
+router.register('products', ProductAdminViewSet, basename='admin-products')
+router.register('orders', OrderAdminViewSet, basename='admin-orders')
+router.register('promotions', PromotionAdminViewSet, basename='admin-promotions')
+router.register('users', UserAdminView, basename='admin-users')
 
 analytics_urlpatterns = [
-    path('analytics/orders/', OrderAnalyticsView.as_view(), name='admin_analytics_orders'),
-    path('analytics/users/', UserAnalyticsView.as_view(), name='admin_analytics_users'),
-    path('analytics/reviews/', ReviewAnalyticsView.as_view(), name='admin_analytics_users')
+    path('analytics/orders/', OrderAnalyticsView.as_view(), name='admin-analytics-orders'),
+    path('analytics/users/', UserAnalyticsView.as_view(), name='admin-analytics-users'),
+    path('analytics/reviews/', ReviewAnalyticsView.as_view(), name='admin-analytics-users')
 ]
 
 urlpatterns = analytics_urlpatterns + [
-    path('products/genres/', GenreSearchAdminView.as_view(), name='admin_genres_search'),
-    path('products/tags/', TagSearchAdminView.as_view(), name='admin_tags_search'),
-    path('conversion/', ConversionListAdminView.as_view(), name='admin_conversion_list'),
-    re_path('^conversion/(?P<id>.+)/$', UpdateConversionAdminView.as_view(), name='admin_conversion_update'),
+    path('products/genres/', GenreSearchAdminView.as_view(), name='admin-genres-list'),
+    path('products/tags/', TagSearchAdminView.as_view(), name='admin-tags-list'),
+    path('conversions/', ConversionListAdminView.as_view(), name='admin-conversions-list'),
+    re_path('^conversions/(?P<id>.+)/$', UpdateConversionAdminView.as_view(), name='admin-conversion-update'),
     path('', include(router.urls)),
 ]

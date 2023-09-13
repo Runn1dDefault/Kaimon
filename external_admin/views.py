@@ -29,8 +29,8 @@ class DirectorViewMixin:
 
 
 class StaffViewMixin:
-    # permission_classes = (permissions.IsAuthenticated, IsStaffUser,)
-    pass
+    permission_classes = (permissions.IsAuthenticated, IsStaffUser,)
+
 
 # ---------------------------------------------- Users -----------------------------------------------------------------
 class UserAdminView(DirectorViewMixin, viewsets.ReadOnlyModelViewSet):
