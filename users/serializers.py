@@ -1,8 +1,6 @@
-import copy
 from typing import Iterable
 
 from django.contrib.auth.password_validation import validate_password
-from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
@@ -22,13 +20,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
         self.hide_fields = hide_fields or []
         super().__init__(instance=instance, data=data, **kwargs)
 
-    @cached_property
-    def fields(self):
-        fields = super().fields
-        for field in copy.deepcopy(fields).keys():
-            if field in self.hide_fields:
-                fields.pop(field)
-        return fields
+    @property
+    def _readable_fields(self):
+        for field_name, field_ins in self.fields.items():
+            # this will prevent a representation field from appearing
+            if field_name in self.hide_fields:
+                continue
+
+            if not field_ins.write_only:
+                yield field_ins
 
 
 class PasswordSerializer(serializers.Serializer):
