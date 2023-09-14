@@ -1,6 +1,8 @@
+import copy
 from typing import Iterable
 
 from django.contrib.auth.password_validation import validate_password
+from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
@@ -11,25 +13,22 @@ from .tokens import get_tokens_for_user, RestoreToken, RestoreCode
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    def __init__(self, hide_fields: Iterable[str] = None, *args, **kwargs):
-        self.hide_fields = hide_fields
-        super().__init__(*args, **kwargs)
-
     class Meta:
         model = User
         fields = ('email', 'full_name', 'role', 'image')
         extra_kwargs = {'role': {'read_only': True}}
 
-    def remove_hide_fields(self, representation):
-        for field in self.hide_fields or []:
-            if field not in representation.keys():
-                continue
-            representation.pop(field)
+    def __init__(self, hide_fields: Iterable[str] = None, instance=None, data=None, **kwargs):
+        self.hide_fields = hide_fields or []
+        super().__init__(instance=instance, data=data, **kwargs)
 
-    def to_representation(self, instance):
-        representation = super().to_representation(instance)
-        self.remove_hide_fields(representation)
-        return representation
+    @cached_property
+    def fields(self):
+        fields = super().fields
+        for field in copy.deepcopy(fields).keys():
+            if field in self.hide_fields:
+                fields.pop(field)
+        return fields
 
 
 class PasswordSerializer(serializers.Serializer):
@@ -43,29 +42,40 @@ class PasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError({'detail': 'passwords not match!'})
         return attrs
 
+    def update(self, instance, validated_data):
+        raise NotImplementedError('`update()` must be implemented.')
+
+    def create(self, validated_data):
+        raise NotImplementedError('`create()` must be implemented.')
+
 
 class RegistrationSerializer(PasswordSerializer):
-    _user_serializer = UserProfileSerializer
     full_name = serializers.CharField(max_length=300, required=True)
     email = serializers.EmailField(max_length=300, required=True)
     image = serializers.ImageField(required=False, allow_empty_file=False, write_only=True)
 
-    def _get_user_data(self, user):
-        return self._user_serializer(instance=user, context=self.context).data
-
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        email = attrs['email']
-        user = User.objects.create_user(
+    def create(self, validated_data):
+        email = validated_data['email']
+        return User.objects.create_user(
             username=email,
             email=email,
-            password=attrs['password'],
-            full_name=attrs['full_name'],
+            password=validated_data['password'],
+            full_name=validated_data['full_name'],
             is_active=False,
             registration_payed=False,
-            image=attrs.get('image', None)
+            image=validated_data.get('image', None)
         )
-        return self._get_user_data(user)
+
+    def update(self, instance, validated_data):
+        raise NotImplementedError('`update()` not implemented.')
+
+    def to_representation(self, instance):
+        raise NotImplementedError('`to_representation()` not implemented.')
+
+    @property
+    def data(self):
+        assert self.instance
+        return UserProfileSerializer(instance=self.instance, many=False, context=self.context).data
 
 
 class RestoreSerializer(serializers.Serializer):
@@ -76,12 +86,14 @@ class RestoreSerializer(serializers.Serializer):
     code = serializers.CharField(write_only=True, required=False, min_length=6, max_length=6)
     send_new_code = serializers.BooleanField(default=False)
 
-    @staticmethod
-    def _get_user_by_email(email):
-        user = User.objects.filter(email=email).first()
-        if not user:
-            raise serializers.ValidationError({'email': _('User with email %s not exist!') % email})
-        return user
+    def __init__(self, data, **kwargs):
+        super().__init__(data=data, instance=None, **kwargs)
+
+    def create(self, validated_data):
+        raise NotImplementedError('`create()` not implemented.')
+
+    def update(self, instance, validated_data):
+        raise NotImplementedError('`update()` not implemented.')
 
     def create_token(self, user_id: int, code):
         try:
@@ -101,31 +113,44 @@ class RestoreSerializer(serializers.Serializer):
             return code
 
     def validate(self, attrs):
-        email = attrs['email']
-        user = self._get_user_by_email(email)
-        code = attrs.get('code')
-        send_new_code = attrs['send_new_code']
+        email = attrs.pop('email')
+        user = User.objects.filter(email=email).first()
+        if not user:
+            raise serializers.ValidationError({'email': _('User with email %s not exist!') % email})
 
+        code = attrs.pop('code', None)
+        send_new_code = attrs['send_new_code']
         if not code and not send_new_code:
-            raise serializers.ValidationError(
-                {'send_new_code': _('When send_new_code is false code field become required!')}
-            )
+            raise serializers.ValidationError({'code': _('Invalid code!')})
+
         if code:
             token = self.create_token(user_id=user.id, code=code)
             return {'token': str(token)}
 
         if send_new_code is True:
             # if you need to restrict sending for a user who has already sent, then change raise_on_exist to True
-            code = self.create_code(user_id=user.id, raise_on_exist=False)
-            send_code_template.delay(email=email, code=str(code))
+            new_code = self.create_code(user_id=user.id, raise_on_exist=False)
+            send_code_template.delay(email=email, code=str(new_code))
+            return {'sent': True}
+        raise serializers.ValidationError({'detail': _('Something went wrong!')}, code=500)
+
+    def to_representation(self, validated_data):
+        token = validated_data.get('token')
+        if token:
+            return {'status': 'ok', 'token': token}
+        if validated_data.get('sent', False) is True:
             return {'status': 'send'}
         return {'status': 'failed'}
 
 
 class UpdatePasswordSerializer(PasswordSerializer):
-    def validate(self, attrs):
-        user = self.context['request'].user
-        attrs = super().validate(attrs)
-        user.set_password(attrs['password'])
-        user.save()
-        return get_tokens_for_user(user)
+    def create(self, validated_data):
+        raise NotImplementedError('`create()` not implemented.')
+
+    def update(self, instance, validated_data):
+        instance.set_password(validated_data['password'])
+        instance.save()
+        return instance
+
+    def to_representation(self, instance):
+        return get_tokens_for_user(instance)
