@@ -17,6 +17,8 @@ class OauthManager(models.Manager):
         return f'{app_settings.USED_USER_PREFIX}:{client_id}_{app_id}'
 
     def free_client(self):
+        # TODO: perhaps you should allocate free clients based on a minimum amount of usage
+        #  and usage amount stored in cache
         print('Search free client...')
         st = time.monotonic()
         while True:

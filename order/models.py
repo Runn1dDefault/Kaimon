@@ -1,12 +1,12 @@
-from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models.functions import Round
 from django.utils.translation import gettext_lazy as _
 
 from order.querysets import OrderAnalyticsQuerySet
 from order.validators import only_digit_validator
+# from payment.models import Payment
 from product.models import Product, Tag
-from users.utils import get_sentinel_user
 
 
 class BaseModel(models.Model):
@@ -27,8 +27,7 @@ class Customer(BaseModel):
 
 
 class DeliveryAddress(BaseModel):
-    user = models.ForeignKey(get_user_model(), on_delete=models.SET(get_sentinel_user),
-                             related_name='delivery_addresses')
+    customer = models.ForeignKey(Customer, on_delete=models.RESTRICT, related_name='delivery_addresses')
     recipient_name = models.CharField(max_length=100)
     address_line1 = models.CharField(max_length=255)
     address_line2 = models.CharField(max_length=255, blank=True, null=True)
@@ -54,20 +53,29 @@ class Order(BaseModel):
     class Status(models.TextChoices):
         pending = 'pending', _('Pending')
         rejected = 'rejected', _('Rejected')
-        canceled = 'canceled', _('Canceled')
         delivered = 'delivered', _('Delivered')
         success = 'success', _('Success')
 
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='delivery_addresses')
+    # payment = models.OneToOneField(Payment, on_delete=models.CASCADE)
     delivery_address = models.ForeignKey(DeliveryAddress, on_delete=models.RESTRICT, related_name='orders')
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.pending)
+    comment = models.TextField(null=True, blank=True)
+
     # important!: when updating an address, create a new address and mark the old one as deleted
     shipping_carrier = models.CharField(max_length=50, default='FedEx')
     shipping_weight = models.IntegerField(verbose_name=_('Shipping weight'), blank=True, null=True)
-    comment = models.TextField(null=True, blank=True)
     # for correct analytics, the value of conversions for two currencies with yen will be saved here
     yen_to_usd = models.FloatField()
     yen_to_som = models.FloatField()
+
+    @property
+    def total_price(self):
+        if not self.receipts.exists():
+            return 0.0
+
+        sale_price_case = self.__class__.analytics.sale_price_case(from_receipts=True)
+        receipts_prices = self.receipts.annotate(receipt_price=sale_price_case).values_list('receipt_price', flat=True)
+        return sum(list(receipts_prices))
 
 
 class OrderReceipt(BaseModel):

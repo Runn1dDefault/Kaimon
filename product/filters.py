@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.filters import SearchFilter, BaseFilterBackend
 from rest_framework.generics import get_object_or_404
 
-from utils.mixins import LanguageMixin
+from utils.views.mixins import LanguageMixin
 
 from .querysets import ProductQuerySet
 

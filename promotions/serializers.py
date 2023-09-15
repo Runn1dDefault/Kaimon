@@ -1,8 +1,7 @@
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
-from product.serializers import ProductListSerializer
-from utils.mixins import LangSerializerMixin
+from utils.serializers.mixins import LangSerializerMixin
 
 from .models import Banner, Promotion
 

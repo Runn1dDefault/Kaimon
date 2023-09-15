@@ -1,14 +1,24 @@
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import QuerySet, F, Count, Avg, Q
+from django.db.models import QuerySet, F, Count, Avg, Q, Case, When
 from django.db.models.functions import JSONObject, Round
-from django.forms import FloatField
 
 from utils.queryset import AnalyticsQuerySet
 from utils.types import AnalyticsFilter
 
-class TagQuerySet(QuerySet):
+
+class TagGroupQuerySet(QuerySet):
     def groups_with_tags(self):
         return self.annotate(tags_qty=Count('tags__id')).filter(tags_qty__gt=0)
+
+    def tags_list(self, name_field: str = 'name'):
+        return self.values(group_id=F('id'), group_name=F(name_field)).annotate(
+            tag_info=ArrayAgg(
+                JSONObject(
+                    id=F('tags__id'),
+                    name=F('tags__' + name_field)
+                )
+            )
+        )
 
 
 class GenreQuerySet(QuerySet):

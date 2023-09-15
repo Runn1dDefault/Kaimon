@@ -8,21 +8,19 @@ from django.core.validators import MaxValueValidator
 from django.db import transaction
 from django.db.models import F, Case, When, Value
 from django.db.models.functions import Round
-from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
 from pandas import DataFrame
 from rest_framework import serializers
 from rest_framework.utils.serializer_helpers import ReturnDict
 
-from currencies.mixins import CurrencySerializerMixin
 from currencies.models import Conversion
+from currencies.serializers import ConversionField
 from order.querysets import AnalyticsFilter
 from product.models import Product, Genre, Tag, ProductImageUrl, TagGroup, ProductReview
 from product.serializers import TagByGroupSerializer
-from product.utils import get_genre_parents_tree, get_product_avg_rank
+from product.utils import get_genre_parents_tree
 from promotions.models import Banner, Promotion, Discount
 from order.models import Order, Customer, DeliveryAddress, OrderReceipt
-from order.serializers import OrderReceiptSerializer
 from users.models import User
 
 
@@ -61,8 +59,9 @@ class ProductImageAdminSerializer(serializers.ModelSerializer):
         fields = ('id', 'product', 'url')
 
 
-class ProductAdminSerializer(CurrencySerializerMixin, serializers.ModelSerializer):
-    sale_price = serializers.SerializerMethodField(read_only=True)
+class ProductAdminSerializer(serializers.ModelSerializer):
+    price = ConversionField(all_conversions=True)
+    sale_price = ConversionField(all_conversions=True)
     avg_rank = serializers.SerializerMethodField(read_only=True)
     image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
 
@@ -70,22 +69,6 @@ class ProductAdminSerializer(CurrencySerializerMixin, serializers.ModelSerialize
         model = Product
         fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'image_urls',
                   'created_at', 'description')
-
-    def get_avg_rank(self, instance):
-        return get_product_avg_rank(instance)
-
-    def get_sale_price(self, instance):
-        sale_price = instance.sale_price
-        if not sale_price:
-            return
-
-        som_conversion = self.get_conversation_instance(Conversion.Currencies.som)
-        dollar_conversion = self.get_conversation_instance(Conversion.Currencies.dollar)
-        return {
-            Conversion.Currencies.yen: sale_price,
-            Conversion.Currencies.som: som_conversion.calc_price(sale_price),
-            Conversion.Currencies.dollar: dollar_conversion.calc_price(sale_price)
-        }
 
 
 class TagByGroupAdminSerializer(TagByGroupSerializer):
@@ -196,7 +179,8 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
     description_ky = serializers.CharField(write_only=True, required=False)
     image = serializers.ImageField(write_only=True, required=False)
 
-    set_products = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), write_only=True, many=True)
+    set_products = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), write_only=True, many=True,
+                                                      required=False)
     set_discount = serializers.FloatField(validators=[MaxValueValidator(100)], write_only=True, required=False)
 
     discount = serializers.SlugRelatedField(slug_field='percentage', read_only=True)

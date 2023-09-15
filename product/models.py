@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from utils.helpers import round_half_integer
 
-from .querysets import GenreQuerySet, ProductQuerySet, TagQuerySet, ReviewAnalyticsQuerySet
+from .querysets import GenreQuerySet, ProductQuerySet, TagGroupQuerySet, ReviewAnalyticsQuerySet
 from .utils import internal_product_id_generation, increase_price
 
 
@@ -45,7 +45,7 @@ class BaseTagModel(models.Model):
 
 
 class TagGroup(BaseTagModel):
-    objects = TagQuerySet.as_manager()
+    objects = TagGroupQuerySet.as_manager()
 
     def __str__(self):
         return f'Tag-group-{self.id}-{self.name}'
@@ -71,21 +71,6 @@ class Product(models.Model):
     increased_price = models.FloatField(null=True)
     product_url = models.TextField(blank=True, null=True)
     availability = models.BooleanField(default=True)
-    # Genres and tags
-    # Why ManyToManyField? is about making it accessible from the top level of genres.
-    # Without wasting filtering operations
-    genres = models.ManyToManyField(
-        Genre,
-        blank=True,
-        related_name="product_set",
-        related_query_name="products",
-    )
-    tags = models.ManyToManyField(
-        Tag,
-        blank=True,
-        related_name='product_set',
-        related_query_name='products'
-    )
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
@@ -137,6 +122,31 @@ class Product(models.Model):
             return None
 
         return discount.calc_price(self.price)
+
+    @property
+    def avg_rank(self):
+        reviews = self.reviews.filter(is_active=True)
+        if reviews.exists():
+            return sum(reviews.values_list('rank', flat=True)) / reviews.count()
+        return 0.0
+
+
+class ProductGenre(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    genre = models.ForeignKey(Genre, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'product_product_genres'
+        managed = False
+
+
+class ProductTag(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    tag = models.ForeignKey(Tag, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'product_product_tags'
+        managed = False
 
 
 class ProductImageUrl(models.Model):

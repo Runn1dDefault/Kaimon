@@ -29,7 +29,6 @@ class DeliveryAddressViewSet(viewsets.ModelViewSet):
 
 class OrderViewSet(
     mixins.CreateModelMixin,
-    mixins.DestroyModelMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet
 ):
@@ -43,10 +42,6 @@ class OrderViewSet(
 
     def get_queryset(self):
         return super().get_queryset().filter(delivery_address__user=self.request.user)
-
-    def perform_destroy(self, instance):
-        instance.status = Order.Status.canceled
-        instance.save()
 
     @action(methods=['GET'], detail=True)
     def order_products(self, request, **kwargs):

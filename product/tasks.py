@@ -70,7 +70,7 @@ def deactivate_empty_genres():
     for base_genre in base_genres:
         last_children_ids = get_last_children(base_genre)
         to_deactivate_genres = Genre.objects.filter(id__in=last_children_ids).annotate(
-            products_qty=Count('products', filter=Q(products__is_active=True))
+            products_qty=Count('products', filter=Q(products__is_active=True, products__availability=True))
         ).filter(products_qty=0)
 
         deactivated_rows = to_deactivate_genres.update(deactivated=True)

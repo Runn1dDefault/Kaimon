@@ -3,7 +3,7 @@ from django.urls import path, re_path
 from .views import (
     get_languages_view,
     GenreListView, GenreChildrenView, GenreParentsView, TagByGenreListView,
-    ProductsListByGenreView, SearchProductView, ProductRetrieveView,
+    ProductsListByGenreView, ProductRetrieveView,
     ProductReviewCreateView, ProductReviewListView,
     ReferenceListView,
 )
@@ -22,7 +22,6 @@ reviews_urlpatterns = [
 
 products_urlpatterns = [
     re_path('^genres/(?P<id>.+)/products/$', ProductsListByGenreView.as_view(), name='product_list'),
-    path('search/', SearchProductView.as_view(), name='product_search'),
     # Important: product_detail must always be the last, otherwise it will overlap other addresses.
     # also product_urlpatterns should also be at the end of urlpatterns
     re_path('^(?P<id>.+)/$', ProductRetrieveView.as_view(), name='product_detail'),

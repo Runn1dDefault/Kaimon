@@ -29,16 +29,3 @@ def get_last_children(current_genre) -> list[int]:
 
         last_children.extend(get_last_children(child))
     return last_children
-
-
-def get_field_by_lang(field_name: str, lang: str):
-    if lang in settings.SUPPORTED_LANG:
-        return f'{field_name}_{lang}' if lang != 'ja' else field_name
-
-
-def get_product_avg_rank(product) -> float:
-    reviews = product.reviews.filter(is_active=True)
-    if reviews.exists():
-        ranks = list(reviews.values_list('rank', flat=True))
-        return sum(ranks) / len(ranks)
-    return 0.0

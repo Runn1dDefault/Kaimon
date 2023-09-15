@@ -162,10 +162,12 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers.DatabaseScheduler"
 
+PAGE_CACHED_SECONDS = 43200
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": REDIS_CONNECTION_URL + '/0'
+        "LOCATION": REDIS_CONNECTION_URL + '/3'
     },
     "users": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -175,7 +177,6 @@ CACHES = {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": REDIS_CONNECTION_URL + '/2'
     },
-
 }
 
 SIMPLE_JWT = {

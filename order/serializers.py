@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from currencies.models import Conversion
 from product.models import Product, Tag
-from utils.mixins import LangSerializerMixin
+from utils.serializers.mixins import LangSerializerMixin
 
 from .models import DeliveryAddress, Order, OrderReceipt, Customer
 from .utils import duplicate_delivery_address

@@ -5,8 +5,8 @@ from .models import DeliveryAddress, Order, OrderReceipt
 
 @admin.register(DeliveryAddress)
 class DeliveryAddressAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'country', 'city', 'as_deleted', 'created_at')
-    search_fields = ('id', 'user__email', 'city', 'country__name',)
+    list_display = ('id', 'customer', 'country', 'city', 'as_deleted', 'created_at')
+    search_fields = ('id', 'customer__email', 'city', 'country__name',)
     list_filter = ('as_deleted', 'created_at',)
     readonly_fields = ('created_at',)
 

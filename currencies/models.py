@@ -8,6 +8,16 @@ class Conversion(models.Model):
         som = 'som', _('Som')
         yen = 'yen', _('Yen')
 
+        @classmethod
+        def from_string(cls, currency: str):
+            match currency:
+                case cls.dollar.value:
+                    return cls.dollar
+                case cls.yen.value:
+                    return cls.yen
+                case cls.som.value:
+                    return cls.som
+
     currency_from = models.CharField(max_length=10, choices=Currencies.choices, default=Currencies.yen)
     currency_to = models.CharField(max_length=10, choices=Currencies.choices)
     price_per = models.FloatField(help_text=_('unit price currency_from'))

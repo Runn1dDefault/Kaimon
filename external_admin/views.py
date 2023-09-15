@@ -13,10 +13,9 @@ from users.models import User
 from users.permissions import IsDirectorPermission, IsStaffUser
 from order.models import Order
 from utils.filters import FilterByFields, DateRangeFilter
-from utils.mixins import LanguageMixin
 from utils.paginators import PagePagination
-from .paginators import UserListPagination
 
+from .paginators import UserListPagination
 from .serializers import ConversionAdminSerializer, PromotionAdminSerializer, \
     ProductAdminSerializer, ProductDetailAdminSerializer, \
     ProductImageAdminSerializer, UserAdminSerializer, GenreAdminSerializer, TagAdminSerializer, \
@@ -235,11 +234,11 @@ class OrderAdminViewSet(StaffViewMixin, viewsets.ReadOnlyModelViewSet):
 
 
 # ----------------------------------------------- Promotions -----------------------------------------------------------
-class PromotionAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
+class PromotionAdminViewSet(viewsets.ModelViewSet):
     queryset = Promotion.objects.filter(is_deleted=False)
     pagination_class = PagePagination
     serializer_class = PromotionAdminSerializer
-    parser_classes = (parsers.JSONParser,)
+    parser_classes = (parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser)
     filter_backends = [filters.SearchFilter, FilterByFields, filters.OrderingFilter]
     search_fields = ['banner__name', 'banner__name_ru', 'banner__name_en', 'banner__name_tr', 'banner__name_ky',
                      'banner__name_kz']

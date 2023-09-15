@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
 from product.filters import ProductRankAdminFilter
-from product.models import Genre, Product, ProductImageUrl, ProductReview, Tag, TagGroup
+from product.models import Genre, Tag, TagGroup, Product, ProductTag, ProductGenre, ProductImageUrl, ProductReview
 
 
 @admin.register(Genre)
@@ -39,6 +39,18 @@ class TagAdmin(admin.ModelAdmin):
     list_filter = ('created_at',)
 
 
+@admin.register(ProductTag)
+class ProductTagAdmin(admin.ModelAdmin):
+    list_display = ('id', 'product', 'tag')
+    search_fields = ('product__id', 'tag__id')
+
+
+@admin.register(ProductGenre)
+class ProductGenreAdmin(admin.ModelAdmin):
+    list_display = ('id', 'product', 'genre')
+    search_fields = ('product__id', 'genre__id')
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductImageInline]
@@ -50,11 +62,11 @@ class ProductAdmin(admin.ModelAdmin):
                      'genres__name_kz')
     search_help_text = _('Search by fields: ID, Rakuten ID, NAME, GENRE NAME')
     list_filter = (ProductRankAdminFilter, 'is_active', 'created_at', 'modified_at', 'reference_rank')
-    readonly_fields = ('id', 'created_at', 'modified_at', 'tags', 'genres')
+    readonly_fields = ('id', 'created_at', 'modified_at')
     fieldsets = (
         (
             _('General Info'),
-            {'fields': ('id', 'name', 'description', 'price', 'tags', 'genres')}
+            {'fields': ('id', 'name', 'description', 'price')}
         ),
         (_('Dates'), {'classes': ['collapse'], 'fields': ('created_at', 'modified_at')}),
         (_('Control'), {'fields': ('is_active', 'reference_rank')}),
