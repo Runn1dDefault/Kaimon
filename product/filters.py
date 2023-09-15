@@ -45,7 +45,7 @@ class ProductReferenceFilter(BaseFilterBackend):
     @staticmethod
     def filter_by_purchases_count(queryset, min_count: int = 0) -> ProductQuerySet:
         return queryset.annotate(
-            purchases_count=Sum('receipts__purchases_count', output_field=IntegerField())
+            purchases_count=Sum('receipts__quantity', output_field=IntegerField())
         ).filter(purchases_count__gt=min_count)
 
     @staticmethod
