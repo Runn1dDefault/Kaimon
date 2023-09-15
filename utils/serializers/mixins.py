@@ -25,10 +25,15 @@ class LangSerializerMixin:
         # It updates the field attributes directly.
         extra_kwargs = super().get_extra_kwargs()
         for original_field in self.translate_fields:
-            translate_field_name = self.get_translate_field(original_field)
             kwargs = extra_kwargs.get(original_field, {})
+            source = kwargs.get('source', '*')
+            if source == '*':
+                source = original_field
+
+            translate_field_name = self.get_translate_field(source)
             if translate_field_name == original_field:
                 continue
+
             kwargs['source'] = translate_field_name
             extra_kwargs[original_field] = kwargs
         return extra_kwargs
