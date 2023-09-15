@@ -1,11 +1,9 @@
 from django.core.validators import MinValueValidator
 from django.db import models
-from django.db.models.functions import Round
 from django.utils.translation import gettext_lazy as _
 
 from order.querysets import OrderAnalyticsQuerySet
 from order.validators import only_digit_validator
-# from payment.models import Payment
 from product.models import Product, Tag
 
 
@@ -29,12 +27,11 @@ class Customer(BaseModel):
 class DeliveryAddress(BaseModel):
     customer = models.ForeignKey(Customer, on_delete=models.RESTRICT, related_name='delivery_addresses')
     recipient_name = models.CharField(max_length=100)
-    address_line1 = models.CharField(max_length=255)
-    address_line2 = models.CharField(max_length=255, blank=True, null=True)
-    city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100)
-    postal_code = models.CharField(max_length=20)
     country = models.CharField(max_length=100)
+    city = models.CharField(max_length=100)
+    postal_code = models.CharField(max_length=20)
+    state = models.CharField(max_length=100, blank=True, null=True)
+    address_line = models.TextField(blank=True, null=True)
 
     as_deleted = models.BooleanField(default=False)
 
@@ -56,7 +53,6 @@ class Order(BaseModel):
         delivered = 'delivered', _('Delivered')
         success = 'success', _('Success')
 
-    # payment = models.OneToOneField(Payment, on_delete=models.CASCADE)
     delivery_address = models.ForeignKey(DeliveryAddress, on_delete=models.RESTRICT, related_name='orders')
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.pending)
     comment = models.TextField(null=True, blank=True)

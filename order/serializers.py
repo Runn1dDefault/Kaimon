@@ -14,7 +14,7 @@ from .validators import only_digit_validator
 class DeliveryAddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeliveryAddress
-        fields = ('id', 'recipient_name', 'address_line1', 'address_line2', 'city', 'state', 'postal_code', 'country')
+        fields = ('id', 'recipient_name', 'country', 'city', 'state', 'address_line', 'postal_code')
 
     def validate(self, attrs):
         attrs['user'] = self.context['request'].user
