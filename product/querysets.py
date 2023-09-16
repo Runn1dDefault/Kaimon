@@ -2,7 +2,7 @@ from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import QuerySet, F, Count, Avg, Q, Case, When
 from django.db.models.functions import JSONObject, Round
 
-from utils.queryset import AnalyticsQuerySet
+from utils.querysets import AnalyticsQuerySet
 from utils.types import AnalyticsFilter
 
 

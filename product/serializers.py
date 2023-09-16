@@ -72,7 +72,7 @@ class ProductRetrieveSerializer(LangSerializerMixin, serializers.ModelSerializer
     def get_tags_info(self, instance):
         tags_fk = instance.tags.all()
         if not tags_fk.exists():
-            return
+            return []
 
         group_ids = tags_fk.order_by('tag__group_id').distinct('tag__group_id').values_list('tag__group_id', flat=True)
         groups_queryset = TagGroup.objects.filter(id__in=group_ids)

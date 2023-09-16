@@ -1,8 +1,8 @@
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import F, Case, When, Value, ExpressionWrapper
+from django.db.models import F, Case, When, Value, ExpressionWrapper, Q
 from django.db.models.functions import JSONObject, Round
 
-from utils.queryset import AnalyticsQuerySet
+from utils.querysets import AnalyticsQuerySet
 from utils.types import AnalyticsFilter
 
 
@@ -14,11 +14,11 @@ class OrderAnalyticsQuerySet(AnalyticsQuerySet):
         if from_receipts:
             with_discount_formula = self.receipts_sale_formula * F('quantity')
             without_discount_formula = F('unit_price') * F('quantity')
-            discount_zero_exp = ExpressionWrapper(discount=0)
-            discount_gt_zero_exp = ExpressionWrapper(discount__gt=0)
+            discount_zero_exp = Q(discount=0)
+            discount_gt_zero_exp = Q(discount__gt=0)
         else:
-            discount_zero_exp = ExpressionWrapper(receipts__discount=0)
-            discount_gt_zero_exp = ExpressionWrapper(receipts__discount__gt=0)
+            discount_zero_exp = Q(receipts__discount=0)
+            discount_gt_zero_exp = Q(receipts__discount__gt=0)
             with_discount_formula = self.sale_formula * F('receipts__quantity')
             without_discount_formula = F('receipts__unit_price') * F('receipts__quantity')
 
@@ -27,7 +27,7 @@ class OrderAnalyticsQuerySet(AnalyticsQuerySet):
             without_discount_formula *= F(currency_field)
 
         return Case(When(discount_zero_exp, then=Round(without_discount_formula, precision=2)),
-                    When(**discount_gt_zero_exp, then=Round(with_discount_formula, precision=2)))
+                    When(discount_gt_zero_exp, then=Round(with_discount_formula, precision=2)))
 
     def get_analytics(self, by: AnalyticsFilter):
         return self.values(date=by.value('created_at')).annotate(

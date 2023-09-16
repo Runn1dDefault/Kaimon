@@ -1,6 +1,6 @@
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
-from rest_framework import generics, mixins, viewsets, permissions, status, filters, parsers
+from rest_framework import generics, mixins, viewsets, status, filters, parsers
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
@@ -10,25 +10,18 @@ from product.filters import PopularProductOrdering
 from product.models import Product, ProductReview, Genre, Tag
 from promotions.models import Promotion
 from users.models import User
-from users.permissions import IsDirectorPermission, IsStaffUser
 from order.models import Order
 from utils.filters import FilterByFields, DateRangeFilter
-from utils.paginators import PagePagination
 
-from .paginators import UserListPagination
-from .serializers import ConversionAdminSerializer, PromotionAdminSerializer, \
-    ProductAdminSerializer, ProductDetailAdminSerializer, \
-    ProductImageAdminSerializer, UserAdminSerializer, GenreAdminSerializer, TagAdminSerializer, \
-    ProductReviewAdminSerializer, OrderAnalyticsSerializer, UserAnalyticsSerializer, ReviewAnalyticsSerializer, \
+from .mixins import DirectorViewMixin, StaffViewMixin
+from .paginators import UserListPagination, AdminPagePagination
+from .serializers import (
+    ConversionAdminSerializer, PromotionAdminSerializer,
+    ProductAdminSerializer, ProductDetailAdminSerializer,
+    ProductImageAdminSerializer, UserAdminSerializer, GenreAdminSerializer, TagAdminSerializer,
+    ProductReviewAdminSerializer, OrderAnalyticsSerializer, UserAnalyticsSerializer, ReviewAnalyticsSerializer,
     OrderAdminSerializer
-
-
-class DirectorViewMixin:
-    permission_classes = (permissions.IsAuthenticated, IsDirectorPermission,)
-
-
-class StaffViewMixin:
-    permission_classes = (permissions.IsAuthenticated, IsStaffUser,)
+)
 
 
 # ---------------------------------------------- Users -----------------------------------------------------------------
@@ -55,7 +48,7 @@ class UserAdminView(DirectorViewMixin, viewsets.ReadOnlyModelViewSet):
 class GenreSearchAdminView(StaffViewMixin, generics.ListAPIView):
     queryset = Genre.objects.all()
     serializer_class = GenreAdminSerializer
-    pagination_class = PagePagination
+    pagination_class = AdminPagePagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz']
 
@@ -63,7 +56,7 @@ class GenreSearchAdminView(StaffViewMixin, generics.ListAPIView):
 # -------------------------------------------------- Tag ---------------------------------------------------------------
 class TagSearchAdminView(StaffViewMixin, generics.ListAPIView):
     queryset = Tag.objects.all()
-    pagination_class = PagePagination
+    pagination_class = AdminPagePagination
     serializer_class = TagAdminSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz']
@@ -76,7 +69,7 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductDetailAdminSerializer
     list_serializer_class = ProductAdminSerializer
-    pagination_class = PagePagination
+    pagination_class = AdminPagePagination
     parser_classes = (parsers.JSONParser,)
     filter_backends = [filters.SearchFilter, PopularProductOrdering, filters.OrderingFilter]
     search_fields_ja = ['name', 'genres__name', 'tags__name', 'name_ru', 'genres__name_ru', 'tags__name_ru', 'name_en',
@@ -161,7 +154,7 @@ class ProductReviewAdminView(StaffViewMixin, mixins.RetrieveModelMixin, mixins.D
                              viewsets.GenericViewSet):
     queryset = ProductReview.objects.all()
     serializer_class = ProductReviewAdminSerializer
-    pagination_class = PagePagination
+    pagination_class = AdminPagePagination
     lookup_field = 'id'
     lookup_url_kwarg = 'review_id'
     filter_backends = [FilterByFields, filters.SearchFilter, DateRangeFilter]
@@ -194,7 +187,7 @@ class ProductReviewAdminView(StaffViewMixin, mixins.RetrieveModelMixin, mixins.D
 class OrderAdminViewSet(StaffViewMixin, viewsets.ReadOnlyModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderAdminSerializer
-    pagination_class = PagePagination
+    pagination_class = AdminPagePagination
     filter_backends = [filters.SearchFilter, FilterByFields, filters.OrderingFilter, DateRangeFilter]
     start_field = 'created_at__date'
     start_param = 'start_date'
@@ -236,7 +229,7 @@ class OrderAdminViewSet(StaffViewMixin, viewsets.ReadOnlyModelViewSet):
 # ----------------------------------------------- Promotions -----------------------------------------------------------
 class PromotionAdminViewSet(viewsets.ModelViewSet):
     queryset = Promotion.objects.filter(is_deleted=False)
-    pagination_class = PagePagination
+    pagination_class = AdminPagePagination
     serializer_class = PromotionAdminSerializer
     parser_classes = (parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser)
     filter_backends = [filters.SearchFilter, FilterByFields, filters.OrderingFilter]

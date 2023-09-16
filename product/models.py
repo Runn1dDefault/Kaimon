@@ -130,6 +130,20 @@ class Product(models.Model):
             return sum(reviews.values_list('rank', flat=True)) / reviews.count()
         return 0.0
 
+    @property
+    def get_tags(self):
+        tags_fk = self.tags.all()
+        if not tags_fk.exists():
+            return []
+
+        group_ids = tags_fk.order_by('tag__group_id').distinct('tag__group_id').values_list('tag__group_id', flat=True)
+        groups_queryset = TagGroup.objects.filter(id__in=group_ids)
+        tag_translate_field = self.get_translate_field('name')
+        return groups_queryset.tags_list(
+            name_field=tag_translate_field,
+            tag_ids=tags_fk.values_list('tag_id', flat=True)
+        )
+
 
 class ProductGenre(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)

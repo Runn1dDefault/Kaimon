@@ -1,27 +1,19 @@
-import calendar
-from copy import deepcopy
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
-import pandas as pd
 from django.core.validators import MaxValueValidator
 from django.db import transaction
 from django.db.models import F, Case, When, Value
 from django.db.models.functions import Round
-from django.utils.translation import gettext_lazy as _
-from pandas import DataFrame
 from rest_framework import serializers
-from rest_framework.utils.serializer_helpers import ReturnDict
 
 from currencies.models import Conversion
 from currencies.serializers import ConversionField
-from order.querysets import AnalyticsFilter
 from product.models import Product, Genre, Tag, ProductImageUrl, TagGroup, ProductReview
-from product.serializers import TagByGroupSerializer
 from product.utils import get_genre_parents_tree
 from promotions.models import Banner, Promotion, Discount
 from order.models import Order, Customer, DeliveryAddress, OrderReceipt
 from users.models import User
+from utils.serializers import AnalyticsSerializer
 
 
 class UserAdminSerializer(serializers.ModelSerializer):
@@ -71,7 +63,7 @@ class ProductAdminSerializer(serializers.ModelSerializer):
                   'created_at', 'description')
 
 
-class TagByGroupAdminSerializer(TagByGroupSerializer):
+class TagGroupAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = TagGroup
         fields = '__all__'
@@ -102,16 +94,24 @@ class ProductDetailAdminSerializer(ProductAdminSerializer):
 
     def get_tags_info(self, instance):
         if not instance.tags.exists():
-            return
+            return []
         group_ids = list(instance.tags.all().order_by('group_id')
                                             .distinct('group_id')
                                             .values_list('group_id', flat=True))
-        return TagByGroupAdminSerializer(
-            tag_ids=list(instance.tags.values_list('id', flat=True)),
-            instance=TagGroup.objects.filter(id__in=group_ids),
-            many=True,
-            context=self.context
-        ).data
+
+    def get_tags_info(self, instance):
+        tags_fk = instance.tags.all()
+        if not tags_fk.exists():
+            return []
+
+        group_ids = tags_fk.order_by('tag__group_id').distinct('tag__group_id').values_list('tag__group_id',
+                                                                                            flat=True)
+        groups_queryset = TagGroup.objects.filter(id__in=group_ids)
+        tag_translate_field = self.get_translate_field('name')
+        return groups_queryset.tags_list(
+            name_field=tag_translate_field,
+            tag_ids=tags_fk.values_list('tag_id', flat=True)
+        )
 
     def create(self, validated_data):
         images = validated_data.pop('images', None)
@@ -295,121 +295,17 @@ class OrderAdminSerializer(serializers.ModelSerializer):
         )
 
 
-class AnalyticsSerializer(serializers.Serializer):
-    FILTER_BY = (
-        ('day', 'day'),
-        ('month', 'month'),
-        ('year', 'year')
-    )
-    start = serializers.DateField(required=True, write_only=True)
-    end = serializers.DateField(required=True, write_only=True)
-    filter_by = serializers.ChoiceField(choices=FILTER_BY, write_only=True, required=True)
-
-    class Meta:
-        model = None
-        fields = ('start', 'end', 'filter_by')
-        hide_fields = ()
-        empty_data_template = {}
-
-    def validate_filter_by(self, filter_by: str):
-        try:
-            return AnalyticsFilter.get_by_string(filter_by)
-        except ValueError as e:
-            raise serializers.ValidationError({'filter_by': _(str(e))})
-
-    def validate(self, attrs):
-        start, end = attrs['start'], attrs['end']
-        if start >= end:
-            raise serializers.ValidationError({'start': _(f'Cannot be equal or grater than {end}')})
-        return attrs
-
-    def update(self, instance, validated_data):
-        return None
-
-    def create(self, validated_data):
-        return None
-
-    @property
-    def _model(self):
-        return self.Meta.model
-
-    def filter_queryset(self, start, end, filter_by):
-        return self._model.objects.all()
-
-    @property
-    def data(self):
-        start, end = self.validated_data['start'], self.validated_data['end']
-        filter_by = self.validated_data['filter_by']
-        analytics_queryset = self.filter_queryset(start, end, filter_by)
-        df = analytics_queryset.to_df() if analytics_queryset.exists() else DataFrame()
-        ret = self.to_representation(df)
-        return ReturnDict(ret, serializer=self)
-
-    @property
-    def empty_data_template(self):
-        return getattr(self.Meta, 'empty_data_template', {})
-
-    def add_empty_rows(self, found_dates, start, end, filter_by):
-        match filter_by:
-            case AnalyticsFilter.MONTH:
-                iters = (end.month - start.month) + 1
-                iter_date = datetime(day=1, month=start.month, year=start.year, hour=0, minute=0, second=0,
-                                     tzinfo=timezone.utc)
-            case AnalyticsFilter.YEAR:
-                iters = (end.year - start.year) + 1
-                iter_date = datetime(day=1, month=1, year=start.year, hour=0, minute=0, second=0, tzinfo=timezone.utc)
-            case _:
-                iters = (end - start).days + 1
-                iter_date = start
-
-        not_found_dates = []
-        for _ in range(iters):
-            if iter_date not in found_dates:
-                template = deepcopy(self.empty_data_template)
-                template['date'] = iter_date
-                not_found_dates.append(template)
-
-            match filter_by:
-                case AnalyticsFilter.MONTH:
-                    _, days = calendar.monthrange(iter_date.year, iter_date.month)
-                    iter_date += timedelta(days=days)
-                case AnalyticsFilter.YEAR:
-                    first = datetime(year=iter_date.year, day=1, month=1)
-                    second = datetime(year=iter_date.year + 1, day=1, month=1)
-                    iter_date += timedelta(days=(second - first).days)
-                case _:
-                    iter_date += timedelta(days=1)
-        return not_found_dates
-
-    @property
-    def hide_fields(self):
-        return getattr(self.Meta, 'hide_fields', None)
-
-    def to_representation(self, df):
-        dates = df['date'].tolist() if df.empty is False else []
-        start, end = self.validated_data['start'], self.validated_data['end']
-        filter_by = self.validated_data['filter_by']
-        empty_rows = self.add_empty_rows(dates, start, end, filter_by)
-        if empty_rows:
-            df = pd.concat([df, DataFrame.from_records(empty_rows)], ignore_index=True)
-            df = df.sort_values(by='date')
-        if df.empty is False:
-            df['date'] = df['date'].apply(lambda x: str(x))
-            df.set_index('date', inplace=True)
-            if self.hide_fields:
-                df = df.drop(columns=list(self.hide_fields))
-        return df.to_dict('index')
-
-
+# ------------------------------------------------- Analytics ----------------------------------------------------------
 class OrderAnalyticsSerializer(AnalyticsSerializer):
     class Meta:
         model = Order
         hide_fields = ('sale_prices_yen', 'sale_prices_som', 'sale_prices_dollar')
         empty_data_template = {"receipts_info": [], "yen": 0, "som": 0, "dollar": 0}
 
-    def filter_queryset(self, start, end, filter_by):
-        return self._model.analytics.filter(created_at__date__gte=start, created_at__date__lte=end)\
-                                    .get_analytics(filter_by)
+    def filtered_analytics(self, start, end, filter_by):
+        model = getattr(self.Meta, 'model')
+        base_queryset = model.analytics.filter(created_at__date__gte=start, created_at__date__lte=end)
+        return base_queryset.get_analytics(filter_by)
 
     def to_representation(self, df):
         if df.empty is False:
@@ -424,9 +320,10 @@ class UserAnalyticsSerializer(AnalyticsSerializer):
         model = User
         empty_data_template = {"users": [], "count": 0}
 
-    def filter_queryset(self, start, end, filter_by):
-        queryset = self._model.analytics.filter(date_joined__date__gte=start, date_joined__date__lte=end)
-        return queryset.get_joined_analytics(filter_by)
+    def filtered_analytics(self, start, end, filter_by):
+        model = getattr(self.Meta, 'model')
+        base_queryset = model.analytics.filter(date_joined__date__gte=start, date_joined__date__lte=end)
+        return base_queryset.get_joined_users_analytics(filter_by)
 
     def users_representation(self, users):
         request = self.context['request']
@@ -447,6 +344,7 @@ class ReviewAnalyticsSerializer(AnalyticsSerializer):
         model = ProductReview
         empty_data_template = {'info': [], 'count': 0, 'avg_rank': 0.0}
 
-    def filter_queryset(self, start, end, filter_by):
-        queryset = self._model.analytics.filter(created_at__date__gte=start, created_at__date__lte=end)
-        return queryset.get_date_analytics(filter_by)
+    def filtered_analytics(self, start, end, filter_by):
+        model = getattr(self.Meta, 'model')
+        base_queryset = model.analytics.filter(created_at__date__gte=start, created_at__date__lte=end)
+        return base_queryset.get_date_analytics(filter_by)
