@@ -8,10 +8,19 @@ def increase_price(price):
 
 
 def internal_product_id_generation():
+    """
+    a function that returns a new uuid4 with the prefix internal: at the beginning.
+    The prefix can be useful for separating manually created products from other ones
+    """
     return 'internal:' + str(uuid.uuid4())
 
 
 def get_genre_parents_tree(current_genre) -> list[int]:
+    """
+    recursive way to get all ancestors including the genre itself
+    It is important to remember that with this approach we work from the bottom up.
+     And we get a list from the category itself to the topmost parent
+    """
     collected_parents = [current_genre.id]
     if not current_genre.parent:
         return collected_parents
@@ -20,6 +29,9 @@ def get_genre_parents_tree(current_genre) -> list[int]:
 
 
 def get_last_children(current_genre) -> list[int]:
+    """
+    recursive way to get children that are missing children
+    """
     last_children = []
 
     for child in current_genre.children.all():
