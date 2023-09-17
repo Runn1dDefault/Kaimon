@@ -8,15 +8,16 @@ from rest_framework.response import Response
 from currencies.mixins import CurrencyMixin
 from users.permissions import RegistrationPayedPermission
 from utils.filters import FilterByLookup
-from utils.schemas import LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM
 from utils.paginators import PagePagination
-from utils.views.mixins import CachingMixin, LanguageMixin
+from utils.views import CachingMixin, LanguageMixin
 
 from .filters import SearchFilterByLang, GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter, FilterByTag
 from .models import Genre, Product, TagGroup
 from .paginators import GenrePagination
 from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer
 from .utils import get_genre_parents_tree
+
+currency_and_lang_params = [settings.LANGUAGE_QUERY_SCHEMA_PARAM, settings.CURRENCY_QUERY_SCHEMA_PARAM]
 
 
 @api_view(['GET'])
@@ -29,7 +30,7 @@ def get_languages_view(request):
     get=extend_schema(
         parameters=[
             OpenApiParameter(name='level', type=OpenApiTypes.INT, required=False, default=1),
-            LANGUAGE_QUERY_SCHEMA_PARAM
+            settings.LANGUAGE_QUERY_SCHEMA_PARAM
         ]
     )
 )
@@ -40,7 +41,7 @@ class GenreListView(CachingMixin, LanguageMixin, generics.ListAPIView):
     serializer_class = GenreSerializer
 
 
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
+@extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
 class GenreChildrenView(CachingMixin, LanguageMixin, generics.ListAPIView):
     lookup_field = 'id'
     queryset = Genre.objects.filter(deactivated=False)
@@ -63,7 +64,7 @@ class GenreChildrenView(CachingMixin, LanguageMixin, generics.ListAPIView):
         return Response(serializer.data)
 
 
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
+@extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
 class GenreParentsView(CachingMixin, LanguageMixin, generics.ListAPIView):
     lookup_field = 'id'
     queryset = Genre.objects.filter(deactivated=False)
@@ -82,24 +83,24 @@ class GenreParentsView(CachingMixin, LanguageMixin, generics.ListAPIView):
 
 
 # ------------------------------------------------ Products ------------------------------------------------------------
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
+@extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
 class ProductsListByGenreView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
     queryset = Product.objects.filter(is_active=True, availability=True)
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
     filter_backends = [FilterByLookup, SearchFilterByLang, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
     lookup_url_kwarg = 'id'
-    lookup_field = 'productgenre__genre_id'
-    search_fields_ja = ['name', 'productgenre__genre__name', 'tags__name']
-    search_fields_ru = ['name_ru', 'productgenre__genre__name_ru', 'productgenre__tag__name_ru']
-    search_fields_en = ['name_en', 'productgenre__genre__name_en', 'productgenre__tag__name_en']
-    search_fields_tr = ['name_tr', 'productgenre__genre__name_tr', 'productgenre__tag__name_tr']
-    search_fields_ky = ['name_ky', 'productgenre__genre__name_ky', 'productgenre__tag__name_ky']
-    search_fields_kz = ['name_kz', 'productgenre__genre__name_kz', 'productgenre__tag__name_kz']
+    lookup_field = 'genres__genre_id'
+    search_fields_ja = ['name', 'genres__genre__name', 'tags__tag__name']
+    search_fields_ru = ['name_ru', 'genres__genre__name_ru', 'tags__tag__name_ru']
+    search_fields_en = ['name_en', 'genres__genre__name_en', 'tags__tag__name_en']
+    search_fields_tr = ['name_tr', 'genres__genre__name_tr', 'tags__tag__name_tr']
+    search_fields_ky = ['name_ky', 'genres__genre__name_ky', 'tags__tag__name_ky']
+    search_fields_kz = ['name_kz', 'genres__genre__name_kz', 'tags__tag__name_kz']
     ordering_fields = ['created_at', 'price']
 
 
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM]))
+@extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
 class TagByGenreListView(CachingMixin, LanguageMixin, generics.ListAPIView):
     queryset = TagGroup.objects.all()
     lookup_url_kwarg = 'id'
@@ -118,7 +119,7 @@ class TagByGenreListView(CachingMixin, LanguageMixin, generics.ListAPIView):
         return f'{self.name_field}_{lang}' if lang != 'ja' else self.name_field
 
 
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
+@extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
 class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView):
     lookup_field = 'id'
     queryset = Product.objects.filter(is_active=True)
@@ -151,7 +152,7 @@ class ProductReviewListView(generics.ListAPIView):
 
 
 # -------------------------------------------- Recommendations ---------------------------------------------------------
-@extend_schema_view(get=extend_schema(parameters=[LANGUAGE_QUERY_SCHEMA_PARAM, CURRENCY_QUERY_SCHEMA_PARAM]))
+@extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
 class ReferenceListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
     queryset = Product.objects.filter(is_active=True, availability=True)
     filter_backends = [ProductReferenceFilter]
