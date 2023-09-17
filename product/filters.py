@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.filters import SearchFilter, BaseFilterBackend
 from rest_framework.generics import get_object_or_404
 
-from utils.views.mixins import LanguageMixin
+from utils.views import LanguageMixin
 
 from .querysets import ProductQuerySet
 
@@ -30,8 +30,8 @@ class FilterByTag(BaseFilterBackend):
                 'description': force_str(self.description),
                 'schema': {
                     'type': 'string',
-                },
-            },
+                }
+            }
         ]
 
 
@@ -82,8 +82,8 @@ class ProductReferenceFilter(BaseFilterBackend):
                 'description': force_str(self.product_id_description),
                 'schema': {
                     'type': 'string',
-                },
-            },
+                }
+            }
         ]
 
 
@@ -115,8 +115,8 @@ class PopularProductOrdering(BaseFilterBackend):
                 'description': force_str(self.popular_description),
                 'schema': {
                     'type': 'number',
-                },
-            },
+                }
+            }
         ]
 
 
