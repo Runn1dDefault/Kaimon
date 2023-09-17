@@ -6,8 +6,7 @@ from rest_framework import serializers
 
 from .models import User
 from .tasks import send_code_template
-from .tokens import get_tokens_for_user
-from .utils import create_restore_token, create_confirm_code
+from .tokens import get_tokens_for_user, create_restore_token, create_confirm_code
 
 
 class RestoreSerializer(serializers.Serializer):
