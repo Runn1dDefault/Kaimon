@@ -3,8 +3,10 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
+from django.conf import settings
 from django.utils.timezone import localtime, now
 from django.utils.translation import gettext_lazy as _
+from django.utils.functional import cached_property
 from rest_framework.exceptions import ValidationError
 from rest_framework.fields import DateField, ChoiceField
 from rest_framework.serializers import ModelSerializer
@@ -38,28 +40,22 @@ class AnalyticsSerializer(ModelSerializer):
     def create(self, validated_data):
         return None
 
-    def validate_filter_by(self, filter_by: str):
+    @staticmethod
+    def validate_filter_by(filter_by: str):
         try:
             return AnalyticsFilter.get_by_string(filter_by)
         except ValueError as e:
             raise ValidationError({'filter_by': _(str(e))})
 
-    def validate_start(self, start: datetime.date):
-        today = localtime(now()).date()
-        if start > today:
-            raise ValidationError({'start': _(f'Cannot be grater than {today}')})
-        return start
-
-    def validate_end(self, end: datetime.date):
-        today = localtime(now()).date()
-        if end > today:
-            return today
-        return end
-
     def validate(self, attrs):
         start, end = attrs['start'], attrs['end']
         if start >= end:
             raise ValidationError({'start': _(f'Cannot be equal or grater than {end}')})
+        today = localtime(now()).date()
+        if start > today:
+            raise ValidationError({'start': _(f'Cannot be grater than {today}')})
+        if end > today:
+            attrs['end'] = today
         return attrs
 
     def filtered_analytics(self, start, end, filter_by) -> AnalyticsQuerySet:
@@ -131,3 +127,38 @@ class AnalyticsSerializer(ModelSerializer):
             if remove_fields:
                 df = df.drop(columns=list(self.hide_fields))
         return df.to_dict('index')
+
+
+class LangSerializerMixin:
+    """
+    A mixin for serializers that handle translated fields.
+    """
+    @cached_property
+    def translate_fields(self):
+        return getattr(self.Meta, 'translate_fields', [])
+
+    def get_translate_field(self, field_name: str) -> str:
+        lang = self.context.get('lang', 'ja')
+        if lang not in settings.SUPPORTED_LANG:
+            raise ValidationError({'detail': _('Language `%s` does not support!') % lang})
+
+        translate_field = f'{field_name}_{lang}' if lang != 'ja' else field_name
+        return translate_field
+
+    def get_extra_kwargs(self):
+        # This approach is more efficient because it doesn't require you to manually manipulate the serialized data.
+        # It updates the field attributes directly.
+        extra_kwargs = super().get_extra_kwargs()
+        for original_field in self.translate_fields:
+            kwargs = extra_kwargs.get(original_field, {})
+            source = kwargs.get('source', '*')
+            if source == '*':
+                source = original_field
+
+            translate_field_name = self.get_translate_field(source)
+            if translate_field_name == original_field:
+                continue
+
+            kwargs['source'] = translate_field_name
+            extra_kwargs[original_field] = kwargs
+        return extra_kwargs
