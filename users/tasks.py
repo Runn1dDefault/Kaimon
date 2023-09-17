@@ -18,6 +18,7 @@ def send_code_template(email: str, code: str | int):
         "from": {"email": settings.MAILING_FROM_EMAIL}
     }
     try:
+        # TODO: remove sendgrid and use custom SMTP
         sg.client.mail.send.post(request_body=data)
     except Exception as e:
         print(e)
