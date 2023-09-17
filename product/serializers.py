@@ -3,9 +3,9 @@ from rest_framework.fields import empty
 
 from currencies.serializers import ConversionField
 from users.serializers import UserProfileSerializer
-from utils.serializers.mixins import LangSerializerMixin
+from utils.serializers import LangSerializerMixin
 
-from .models import Genre, Product, ProductReview, TagGroup, Tag
+from .models import Genre, Product, ProductReview, TagGroup
 
 
 class GenreSerializer(LangSerializerMixin, serializers.ModelSerializer):
