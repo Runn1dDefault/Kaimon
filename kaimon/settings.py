@@ -13,6 +13,8 @@ from datetime import timedelta
 from pathlib import Path
 
 from decouple import config
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -195,6 +197,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
+    "COERCE_DECIMAL_TO_STRING": False
 }
 
 SPECTACULAR_SETTINGS = {
@@ -242,12 +245,25 @@ TRANSLATE_LANGUAGES = {
     'ru': 'ru',
     'en': 'en',
     'tr': 'tr',
-    # 'ky': 'ky',
-    # 'kz': 'kk'
+    'ky': 'ky',
+    'kz': 'kk'
 }
 TRANSLATE_DELAY = 0.25
 LANGUAGE_QUERY_PARAM = 'lang'
 CURRENCY_QUERY_PARAM = 'currency'
+
+LANGUAGE_QUERY_SCHEMA_PARAM = OpenApiParameter(
+    name=LANGUAGE_QUERY_PARAM,
+    type=OpenApiTypes.STR,
+    required=False,
+    default='ja'
+)
+CURRENCY_QUERY_SCHEMA_PARAM = OpenApiParameter(
+    name=CURRENCY_QUERY_PARAM,
+    type=OpenApiTypes.STR,
+    required=False,
+    default='yen'
+)
 
 GENRE_MODEL_PATH = 'product.models.Genre'
 GENRE_TRANSLATE_FIELDS = ('name',)
@@ -259,4 +275,3 @@ MARKER_MODEL_PATH = 'product.models.Marker'
 MARKER_TRANSLATE_FIELDS = ('name',)
 
 INCREASE_PRICE_PERCENTAGE = 10
-
