@@ -5,6 +5,8 @@ import jwt
 from django.conf import settings as server_settings
 from django.core.cache import caches
 from django.utils.crypto import get_random_string
+from django.utils.translation import gettext_lazy
+from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.exceptions import InvalidRestoreCode, RestoreCodeExist
@@ -150,3 +152,22 @@ class RestoreToken(BaseRestore):
     def for_token(cls, raw_token):
         payload = cls._decode(raw_token)
         return cls(sub=payload['user_id'])
+
+
+def create_restore_token(user_id, code):
+    try:
+        token = RestoreToken.for_user(user_id=user_id, code=code)
+    except InvalidRestoreCode as e:
+        raise ValidationError({'detail': gettext_lazy(str(e))})
+    else:
+        RestoreCode(sub=user_id).remove()
+        return token
+
+
+def create_confirm_code(user_id, raise_on_exist):
+    try:
+        code = RestoreCode.for_user(user_id=user_id, raise_on_exist=raise_on_exist)
+    except RestoreCodeExist as e:
+        raise ValidationError({'code': gettext_lazy(str(e))})
+    else:
+        return code
