@@ -3,7 +3,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .authentication import RestoreJWTAuthentication
-from .serializers import RegistrationSerializer, RestoreSerializer, UpdatePasswordSerializer, UserProfileSerializer
+from .serializers import RegistrationSerializer, RestoreSerializer, UpdatePasswordSerializer, UserProfileSerializer, \
+    ConfirmEmailSerializer
 
 
 class RegistrationView(generics.CreateAPIView):
@@ -18,6 +19,17 @@ class RestorePasswordView(generics.GenericAPIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ConfirmPasswordView(generics.GenericAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = ConfirmEmailSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

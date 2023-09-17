@@ -6,6 +6,7 @@ from .views import RegistrationView, RestorePasswordView, UpdatePasswordView, Us
 
 urlpatterns = [
     path('registration/', RegistrationView.as_view(), name='auth_registration'),
+    path('confirm/email/', RegistrationView.as_view(), name='auth_registration'),
     path('token/', TokenObtainPairView.as_view(), name='auth_token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='auth_token_refresh'),
     path('restore/password/', RestorePasswordView.as_view(), name='auth_restore_pwd'),

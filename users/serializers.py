@@ -4,10 +4,55 @@ from django.contrib.auth.password_validation import validate_password
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from .exceptions import InvalidRestoreCode, RestoreCodeExist
 from .models import User
 from .tasks import send_code_template
-from .tokens import get_tokens_for_user, RestoreToken, RestoreCode
+from .tokens import get_tokens_for_user
+from .utils import create_restore_token, create_confirm_code
+
+
+class RestoreSerializer(serializers.Serializer):
+    email = serializers.EmailField(write_only=True, required=True)
+    code = serializers.CharField(write_only=True, required=False, min_length=6, max_length=6)
+    send_new_code = serializers.BooleanField(default=False)
+
+    def __init__(self, data, **kwargs):
+        super().__init__(data=data, instance=None, **kwargs)
+
+    def create(self, validated_data):
+        raise NotImplementedError('`create()` not implemented.')
+
+    def update(self, instance, validated_data):
+        raise NotImplementedError('`update()` not implemented.')
+
+    def validate(self, attrs):
+        email = attrs.pop('email')
+        user = User.objects.filter(email=email).first()
+        if not user:
+            raise serializers.ValidationError({'email': _('User with email %s not exist!') % email})
+
+        code = attrs.pop('code', None)
+        send_new_code = attrs['send_new_code']
+        if not code and not send_new_code:
+            raise serializers.ValidationError({'code': _('Invalid code!')})
+
+        if code:
+            token = create_restore_token(user_id=user.id, code=code)
+            return {'token': str(token)}
+
+        if send_new_code is True:
+            # if you need to restrict sending for a user who has already sent, then change raise_on_exist to True
+            new_code = create_confirm_code(user_id=user.id, raise_on_exist=False)
+            send_code_template.delay(email=email, code=str(new_code))
+            return {'sent': True}
+        raise serializers.ValidationError({'detail': _('Something went wrong!')}, code=500)
+
+    def to_representation(self, validated_data):
+        token = validated_data.get('token')
+        if token:
+            return {'status': 'ok', 'token': token}
+        if validated_data.get('sent', False) is True:
+            return {'status': 'send'}
+        return {'status': 'failed'}
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -56,91 +101,53 @@ class RegistrationSerializer(PasswordSerializer):
 
     def create(self, validated_data):
         email = validated_data['email']
-        return User.objects.create_user(
+        user = User.objects.create_user(
             username=email,
             email=email,
             password=validated_data['password'],
             full_name=validated_data['full_name'],
-            is_active=False,
             registration_payed=False,
+            email_confirmed=False,
             image=validated_data.get('image', None)
         )
+        new_code = create_confirm_code(user_id=user.id, raise_on_exist=False)
+        send_code_template.delay(email=email, code=str(new_code))
+        return user
 
     def update(self, instance, validated_data):
         raise NotImplementedError('`update()` not implemented.')
 
     def to_representation(self, instance):
-        raise NotImplementedError('`to_representation()` not implemented.')
-
-    @property
-    def data(self):
-        assert self.instance
-        return UserProfileSerializer(instance=self.instance, many=False, context=self.context).data
+        return get_tokens_for_user(instance)
 
 
-class RestoreSerializer(serializers.Serializer):
-    RESTORE_TOKEN_CLASS = RestoreToken
-    RESTORE_CODE_CLASS = RestoreCode
-
+class ConfirmEmailSerializer(serializers.Serializer):
     email = serializers.EmailField(write_only=True, required=True)
-    code = serializers.CharField(write_only=True, required=False, min_length=6, max_length=6)
-    send_new_code = serializers.BooleanField(default=False)
+    code = serializers.CharField(write_only=True, required=True, max_length=6, min_length=6)
 
-    def __init__(self, data, **kwargs):
-        super().__init__(data=data, instance=None, **kwargs)
+    def validate(self, attrs):
+        email = attrs['email']
+        self.instance = User.objects.filter(email=email).first()
+        if not self.instance:
+            raise serializers.ValidationError({'email': _('User with email %s not exist!') % email})
+
+        if not self.instance.check_password(attrs['password']):
+            raise serializers.ValidationError({'password': _('Invalid')})
+
+        code = attrs['code']
+        create_restore_token(user_id=self.instance.id, code=code)
+        return attrs
+
+    def update(self, instance, validated_data):
+        instance.email_confirmed = True
+        instance.save()
+        return instance
 
     def create(self, validated_data):
         raise NotImplementedError('`create()` not implemented.')
 
-    def update(self, instance, validated_data):
-        raise NotImplementedError('`update()` not implemented.')
-
-    def create_token(self, user_id: int, code):
-        try:
-            token = self.RESTORE_TOKEN_CLASS.for_user(user_id=user_id, code=code)
-        except InvalidRestoreCode as e:
-            raise serializers.ValidationError({'detail': _(str(e))})
-        else:
-            self.RESTORE_CODE_CLASS(sub=user_id).remove()
-            return token
-
-    def create_code(self, user_id: int, raise_on_exist: bool):
-        try:
-            code = self.RESTORE_CODE_CLASS.for_user(user_id=user_id, raise_on_exist=raise_on_exist)
-        except RestoreCodeExist as e:
-            raise serializers.ValidationError({'code': _(str(e))})
-        else:
-            return code
-
-    def validate(self, attrs):
-        email = attrs.pop('email')
-        user = User.objects.filter(email=email).first()
-        if not user:
-            raise serializers.ValidationError({'email': _('User with email %s not exist!') % email})
-
-        code = attrs.pop('code', None)
-        send_new_code = attrs['send_new_code']
-        if not code and not send_new_code:
-            raise serializers.ValidationError({'code': _('Invalid code!')})
-
-        if code:
-            token = self.create_token(user_id=user.id, code=code)
-            return {'token': str(token)}
-
-        if send_new_code is True:
-            # if you need to restrict sending for a user who has already sent, then change raise_on_exist to True
-            new_code = self.create_code(user_id=user.id, raise_on_exist=False)
-            send_code_template.delay(email=email, code=str(new_code))
-            return {'sent': True}
-        raise serializers.ValidationError({'detail': _('Something went wrong!')}, code=500)
-
-    def to_representation(self, validated_data):
-        token = validated_data.get('token')
-        if token:
-            return {'status': 'ok', 'token': token}
-        if validated_data.get('sent', False) is True:
-            return {'status': 'send'}
-        return {'status': 'failed'}
+    def to_representation(self, instance):
+        return get_tokens_for_user(instance)
 
 
 class UpdatePasswordSerializer(PasswordSerializer):
