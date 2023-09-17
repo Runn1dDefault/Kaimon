@@ -17,12 +17,6 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault('role', User.Role.DEVELOPER)
         return super().create_superuser(username, email=email, password=password, **extra_fields)
 
-    # def create_partner(self, email, password=None, **extra_fields):
-    #     extra_fields['role'] = User.Role.PARTNER
-    #     extra_fields.setdefault('registration_payed', True)
-    #     extra_fields.setdefault('is_active', True)
-    #     return self.create_user(username=email, email=email, password=password, **extra_fields)
-
 
 class User(AbstractUser):
     objects = UserManager()
@@ -32,14 +26,13 @@ class User(AbstractUser):
         DEVELOPER = 'dev', _('Developer')
         DIRECTOR = 'director', _('Director')
         MANAGER = 'manager', _('Manager')
-        # PARTNER = 'partner', _('Partner')
         CLIENT = 'client', _('Client')
 
     full_name = models.CharField(max_length=300)
     role = models.CharField(choices=Role.choices, max_length=10, default=Role.CLIENT)
     image = models.ImageField(upload_to='users/', blank=True, null=True)
     registration_payed = models.BooleanField(default=False)
-    # TODO: add partners ОсОО Хелс Клаб ЛТД
+    email_confirmed = models.BooleanField(default=False)
 
     @property
     def is_director(self) -> bool:

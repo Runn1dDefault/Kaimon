@@ -3,7 +3,6 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import Group
 from django.utils.translation import gettext_lazy as _
 
-from utils.transforms import concat_to_upper_string
 from .models import User
 
 
@@ -13,11 +12,11 @@ admin.site.unregister(Group)
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
     list_display = ('id', 'email', 'role', 'is_active', 'registration_payed', 'date_joined')
-    list_filter = ('role', 'registration_payed', 'date_joined', 'last_login',
+    list_filter = ('role', 'email_confirmed', 'registration_payed', 'date_joined', 'last_login',
                    "is_staff", "is_superuser", "is_active", "groups")
     list_display_links = ('id', 'email',)
-    search_fields = ('id', 'email', 'full_name', 'username')
-    search_help_text = _('Search by fields: ' + concat_to_upper_string(search_fields))
+    search_fields = ('id', 'email', 'full_name')
+    search_help_text = _('Search by fields: ID, Email, Full Name')
     ordering = ("date_joined",)
     prepopulated_fields = {'username': ('email',)}
     add_fieldsets = (
@@ -38,7 +37,7 @@ class CustomUserAdmin(UserAdmin):
     )
     fieldsets = (
         (_("Credentials"), {"fields": ("email", "username", "password")}),
-        (_("Personal info"), {"fields": ("full_name", "image",)}),
+        (_("Personal info"), {"fields": ("full_name", "image", "email_confirmed",)}),
         (
             _("Permissions"),
             {
