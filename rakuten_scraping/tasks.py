@@ -4,7 +4,7 @@ from typing import Any
 from django.core.exceptions import ObjectDoesNotExist
 
 from kaimon.celery import app
-from product.utils import get_genre_parents_tree, get_last_children
+from product.utils import get_last_children, get_genre_parents_tree
 from utils.helpers import import_model
 
 from .settings import app_settings
@@ -115,6 +115,7 @@ def update_or_create_tag(tag_data: dict[str, Any]):
 def update_items(items: list[dict[str, Any]]):
     conf = app_settings.PRODUCT_PARSE_SETTINGS
     product_model = import_model(conf.MODEL)
+    product_tag_model = import_model(conf.TAG_RELATION_MODEL)
     fields_map = conf.PARSE_KEYS._asdict()
     updated_products, update_fields = [], set()
 
@@ -133,8 +134,23 @@ def update_items(items: list[dict[str, Any]]):
                 setattr(db_product, field, value)
                 update_fields.add(field)
                 updated = True
+
         if updated:
             updated_products.append(db_product)
+
+        tag_ids = item[conf.TAG_IDS_KEY]
+        saved_tag_ids = db_product.tags.filter(id__in=tag_ids).values_list('tag_id', flat=True)
+        tags_to_delete = db_product.tags.exclude(id__in=tag_ids)
+        if tags_to_delete.exists():
+            tags_to_delete.delete()
+
+        new_tags = [
+            product_tag_model(product_id=item_code, tag_id=tag_id)
+            for tag_id in tag_ids if tag_id not in saved_tag_ids
+        ]
+
+        if new_tags:
+            product_tag_model.objects.bulk_create(new_tags)
 
     if updated_products:
         product_model.objects.bulk_update(updated_products, update_fields)
@@ -143,43 +159,36 @@ def update_items(items: list[dict[str, Any]]):
 @app.task()
 def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict[str, Any]] = None):
     conf = app_settings.PRODUCT_PARSE_SETTINGS
-    tag_conf = app_settings.TAG_PARSE_SETTINGS
     product_model = import_model(conf.MODEL)
+    product_genre_model = import_model(conf.GENRE_RELATION_MODEL)
+    product_tag_model = import_model(conf.TAG_RELATION_MODEL)
     img_model = import_model(conf.IMAGE_MODEL)
-    tag_model = import_model(tag_conf.MODEL)
     genre_model = import_model(app_settings.GENRE_PARSE_SETTINGS.MODEL)
+    genre = genre_model.objects.get(id=genre_id)
+    genre_ids = get_genre_parents_tree(genre)
     fields_map = conf.PARSE_KEYS._asdict()
 
     if tag_groups:
         save_tags_from_groups(tag_groups)
 
     db_product_ids = list(product_model.objects.values_list('id', flat=True))
-    db_tag_ids = list(tag_model.objects.values_list('id', flat=True))
-    db_genres_ids = list(set(get_genre_parents_tree(genre_model.objects.get(id=genre_id))))
-
-    to_update_items = []
-    new_products, product_images = [], []
-    new_tags, new_tag_ids = [], []
-
-    product_tags = {}
+    new_products, products_to_update = [], []
+    new_product_images, new_product_tags, new_product_genres = [], [], []
 
     for item in items:
         item_code = item[conf.PARSE_KEYS.id]
 
         if item_code in db_product_ids:
-            to_update_items.append(item)
+            products_to_update.append(item)
             continue
 
-        tag_ids = item[conf.TAG_IDS_KEY]
-        if tag_ids:
-            for tag_id in tag_ids:
-                if tag_id not in db_tag_ids and tag_id not in new_tag_ids:
-                    new_tags.append(tag_model(id=tag_id, name=conf.TAG_TMP_NAME))
-                    new_tag_ids.append(tag_id)
-
-            product_tags[item_code] = tag_ids
-
         new_products.append(product_model(**build_by_fields_map(item, fields_map=fields_map)))
+
+        for genre_id in genre_ids:
+            new_product_genres.append(product_genre_model(product_id=item_code, genre_id=genre_id))
+
+        for tag_id in item[conf.TAG_IDS_KEY] or []:
+            new_product_tags.append(product_tag_model(product_id=item_code, tag_id=tag_id))
 
         for img_key in conf.IMG_PARSE_FIELDS or []:
             image_urls = item.get(img_key)
@@ -188,40 +197,29 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
                 continue
 
             image_instances = list(
-                map(
-                    lambda url: img_model(
-                        product_id=item_code,
-                        url=url.split('?')[0]
-                    ), image_urls)
+                map(lambda url: img_model(product_id=item_code, url=url.split('?')[0]), image_urls)
             )
             if image_instances:
-                product_images.extend(image_instances)
+                new_product_images.extend(image_instances)
                 break
 
-    if new_tags:
-        tag_model.objects.bulk_create(new_tags)
-
-        for tag in new_tags:
-            parse_and_update_tag.delay(tag.id)
-
     if new_products:
-        products = product_model.objects.bulk_create(new_products)
+        product_model.objects.bulk_create(new_products)
 
-        for product in products:
-            product.genres.add(*db_genres_ids)
-            if product.id in product_tags:
-                product.tags.add(*product_tags[product.id])
-            product.save()
+    if new_product_tags:
+        product_tag_model.objects.bulk_create(new_product_tags)
 
-    if product_images:
-        img_model.objects.bulk_create(product_images)
+    if new_product_genres:
+        product_genre_model.objects.bulk_create(new_product_genres)
 
-    if to_update_items:
-        update_items.delay(to_update_items)
+    if new_product_images:
+        img_model.objects.bulk_create(new_product_images)
+
+    if products_to_update:
+        update_items.delay(products_to_update, genre_id=genre_id)
 
 
 # ----------------------------------------------- REQUEST's TASK's -----------------------------------------------------
-
 @app.task()
 def parse_genres(genre_id: int = 0, parse_more: bool = False):
     rakuten = get_rakuten_client(app_settings.DELAY)

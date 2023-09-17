@@ -42,6 +42,8 @@ class GenreParseSettings(NamedTuple):
 class ProductParseSettings(NamedTuple):
     MODEL: str = 'product.models.Product'
     IMAGE_MODEL: str = 'product.models.ProductImageUrl'
+    GENRE_RELATION_MODEL: str = 'product.models.ProductGenre'
+    TAG_RELATION_MODEL: str = 'product.models.ProductTag'
     PARSE_KEYS: ProductParseCase = ProductParseCase()
     BOOLEAN_FIELDS: Iterable[str] = ('availability',)
     IMG_PARSE_FIELDS: list[str] = ['mediumImageUrls', 'smallImageUrls']
