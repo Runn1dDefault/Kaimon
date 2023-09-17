@@ -1,3 +1,4 @@
+import logging
 import time
 
 from django.core.cache import caches
@@ -6,23 +7,23 @@ from django.db import models
 from rakuten_scraping.settings import app_settings
 
 
-class OauthManager(models.Manager):
+class CacheOauthManager(models.Manager):
     _cache = caches[app_settings.CACHE_NAME]
 
     def active_clients(self):
-        return self.get_queryset().filter(disabled=False)
+        return self.filter(disabled=False)
 
     @staticmethod
     def _get_cache_key(client_id, app_id) -> str:
         return f'{app_settings.USED_USER_PREFIX}:{client_id}_{app_id}'
 
     def free_client(self):
-        # TODO: perhaps you should allocate free clients based on a minimum amount of usage
+        # future: perhaps you should allocate free clients based on a minimum amount of usage
         #  and usage amount stored in cache
-        print('Search free client...')
+        logging.info('Search free client...')
         st = time.monotonic()
         while True:
-            clients = self.active_clients()
+            clients = self.get_queryset().active_clients()
 
             if clients.exists() is False:
                 continue
@@ -30,7 +31,7 @@ class OauthManager(models.Manager):
             for client in clients:
                 client_used = self._cache.get(self._get_cache_key(client.id, client.app_id))
                 if client_used is None:
-                    print(f'Found free client {time.monotonic() - st}')
+                    logging.info(f'Found free client {time.monotonic() - st}')
                     return client
 
     def set_busy(self, client_id, app_id, delay: int | float = None) -> None:
@@ -41,11 +42,13 @@ class OauthManager(models.Manager):
 
 
 class Oauth2Client(models.Model):
-    objects = OauthManager()
+    objects = models.Manager()
+    cached_objects = CacheOauthManager()
 
     app_id = models.BigIntegerField(unique=True)
     secret = models.CharField(max_length=50, blank=True, null=True)
     partner_id = models.CharField(max_length=35, blank=True, null=True)
 
     disabled = models.BooleanField(default=False)
+    to_validation = models.BooleanField(default=False)
 

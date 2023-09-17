@@ -3,8 +3,8 @@ from typing import Any
 
 from requests import Request, Response, HTTPError
 
-from utils.clients.base import BaseClient
-from utils.clients.types import ProductSort, ItemSort
+from services.clients.base import BaseClient
+from services.clients.types import ProductSort, ItemSort
 
 
 class RakutenClient(BaseClient):
@@ -52,8 +52,8 @@ class RakutenClient(BaseClient):
     def product_search(
         self,
         keyword: str = None,
-        genre_id: str = None,
-        product_id: str = None,
+        genre_id: str | int = None,
+        product_id: str | int = None,
         hits_qty: int = None,
         sort_by: ProductSort = ProductSort.standard,
         genre_info_flag: int = 1,
@@ -66,6 +66,9 @@ class RakutenClient(BaseClient):
         assert genre_info_flag in [0, 1]
         assert or_flag in [0, 1]
 
+        if product_id:
+            return self.get(self.PRODUCT_SEARCH_PATH, {'productId': product_id})
+
         params = dict(
             formatVersion=2,
             sort=sort_by.value,
@@ -76,8 +79,7 @@ class RakutenClient(BaseClient):
             params['keyword'] = keyword
         if genre_id:
             params['genreId'] = genre_id
-        if product_id:
-            params['productId'] = product_id
+
         if isinstance(hits_qty, int):
             assert 0 <= hits_qty < 30
             params['hits'] = hits_qty
@@ -102,7 +104,7 @@ class RakutenClient(BaseClient):
         keyword: str = None,
         shop_code: str = None,
         item_code: str = None,
-        genre_id: int = None,
+        genre_id: int | str = None,
         tag_id: int | str = None,
         hits_qty: int = None,
         sort_by: ItemSort = ItemSort.standard,
@@ -162,7 +164,9 @@ if __name__ == '__main__':
     rakuten = RakutenClient(app_id='1027393930619954222')
     # pprint(rakuten.genres_search())
     # pprint(rakuten.item_search(genre_id=568674))
-    pprint(rakuten.tag_search(1000319))
+    # pprint(rakuten.product_search(keyword='フロントップ楽天市場店'))
+    # pprint(rakuten.tag_search(1000319))
 
-    # data = rakuten.product_search(product_id='4589453011031')
-    # pprint(data)
+    # data = rakuten.product_search(genre_id=568674)
+    data = rakuten.item_search(item_code="thematerialworld:10016878")
+    pprint(data)

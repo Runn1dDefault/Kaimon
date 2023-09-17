@@ -22,8 +22,8 @@ def set_free(modeladmin, request, queryset):
 
 @admin.register(Oauth2Client)
 class OauthClientAdmin(admin.ModelAdmin):
-    list_display = ('id', 'app_id', 'disabled')
-    list_filter = ('disabled',)
+    list_display = ('id', 'app_id', 'disabled', 'to_validation')
+    list_filter = ('disabled', 'to_validation')
     search_fields = ('id', 'app_id',)
     actions = [make_disable, make_active, set_free]
 
