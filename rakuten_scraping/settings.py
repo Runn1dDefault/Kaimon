@@ -1,4 +1,5 @@
 from copy import deepcopy
+from datetime import timedelta
 from typing import NamedTuple, Iterable
 
 from django.conf import settings
@@ -52,6 +53,7 @@ class ProductParseSettings(NamedTuple):
     ITEMS_KEY: str = 'Items'
     TAG_INFO_KEY: str = 'TagInformation'
     PAGES_COUNT_KEY: str = 'pageCount'
+    UPDATE_DELTA: timedelta = timedelta(hours=12)
 
 
 class TagParseSettings(NamedTuple):

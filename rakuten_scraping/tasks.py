@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
 
 from kaimon.celery import app
 from product.utils import get_last_children, get_genre_parents_tree
@@ -121,12 +122,13 @@ def update_items(items: list[dict[str, Any]]):
 
     for item in items:
         item_code = item[conf.PARSE_KEYS.id]
-        try:
-            db_product = product_model.objects.get(id=item_code)
-        except ObjectDoesNotExist:
-            logging.warning('not found product with code %s' % item_code)
+        update_delta = timezone.now() - conf.UPDATE_DELTA
+        product_query = product_model.objects.filter(id=item_code, modified_at__lte=update_delta)
+        if not product_query.exists():
+            logging.warning('product with code %s not found or modified_at grater then update delta' % item_code)
             continue
 
+        db_product = product_query.first()
         updated = False
         collected_db_fields = build_by_fields_map(item, fields_map=fields_map)
         for field, value in collected_db_fields.items():
@@ -252,8 +254,13 @@ def parse_and_update_tag(tag_id: int):
 @app.task()
 def check_products_availability(product_id: str):
     conf = app_settings.PRODUCT_PARSE_SETTINGS
+    update_delta = timezone.now() - conf.UPDATE_DELTA
     product_model = import_model(conf.PRODUCT_MODEL)
-    product = product_model.objects.get(id=product_id)
+    product = product_model.objects.filter(mofied_at__lte=update_delta, id=product_id).first()
+    if not product:
+        logging.warning('Product %s was updated in %s' % (product.id, product.modified_at))
+        return
+
     rakuten = get_rakuten_client(app_settings.DELAY, validation_client=True)
     items_data = rakuten.item_search(item_code=product_id).get(conf.ITEMS_KEY) or []
     if not items_data:
