@@ -1,10 +1,12 @@
-from django.core.validators import MinValueValidator
+from django.contrib.auth import get_user_model
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from order.querysets import OrderAnalyticsQuerySet
-from order.validators import only_digit_validator
-from product.models import Product, Tag
+from users.utils import get_sentinel_user
+
+from .validators import only_digit_validator
+from .querysets import OrderAnalyticsQuerySet
 
 
 class BaseModel(models.Model):
@@ -16,6 +18,9 @@ class BaseModel(models.Model):
 
 
 class Customer(BaseModel):
+    """
+    model for saving recipient data for history and analytics
+    """
     name = models.CharField(max_length=100)
     email = models.EmailField()
     phone = models.CharField(max_length=20, validators=[only_digit_validator])
@@ -25,14 +30,14 @@ class Customer(BaseModel):
 
 
 class DeliveryAddress(BaseModel):
-    customer = models.ForeignKey(Customer, on_delete=models.RESTRICT, related_name='delivery_addresses')
+    user = models.ForeignKey(get_user_model(), on_delete=models.SET(get_sentinel_user),
+                             related_name='delivery_addresses')
     recipient_name = models.CharField(max_length=100)
     country = models.CharField(max_length=100)
     city = models.CharField(max_length=100)
-    postal_code = models.CharField(max_length=20)
+    postal_code = models.CharField(max_length=20)  # TODO: maybe this is not required field
     state = models.CharField(max_length=100, blank=True, null=True)
     address_line = models.TextField(blank=True, null=True)
-
     as_deleted = models.BooleanField(default=False)
 
     def __str__(self):
@@ -53,6 +58,7 @@ class Order(BaseModel):
         delivered = 'delivered', _('Delivered')
         success = 'success', _('Success')
 
+    customer = models.ForeignKey(Customer, on_delete=models.RESTRICT, related_name='orders')
     delivery_address = models.ForeignKey(DeliveryAddress, on_delete=models.RESTRICT, related_name='orders')
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.pending)
     comment = models.TextField(null=True, blank=True)
@@ -69,21 +75,22 @@ class Order(BaseModel):
         if not self.receipts.exists():
             return 0.0
 
-        sale_price_case = self.__class__.analytics.sale_price_case(from_receipts=True)
-        receipts_prices = self.receipts.annotate(receipt_price=sale_price_case).values_list('receipt_price', flat=True)
-        return sum(list(receipts_prices))
+        receipts_prices = self.__class__analytics.filter(id=self.id).total_prices().values('yen')
+        return receipts_prices[0]['yen']
 
 
-class OrderReceipt(BaseModel):
+class Receipt(BaseModel):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='receipts')
-    product = models.ForeignKey(Product, on_delete=models.RESTRICT, related_name='receipts')
-    unit_price = models.FloatField()
-    discount = models.FloatField(default=0.0)
-    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)], default=1)
-    # product tags of client choice will be saved in field tags,
-    # for a better understanding of what the client wants to order
-    tags = models.ManyToManyField(
-        Tag,
-        blank=True,
-        related_name='receipts'
+    product = models.ForeignKey('product.Product', on_delete=models.RESTRICT, related_name='receipts')
+    unit_price = models.DecimalField(max_digits=20, decimal_places=10)
+    discount = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
+    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)], default=1)
+
+
+class ReceiptTag(models.Model):
+    receipt = models.ForeignKey(Receipt, on_delete=models.CASCADE, related_name='tags')
+    tag = models.ForeignKey('product.Tag', on_delete=models.RESTRICT)
