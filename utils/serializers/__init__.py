@@ -1,1 +1,0 @@
-from utils.serializers.serializers import AnalyticsSerializer
