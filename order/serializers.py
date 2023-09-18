@@ -1,12 +1,14 @@
+import logging
+
 from django.db import transaction
-from django.utils.translation import gettext_lazy
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from currencies.models import Conversion
 from product.models import Product, Tag
-from utils.serializers.mixins import LangSerializerMixin
+from utils.serializers import LangSerializerMixin
 
-from .models import DeliveryAddress, Order, OrderReceipt, Customer
+from .models import DeliveryAddress, Order, Receipt, Customer, ReceiptTag
 from .utils import duplicate_delivery_address
 from .validators import only_digit_validator
 
@@ -22,6 +24,7 @@ class DeliveryAddressSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         if instance.orders.exists():
+            # for any updates, the old data must be preserved if the address had orders
             duplicated_address = duplicate_delivery_address(instance, updates=validated_data)
             instance.as_deleted = True
             instance.save()
@@ -29,7 +32,7 @@ class DeliveryAddressSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class OrderReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer):
+class ReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer):
     tags = serializers.SerializerMethodField(read_only=True)
     product_id = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.filter(is_active=True, availability=True),
@@ -44,7 +47,7 @@ class OrderReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer):
     )
 
     class Meta:
-        model = OrderReceipt
+        model = Receipt
         fields = ('order', 'product_id', 'unit_price', 'discount', 'quantity', 'tags', 'tag_ids',)
         extra_kwargs = {'order': {'read_only': True}, 'unit_price': {'read_only': True},
                         'discount': {'read_only': True}}
@@ -56,58 +59,54 @@ class OrderReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer):
             for tag in tags:
                 if not product.tags.filter(id=tag.id).exists():
                     raise serializers.ValidationError(
-                        {'tag_ids': gettext_lazy("Invalid pk \"%s\" - object does not exist.") % tag.id}
+                        {'tag_ids': _("Invalid pk \"%s\" - object does not exist.") % tag.id}
                     )
         return attrs
 
     def get_tags(self, instance):
-        lang = self.get_lang()
-        field = 'name' if lang == 'ja' else 'name_' + lang
+        field = self.get_translate_field('name')
         return list(instance.tags.values_list(field, flat=True))
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    phone = serializers.CharField(max_length=13, write_only=True, required=True, validators=[only_digit_validator])
+    phone = serializers.CharField(max_length=13, required=True, validators=[only_digit_validator])
     address_id = serializers.PrimaryKeyRelatedField(
         queryset=DeliveryAddress.objects.filter(as_deleted=False),
         write_only=True,
         required=True
     )
     delivery_address = DeliveryAddressSerializer(many=False, read_only=True)
-    receipts = OrderReceiptSerializer(many=True, read_only=True)
-    products = OrderReceiptSerializer(many=True, write_only=True, required=True)
+    receipts = ReceiptSerializer(many=True, read_only=True)
+    products = ReceiptSerializer(many=True, write_only=True, required=True)
 
     class Meta:
         model = Order
         fields = ('id', 'status', 'delivery_address', 'receipts', 'products', 'address_id', 'phone', 'comment')
-        extra_kwargs = {'status': {'read_only': True}}
+        extra_kwargs = {'status': {'read_only': True}, 'phone': {'source': 'customer__phone'}}
 
     def validate(self, attrs):
         address = attrs.get('address_id')
         if address and not self.context['request'].user.delivery_addresses.filter(id=address.id).exists():
             raise serializers.ValidationError(
-                {'address_id': gettext_lazy("Invalid pk \"%s\" - object does not exist.") % address.id}
+                {'address_id': _("Invalid pk \"%s\" - object does not exist.") % address.id}
             )
-        return attrs
 
-    def create(self, validated_data):
         dollar_conversion = Conversion.objects.filter(
             currency_from=Conversion.Currencies.yen,
             currency_to=Conversion.Currencies.dollar
         ).first()
-        if not dollar_conversion:
-            raise serializers.ValidationError({'detail': gettext_lazy('Not found dollar conversion')})
-
         som_conversion = Conversion.objects.filter(
             currency_from=Conversion.Currencies.yen,
             currency_to=Conversion.Currencies.som
         ).first()
-        if not som_conversion:
-            raise serializers.ValidationError({'detail': gettext_lazy('Not found som conversion')})
+        if not dollar_conversion or not som_conversion:
+            logging.warning('no entries were found for conversion')
 
-        validated_data['yen_to_usd'] = dollar_conversion.price_per
-        validated_data['yen_to_som'] = som_conversion.price_per
+        attrs['yen_to_usd'] = dollar_conversion.price_per if dollar_conversion else 0.0
+        attrs['yen_to_som'] = som_conversion.price_per if som_conversion else 0.0
+        return attrs
 
+    def create(self, validated_data):
         phone = validated_data.pop('phone')
         user = self.context['request'].user
         customer, _ = Customer.objects.get_or_create(
@@ -119,36 +118,29 @@ class OrderSerializer(serializers.ModelSerializer):
         address = validated_data.pop('address_id')
         validated_data['delivery_address'] = address
         receipts_data = validated_data.pop('products')
+        order = super().create(validated_data)
+        receipts = []
+        receipt_tags = []
 
-        with transaction.atomic():
-            order = super().create(validated_data)
-            order_receipts = []
-            collected_product_tags = {}
+        for product_data in receipts_data:
+            product = product_data['product_id']
+            receipt = Receipt(
+                order=order,
+                product=product,
+                unit_price=product.price,
+                discount=product.discount.percentage if getattr(product, 'discount', None) else 0.0,
+                quantity=product_data['quantity']
+            )
+            receipts.append(receipt)
 
-            for product_data in receipts_data:
-                product = product_data['product_id']
-                tags = product_data.get('tag_ids')
+            tags = product_data.get('tag_ids')
+            if tags:
+                receipt_tags.extend([ReceiptTag(receipt=receipt, tag=tag) for tag in tags])
 
-                if tags and product.id not in collected_product_tags.keys():
-                    collected_product_tags[product.id] = []
-
-                if tags:
-                    collected_product_tags[product.id].extend(tags)
-
-                receipt = OrderReceipt(
-                    order=order,
-                    product=product,
-                    unit_price=product.price,
-                    discount=product.discount.percentage if getattr(product, 'discount', None) else 0.0,
-                    quantity=product_data['quantity']
-                )
-                order_receipts.append(receipt)
-
-            receipts = OrderReceipt.objects.bulk_create(order_receipts)
-            for receipt in receipts:
-                tags = collected_product_tags.get(receipt.product.id)
-                if tags:
-                    receipt.tags.add(*tags)
+        if receipts:
+            Receipt.objects.bulk_create(receipts)
+        if receipt_tags:
+            ReceiptTag.objects.bulk_create(receipt_tags)
         return order
 
     def update(self, instance, validated_data):
@@ -166,21 +158,19 @@ class OrderSerializer(serializers.ModelSerializer):
             return instance
 
         if instance.status != Order.Status.pending:
-            raise serializers.ValidationError({'detail': gettext_lazy("not available for update")})
+            raise serializers.ValidationError({'detail': _("not available for update")})
 
         receipts = validated_data.pop('products', [])
 
         for receipt in receipts:
             receipt_id = receipt.pop('id', None)
             if not receipt_id:
-                raise serializers.ValidationError(
-                    {"products": [{"id": gettext_lazy("required")}]}
-                )
+                raise serializers.ValidationError({"products": [{"id": _("required")}]})
 
             receipt_obj = instance.receipts.filter(id=receipt_id).first()
             if not receipt_obj:
                 raise serializers.ValidationError(
-                    {'products': [{"id": gettext_lazy("Invalid pk \"%s\" - object does not exist.")}]}
+                    {'products': [{"id": _("Invalid pk \"%s\" - object does not exist.")}]}
                 )
 
             save = False
