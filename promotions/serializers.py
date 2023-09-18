@@ -1,7 +1,7 @@
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
-from utils.serializers.mixins import LangSerializerMixin
+from utils.serializers import LangSerializerMixin
 
 from .models import Banner, Promotion
 
@@ -34,4 +34,3 @@ class PromotionSerializer(serializers.ModelSerializer):
 
     def get_products_count(self, instance) -> int:
         return instance.products.filter(is_active=True).count()
-
