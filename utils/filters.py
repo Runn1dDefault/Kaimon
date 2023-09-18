@@ -1,5 +1,4 @@
 from collections import OrderedDict
-from datetime import datetime
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -8,6 +7,36 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.filters import BaseFilterBackend
 from rest_framework.compat import coreapi, coreschema
+
+
+class ListFilterFields(BaseFilterBackend):
+    description = _('Filtering by field %s ex: query1,query2')
+
+    def get_field_names(self, view):
+        return getattr(view, 'list_filter_fields', {})
+
+    def get_queries_kwargs(self, request, view) -> dict[str, list[str]]:
+        return {
+            source + '__in': [i for i in request.query_params.get(field_name, '').split(',') if i.strip()]
+            for field_name, source in self.get_field_names(view).items()
+        }
+
+    def filter_queryset(self, request, queryset, view):
+        return queryset.filter(**self.get_queries_kwargs(request, view))
+
+    def get_schema_operation_parameters(self, view):
+        return [
+            {
+                'name': field_name,
+                'required': False,
+                'in': 'query',
+                'description': force_str(self.description % source),
+                'schema': {
+                    'type': 'string',
+                },
+            }
+            for field_name, source in self.get_field_names(view).items()
+        ]
 
 
 class DateRangeFilter(BaseFilterBackend):
