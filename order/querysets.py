@@ -1,9 +1,8 @@
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import F, Case, When, Value, Q, Sum
+from django.db.models import F, Case, When, Value, Sum
 from django.db.models.functions import JSONObject, Round
 
 from utils.querysets import AnalyticsQuerySet
-from utils.types import AnalyticsFilter
 
 
 def sale_price_calc_case(currency_field: str = None, from_receipt_obj: bool = True):
@@ -35,7 +34,7 @@ class OrderAnalyticsQuerySet(AnalyticsQuerySet):
             dollar=Sum(sale_price_calc_case('yen_to_usd', from_receipt_obj=False))
         )
 
-    def by_dates(self, by: AnalyticsFilter):
+    def by_dates(self, by):
         return self.values(date=by.value('created_at')).annotate(
             receipts_info=ArrayAgg(
                 JSONObject(

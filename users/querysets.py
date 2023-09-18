@@ -3,11 +3,10 @@ from django.db.models import Count, F
 from django.db.models.functions import JSONObject, TruncDate
 
 from utils.querysets import AnalyticsQuerySet
-from utils.types import AnalyticsFilter
 
 
 class UserAnalyticsQuerySet(AnalyticsQuerySet):
-    def get_joined_users_analytics(self, by: AnalyticsFilter):
+    def by_dates(self, by):
         return self.values(date=by.value('date_joined')).annotate(
             users=ArrayAgg(
                 JSONObject(

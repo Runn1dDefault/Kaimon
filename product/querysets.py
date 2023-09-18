@@ -1,5 +1,5 @@
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import QuerySet, F, Count, Avg, Q, Case, When
+from django.db.models import QuerySet, F, Count, Avg, Q
 from django.db.models.functions import JSONObject, Round
 
 from utils.querysets import AnalyticsQuerySet
@@ -54,7 +54,7 @@ class ProductQuerySet(QuerySet):
 
 
 class ReviewAnalyticsQuerySet(AnalyticsQuerySet):
-    def get_date_analytics(self, by: AnalyticsFilter):
+    def by_dates(self, by: AnalyticsFilter):
         return self.values(date=by.value('created_at')).annotate(
             info=ArrayAgg(
                 JSONObject(
