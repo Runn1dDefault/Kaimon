@@ -232,7 +232,18 @@ RESTORE_VERIFY_TEMPLATE = {
     "code": "",
     "warning_text": "if it wasn't you. Please ignore this message and do not share the code with anyone."
 }
+VERIFICATION_PLAIN_TEXT = """
+Verify your email
+*{subject}*
 
+**********
+*{code}*
+**********
+
+Warning: {warning_text}
+
+© Copyright Kaimono. All Rights Reserved
+"""
 
 SUPPORTED_LANG = ('ru', 'en', 'ja', 'tr', 'ky', 'kz')
 VERBOSE_LANGUAGES = {'ja': '日本語', 'ru': 'Русский', 'en': 'English', 'tr': 'Türkçe', 'ky': 'Кыргызча', 'kz': 'Қазақ'}

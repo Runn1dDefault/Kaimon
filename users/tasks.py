@@ -21,8 +21,7 @@ def send_code_template(email: str, code: str | int):
     template_data['code'] = code
 
     html_message = render_to_string('restore_code.html', context=template_data)
-    plain_message = ''  # TODO: add plain text
-
+    plain_message = settings.VERIFICATION_PLAIN_TEXT.format(**template_data)
     try:
         send_mail(
             subject='Kaimono',
