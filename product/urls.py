@@ -1,7 +1,6 @@
 from django.urls import path, re_path
 
 from .views import (
-    get_languages_view,
     GenreListView, GenreChildrenView, GenreParentsView, TagByGenreListView,
     ProductsListByGenreView, ProductRetrieveView,
     ProductReviewCreateView, ProductReviewListView,
@@ -28,7 +27,6 @@ products_urlpatterns = [
 ]
 
 additions_urlpatterns = [
-    path('languages/', get_languages_view, name='product_languages_list'),
     path('recommendations/', ReferenceListView.as_view(), name='product_recommendations_list'),
 ]
 

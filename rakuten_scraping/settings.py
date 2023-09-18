@@ -73,7 +73,7 @@ class AppSettings(NamedTuple):
 
 
 def get_app_settings():
-    config = deepcopy(settings.RAKUTEN_PARSING_SETTINGS)
+    config = deepcopy(settings.PARSING_SETTINGS)
 
     case_settings = {
         'GENRE_PARSE_SETTINGS': {'PARSE_KEYS': GenreParseCase},

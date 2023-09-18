@@ -208,7 +208,7 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
         products = validated_data.pop('set_products', None)
         banner_data = self.collect_banner_data(validated_data)
 
-        with transaction.atomic():
+        with transaction.atomic():  # TODO: move to view
             banner_serializer = BannerAdminSerializer(data=banner_data, many=False, context=self.context)
             banner_serializer.is_valid(raise_exception=True)
             banner_serializer.save()
