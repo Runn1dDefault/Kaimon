@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -20,8 +22,10 @@ class Conversion(models.Model):
 
     currency_from = models.CharField(max_length=10, choices=Currencies.choices, default=Currencies.yen)
     currency_to = models.CharField(max_length=10, choices=Currencies.choices)
-    price_per = models.FloatField(help_text=_('unit price currency_from'))
+    price_per = models.DecimalField(max_digits=20, decimal_places=10, help_text=_('unit price currency_from'))
     created_at = models.DateTimeField(auto_now=True)
 
-    def calc_price(self, current_price: float):
+    def calc_price(self, current_price: float | Decimal | int):
+        if not isinstance(current_price, Decimal):
+            current_price = Decimal(current_price)
         return round(current_price * self.price_per, 2)
