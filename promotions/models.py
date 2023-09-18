@@ -51,7 +51,7 @@ class Discount(models.Model):
     # pulled out into a separate model,
     # since in the future they may add a different kind of promotion that does not use discount
     promotion = models.OneToOneField(Promotion, on_delete=models.CASCADE, primary_key=True)
-    percentage = models.FloatField(validators=[MaxValueValidator(100)])
+    percentage = models.DecimalField(max_digits=5, decimal_places=2, validators=[MaxValueValidator(100)])
 
     def calc_price(self, price: float | int):
         if price <= 0:
