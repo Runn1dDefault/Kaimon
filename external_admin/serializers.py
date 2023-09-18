@@ -11,7 +11,7 @@ from currencies.serializers import ConversionField
 from product.models import Product, Genre, Tag, ProductImageUrl, TagGroup, ProductReview
 from product.utils import get_genre_parents_tree
 from promotions.models import Banner, Promotion, Discount
-from order.models import Order, Customer, DeliveryAddress, OrderReceipt
+from order.models import Order, Customer, DeliveryAddress, Receipt
 from users.models import User
 from utils.serializers import AnalyticsSerializer
 
@@ -257,16 +257,16 @@ class DeliveryAddressAdminSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class OrderReceiptAdminSerializer(serializers.ModelSerializer):
+class ReceiptAdminSerializer(serializers.ModelSerializer):
     class Meta:
-        model = OrderReceipt
+        model = Receipt
         fields = '__all__'
 
 
 class OrderAdminSerializer(serializers.ModelSerializer):
     customer = OrderCustomerAdminSerializer(read_only=True)
     delivery_address = DeliveryAddressAdminSerializer(read_only=True)
-    receipts = OrderReceiptAdminSerializer(many=True, read_only=True)
+    receipts = ReceiptAdminSerializer(many=True, read_only=True)
     total_price = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
