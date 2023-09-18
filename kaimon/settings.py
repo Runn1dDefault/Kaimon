@@ -35,7 +35,6 @@ CSRF_TRUSTED_ORIGINS = [
     "http://176.126.166.140:9010",
     "http://176.126.166.140",
     "http://localhost:9010",
-
 ]
 # Application definition
 
@@ -54,13 +53,13 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'drf_spectacular',
 
-    'users',
-    'product',
-    'rakuten_scraping',
-    'order',
-    'promotions',
+    'users',  # ready
+    'product',  # ready
+    'rakuten_scraping',  # ready
     'currencies',
-    'external_admin',
+    'promotions',
+    'order',
+    'external_admin'
 ]
 
 MIDDLEWARE = [
@@ -220,24 +219,20 @@ RESTORE_SETTINGS = {
     "MAIL_SUBJECT": ""
 }
 
-RAKUTEN_PARSING_SETTINGS = {
-    'CACHE_NAME': "scraping"
-}
+RAKUTEN_PARSING_SETTINGS = {'CACHE_NAME': "scraping"}
 
-SENDGRID_API_KEY = config('SENDGRID_API_KEY')
-MAILING_FROM_EMAIL = config('MAILING_FROM_EMAIL')
-RESTORE_VERIFY_CODE_TEMPLATE_ID = config("RESTORE_CODE_TEMPLATE_ID")
+EMAIL_HOST = config('EMAIL_HOST')
+DEFAULT_FROM_EMAIL = config('EMAIL_HOST_USER')
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
 RESTORE_VERIFY_TEMPLATE = {
     "subject": "Verification code",
     "code": "",
     "warning_text": "if it wasn't you. Please ignore this message and do not share the code with anyone."
 }
 
-EMAIL_HOST = 'smtp.sendgrid.net'
-EMAIL_HOST_USER = 'apikey'  # this is exactly the value 'apikey'
-EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
-EMAIL_PORT = 587  # 587 for TLS 465 for ssl
-EMAIL_USE_TLS = True
 
 SUPPORTED_LANG = ('ru', 'en', 'ja', 'tr', 'ky', 'kz')
 VERBOSE_LANGUAGES = {'ja': '日本語', 'ru': 'Русский', 'en': 'English', 'tr': 'Türkçe', 'ky': 'Кыргызча', 'kz': 'Қазақ'}
@@ -264,14 +259,4 @@ CURRENCY_QUERY_SCHEMA_PARAM = OpenApiParameter(
     required=False,
     default='yen'
 )
-
-GENRE_MODEL_PATH = 'product.models.Genre'
-GENRE_TRANSLATE_FIELDS = ('name',)
-PRODUCT_MODEL_PATH = 'product.models.Product'
-PRODUCT_TRANSLATE_FIELDS = ('name', 'description', 'brand_name')
-PRODUCT_DETAIL_MODEL_PATH = 'product.models.ProductDetail'
-PRODUCT_DETAIL_TRANSLATE_FIELDS = ('name', 'value',)
-MARKER_MODEL_PATH = 'product.models.Marker'
-MARKER_TRANSLATE_FIELDS = ('name',)
-
 INCREASE_PRICE_PERCENTAGE = 10
