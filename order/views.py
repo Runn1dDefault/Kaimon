@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import viewsets, mixins
 from rest_framework.decorators import action
 
@@ -5,7 +6,7 @@ from product.models import Product
 from product.serializers import ProductListSerializer
 from users.filters import FilterByUser
 from users.permissions import RegistrationPayedPermission
-from utils.filters import FilterByFields
+from utils.filters import ListFilterFields
 from utils.paginators import PagePagination
 
 from .models import DeliveryAddress, Order
@@ -23,8 +24,11 @@ class DeliveryAddressViewSet(viewsets.ModelViewSet):
     user_relation_filters = {'as_deleted': False}
 
     def perform_destroy(self, instance):
-        instance.as_deleted = True
-        instance.save()
+        if instance.orders.exists():
+            instance.as_deleted = True
+            instance.save()
+        else:
+            instance.delete()
 
 
 class OrderViewSet(
@@ -37,8 +41,12 @@ class OrderViewSet(
     serializer_class = OrderSerializer
     product_serializer_class = ProductListSerializer
     pagination_class = PagePagination
-    filter_backends = [FilterByFields]
-    filter_fields = {'status': {'db_field': 'status', 'type': 'enum', 'choices': Order.Status.choices}}
+    filter_backends = [ListFilterFields]
+    list_filter_fields = {'status': 'status'}
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            super().perform_create(serializer)
 
     def get_queryset(self):
         return super().get_queryset().filter(delivery_address__user=self.request.user)
