@@ -18,7 +18,7 @@ class FilterByTag(BaseFilterBackend):
         tag_ids = request.query_params.get(self.param, '').split(',')
         tag_ids = [tag_id for tag_id in tag_ids if tag_id.strip()]
         if tag_ids:
-            return queryset.filter(tags__id__in=tag_ids)
+            return queryset.filter(tags__tag_id__in=tag_ids)
         return queryset
 
     def get_schema_operation_parameters(self, view):
@@ -57,9 +57,14 @@ class ProductReferenceFilter(BaseFilterBackend):
         if product_id:
             # recommendations by product instance genres and tags
             product = get_object_or_404(queryset, id=product_id)
-            genre_ids = product.genres.exclude(level__in=self.exclude_genre_levels).values_list('id', flat=True)
-            tag_ids = product.tags.values_list('id', flat=True)
-            return queryset.exclude(id=product_id).filter(Q(genres__id__in=genre_ids) | Q(tags__id__in=tag_ids))
+            genre_ids = product.genres.exclude(genre__level__in=self.exclude_genre_levels).values_list('id', flat=True)
+            tag_ids = product.tags.values_list('tag_id', flat=True)
+            return (
+                queryset.exclude(id=product_id)
+                        .filter(Q(genres__genre_id__in=genre_ids) | Q(tags__tag_id__in=tag_ids))
+                        .annotate(average_rank=Sum('reviews__rank'))
+                        .order_by(F('reference_rank').desc(nulls_last=True), F('average_rank').desc(nulls_last=True))
+            )
         # recommendations by products purchases and reviews
         by_purchases_filtered = self.filter_by_purchases_count(queryset, min_count=self.min_filter_qty)
         by_reviews_filtered = self.filter_by_reviews_count(queryset, min_count=self.min_filter_qty)
