@@ -1,18 +1,18 @@
-from rest_framework.permissions import BasePermission, IsAuthenticated
+from rest_framework.permissions import BasePermission
 
 
-class RegistrationPayedPermission(IsAuthenticated):
+class RegistrationPayedPermission(BasePermission):
     """
     to check the status of the authorized user's payment for registration
     """
     def has_permission(self, request, view):
-        return super().has_permission(request, view) and request.user.registration_payed
+        return request.user and request.user.is_authenticated and request.user.registration_payed
 
 
-class EmailConfirmedPermission(IsAuthenticated):
+class EmailConfirmedPermission(BasePermission):
 
     def has_permission(self, request, view):
-        return super().has_permission(request, view) and request.user.email_confirmed
+        return request.user and request.user.is_authenticated and request.user.email_confirmed
 
 
 class IsDirectorPermission(BasePermission):
