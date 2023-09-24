@@ -1,6 +1,45 @@
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import QuerySet, F, Count
-from django.db.models.functions import JSONObject
+from django.db.models import QuerySet, F, Count, Avg, Q
+from django.db.models.functions import JSONObject, Round
+
+from utils.querysets import AnalyticsQuerySet
+from utils.types import AnalyticsFilter
+
+
+class TagGroupQuerySet(QuerySet):
+    def groups_with_tags(self):
+        return self.annotate(tags_qty=Count('tags__id')).filter(tags_qty__gt=0)
+
+    def tags_data(self, tag_ids=None):
+        return self.values(group_id=F('id')).annotate(
+            group_name=F('name'),
+            group_name_ru=F('name_ru'),
+            group_name_en=F('name_en'),
+            group_name_tr=F('name_tr'),
+            group_name_ky=F('name_ky'),
+            group_name_kz=F('name_kz'),
+            tag_info=ArrayAgg(
+                JSONObject(
+                    id=F('tags__id'),
+                    name=F('tags__name'),
+                    name_ru=F('tags__name_ru'),
+                    name_en=F('tags__name_en'),
+                    name_tr=F('tags__name_tr'),
+                    name_ky=F('tags__name_ky'),
+                    name_kz=F('tags__name_kz'),
+                ), filter=Q(tags__id__in=tag_ids) if tag_ids else None
+            )
+        )
+
+    def tags_list(self, name_field: str = 'name', tag_ids=None):
+        return self.values(group_id=F('id'), group_name=F(name_field)).annotate(
+            tag_info=ArrayAgg(
+                JSONObject(
+                    id=F('tags__id'),
+                    name=F('tags__' + name_field)
+                ), filter=Q(tags__id__in=tag_ids) if tag_ids else None
+            )
+        )
 
 
 class GenreQuerySet(QuerySet):
@@ -28,7 +67,28 @@ class GenreQuerySet(QuerySet):
 
 
 class ProductQuerySet(QuerySet):
-    def popular_by_orders_qty(self):
+    def order_by_popular(self):
         return self.annotate(
+            average_rank=Avg('reviews__rank', filter=Q(reviews__is_active=True)),
             receipts_qty=Count('receipts__order_id', distinct=True)
-        ).filter(receipts_qty__gt=0).order_by('-receipts_qty')
+        ).order_by(F('receipts_qty').desc(nulls_last=True), F('average_rank').desc(nulls_last=True))
+
+
+class ReviewAnalyticsQuerySet(AnalyticsQuerySet):
+    def by_dates(self, by: AnalyticsFilter):
+        return self.values(date=by.value('created_at')).annotate(
+            info=ArrayAgg(
+                JSONObject(
+                    user_id=F('user__id'),
+                    email=F('user__email'),
+                    name=F('user__full_name'),
+                    comment=F('comment'),
+                    rank=F('rank'),
+                    created_at=F('created_at'),
+                    is_active=F('is_active'),
+                    is_read=F('is_read')
+                )
+            ),
+            count=Count('id'),
+            avg_rank=Round(Avg('rank'), precision=1)
+        )

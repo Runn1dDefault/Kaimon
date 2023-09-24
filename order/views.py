@@ -1,48 +1,53 @@
-from rest_framework import generics, viewsets
+from django.db import transaction
+from rest_framework import viewsets, mixins, parsers
 
+from product.serializers import ProductListSerializer
 from users.filters import FilterByUser
-from users.permissions import RegistrationPayedPermission
-from utils.mixins import LanguageMixin
-from utils.filters import FilterByFields
+from users.permissions import RegistrationPayedPermission, EmailConfirmedPermission
+from utils.filters import ListFilterFields
 from utils.paginators import PagePagination
 
-from .models import Country, UserDeliveryAddress, Order
+from .models import DeliveryAddress, Order
 from .permissions import OrderPermission
-from .serializers import CountrySerializer, DeliveryAddressSerializer, OrderSerializer
+from .serializers import DeliveryAddressSerializer, OrderSerializer
 
 
-class CountryListView(LanguageMixin, generics.ListAPIView):
-    queryset = Country.objects.filter(is_active=True)
-    serializer_class = CountrySerializer
-    permission_classes = [RegistrationPayedPermission]
-
-
-class DeliveryAddressViewSet(LanguageMixin, viewsets.ModelViewSet):
-    queryset = UserDeliveryAddress.objects.filter(is_deleted=False)
-    permission_classes = [RegistrationPayedPermission]
+class DeliveryAddressViewSet(viewsets.ModelViewSet):
+    queryset = DeliveryAddress.objects.filter(as_deleted=False)
+    permission_classes = [EmailConfirmedPermission, RegistrationPayedPermission]
     serializer_class = DeliveryAddressSerializer
     pagination_class = PagePagination
     filter_backends = [FilterByUser]
     user_relation_field = 'delivery_addresses'
-    user_relation_filters = {'is_deleted': False}
+    user_relation_filters = {'as_deleted': False}
 
     def perform_destroy(self, instance):
-        instance.is_deleted = True
-        instance.save()
+        if instance.orders.exists():
+            instance.as_deleted = True
+            instance.save()
+        else:
+            instance.delete()
 
 
-class OrderViewSet(LanguageMixin, viewsets.ModelViewSet):
-    queryset = Order.objects.filter(is_deleted=False)
-    permission_classes = [RegistrationPayedPermission, OrderPermission]
+class OrderViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet
+):
+    queryset = Order.objects.all()
+    parser_classes = (parsers.JSONParser,)
+    permission_classes = [EmailConfirmedPermission, RegistrationPayedPermission, OrderPermission]
     serializer_class = OrderSerializer
+    product_serializer_class = ProductListSerializer
     pagination_class = PagePagination
-    filter_backends = [FilterByFields]
-    filter_fields = {'status': {'db_field': 'status', 'type': 'enum', 'choices': Order.Status.choices}}
+    filter_backends = [ListFilterFields]
+    list_filter_fields = {'status': 'status'}
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            super().perform_create(serializer)
 
     def get_queryset(self):
-        return super().get_queryset()
+        return super().get_queryset().filter(delivery_address__user=self.request.user)
 
-    def perform_destroy(self, instance):
-        instance.is_deleted = True
-        instance.delete_receipts()
-        instance.save()
+    # TODO: add cancel order if order.status == Order.Status.pending

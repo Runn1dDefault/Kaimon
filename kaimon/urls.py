@@ -13,12 +13,13 @@ docs_urlpatterns = [
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/v1/', include('users.urls')),
-    path('api/v1/', include('product.urls')),
-    path('api/v1/', include('order.urls')),
-    path('api/v1/admin/', include('currency_conversion.external_admin.urls')),
-    path('api/v1/', include('promotions.urls')),
+    path('api/v1/auth/', include('users.urls')),
+    path('api/v1/products/', include('product.urls')),
+    path('api/v1/order/', include('order.urls')),
+    path('api/v1/promotions/', include('promotions.urls')),
+    path('api/v1/external-admin/', include('external_admin.urls')),
 ] + docs_urlpatterns
 
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-urlpatterns += static(settings.STATIC_URL, docement_root=settings.STATIC_ROOT)
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, docement_root=settings.STATIC_ROOT)

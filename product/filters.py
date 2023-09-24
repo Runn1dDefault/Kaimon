@@ -1,10 +1,128 @@
 from django.contrib.admin import SimpleListFilter
-from django.db.models import Avg, Q, Count
+from django.db.models import Avg, Q, F, Sum, Count, Case, When, Value, IntegerField
+from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 from rest_framework.filters import SearchFilter, BaseFilterBackend
 from rest_framework.generics import get_object_or_404
 
-from utils.mixins import LanguageMixin
+from utils.views import LanguageMixin
+
+from .querysets import ProductQuerySet
+
+
+class FilterByTag(BaseFilterBackend):
+    param = 'tag_ids'
+    description = _('Filter by tag ids')
+
+    def filter_queryset(self, request, queryset, view):
+        tag_ids = request.query_params.get(self.param, '').split(',')
+        tag_ids = [tag_id for tag_id in tag_ids if tag_id.strip()]
+        if tag_ids:
+            return queryset.filter(tags__tag_id__in=tag_ids)
+        return queryset
+
+    def get_schema_operation_parameters(self, view):
+        return [
+            {
+                'name': self.param,
+                'required': False,
+                'in': 'query',
+                'description': force_str(self.description),
+                'schema': {
+                    'type': 'string',
+                }
+            }
+        ]
+
+
+class ProductReferenceFilter(BaseFilterBackend):
+    min_filter_qty = 1
+    reference_qty = 10
+    exclude_genre_levels = [0, 1]
+    product_id_param = 'product_id'
+    product_id_description = _('Recommendations by product meta')
+
+    @staticmethod
+    def filter_by_purchases_count(queryset, min_count: int = 0) -> ProductQuerySet:
+        return queryset.annotate(
+            purchases_count=Sum('receipts__quantity', output_field=IntegerField())
+        ).filter(purchases_count__gt=min_count)
+
+    @staticmethod
+    def filter_by_reviews_count(queryset, min_count: int = 0) -> ProductQuerySet:
+        return queryset.annotate(reviews_count=Count('reviews__id')).filter(reviews_count__gt=min_count)
+
+    def filter_queryset(self, request, queryset, view):
+        product_id = request.query_params.get(self.product_id_param)
+        if product_id:
+            # recommendations by product instance genres and tags
+            product = get_object_or_404(queryset, id=product_id)
+            genre_ids = product.genres.exclude(genre__level__in=self.exclude_genre_levels).values_list('id', flat=True)
+            tag_ids = product.tags.values_list('tag_id', flat=True)
+            return (
+                queryset.exclude(id=product_id)
+                        .filter(Q(genres__genre_id__in=genre_ids) | Q(tags__tag_id__in=tag_ids))
+                        .annotate(average_rank=Sum('reviews__rank'))
+                        .order_by(F('reference_rank').desc(nulls_last=True), F('average_rank').desc(nulls_last=True))
+            )
+        # recommendations by products purchases and reviews
+        by_purchases_filtered = self.filter_by_purchases_count(queryset, min_count=self.min_filter_qty)
+        by_reviews_filtered = self.filter_by_reviews_count(queryset, min_count=self.min_filter_qty)
+        purchases_product_ids = list(by_purchases_filtered.values_list('id', flat=True))
+        reviewed_product_ids = list(by_reviews_filtered.values_list('id', flat=True))
+        reference_product_ids = purchases_product_ids + reviewed_product_ids
+        return queryset.annotate(
+            in_reference=Case(
+                When(id__in=reference_product_ids, then=Value(True)),
+                When(~Q(id__in=reference_product_ids), then=Value(False))
+            )
+        ).order_by('in_reference', F('reference_rank').desc(nulls_last=True))
+
+    def get_schema_operation_parameters(self, view):
+        return [
+            {
+                'name': self.product_id_param,
+                'required': False,
+                'in': 'query',
+                'description': force_str(self.product_id_description),
+                'schema': {
+                    'type': 'string',
+                }
+            }
+        ]
+
+
+class PopularProductOrdering(BaseFilterBackend):
+    popular_param = 'popular'
+    popular_description = _("Ordering by popular (enabled when equal to 1)")
+
+    def get_popular_param(self, request, view):
+        return request.query_params.get(self.popular_param, '0')
+
+    def ordering_included(self, request, view) -> bool:
+        popular_param = self.get_popular_param(request, view)
+        if popular_param == '1':
+            return True
+        return False
+
+    def filter_queryset(self, request, queryset, view):
+        if self.ordering_included(request, view):
+            assert isinstance(queryset, ProductQuerySet)
+            return queryset.order_by_popular()
+        return queryset
+
+    def get_schema_operation_parameters(self, view):
+        return [
+            {
+                'name': self.popular_param,
+                'required': False,
+                'in': 'query',
+                'description': force_str(self.popular_description),
+                'schema': {
+                    'type': 'number',
+                }
+            }
+        ]
 
 
 class SearchFilterByLang(SearchFilter):
@@ -14,40 +132,11 @@ class SearchFilterByLang(SearchFilter):
         return getattr(view, f'search_fields_{lang}', None)
 
 
-class GenreProductsFilter(BaseFilterBackend):
-    def filter_queryset(self, request, queryset, view):
-        filter_kwargs = {view.lookup_field: view.kwargs[view.lookup_url_kwarg or view.lookup_field]}
-        genre = get_object_or_404(queryset, **filter_kwargs)
-        view.check_object_permissions(request, genre)
-        return genre.product_set.filter(is_active=True)
-
-
 class GenreLevelFilter(BaseFilterBackend):
     def filter_queryset(self, request, queryset, view):
         level = request.query_params.get('level', 1)
         filter_kwargs = dict(level=level)
         return queryset.filter(**filter_kwargs)
-
-
-class ProductHasDetailAdminFilter(SimpleListFilter):
-    title = _('Has Details')
-    parameter_name = 'details'
-
-    def lookups(self, request, model_admin):
-        return [
-            ("yes", _("Yes")),
-            ("no", _("No"))
-        ]
-
-    def queryset(self, request, queryset):
-        base_queryset = queryset.annotate(details_count=Count('details'))
-        match self.value():
-            case "yes":
-                return base_queryset.filter(details_count__gt=0)
-            case "no":
-                return base_queryset.filter(details_count=0)
-            case _:
-                return queryset
 
 
 class ProductRankAdminFilter(SimpleListFilter):

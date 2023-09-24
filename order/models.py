@@ -1,9 +1,12 @@
 from django.contrib.auth import get_user_model
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from product.models import Product
+from users.utils import get_sentinel_user
+
+from .validators import only_digit_validator
+from .querysets import OrderAnalyticsQuerySet
 
 
 class BaseModel(models.Model):
@@ -14,34 +17,31 @@ class BaseModel(models.Model):
         abstract = True
 
 
-class Country(BaseModel):
-    name = models.CharField(max_length=100, verbose_name=_('Name') + '[ja]', unique=True)
-    name_tr = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[tr]')
-    name_ru = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ru]')
-    name_en = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[en]')
-    name_ky = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ky]')
-    name_kz = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[kz]')
-    is_active = models.BooleanField(default=True)
+class Customer(BaseModel):
+    """
+    model for saving recipient data for history and analytics
+    """
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20, validators=[only_digit_validator])
 
     def __str__(self):
         return self.name
 
-    class Meta:
-        verbose_name_plural = _('Countries')
 
-
-class UserDeliveryAddress(BaseModel):
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='delivery_addresses')
-    country = models.ForeignKey(Country, on_delete=models.CASCADE, related_name='delivery_addresses')
-    city = models.CharField(max_length=255)
-    address = models.TextField()
-    phone = models.CharField(max_length=15)
-    zip_code = models.CharField(max_length=50, blank=True, null=True)
-
-    is_deleted = models.BooleanField(default=False)
+class DeliveryAddress(BaseModel):
+    user = models.ForeignKey(get_user_model(), on_delete=models.SET(get_sentinel_user),
+                             related_name='delivery_addresses')
+    recipient_name = models.CharField(max_length=100)
+    country = models.CharField(max_length=100)
+    city = models.CharField(max_length=100)
+    postal_code = models.CharField(max_length=20)  # TODO: maybe this is not required field
+    state = models.CharField(max_length=100, blank=True, null=True)
+    address_line = models.TextField(blank=True, null=True)
+    as_deleted = models.BooleanField(default=False)
 
     def __str__(self):
-        return f'{self.user.email}'
+        return f"{self.recipient_name}'s Address"
 
     class Meta:
         verbose_name = _('Delivery Address')
@@ -49,38 +49,54 @@ class UserDeliveryAddress(BaseModel):
 
 
 class Order(BaseModel):
+    objects = models.Manager()
+    analytics = OrderAnalyticsQuerySet.as_manager()
+
     class Status(models.TextChoices):
         pending = 'pending', _('Pending')
         rejected = 'rejected', _('Rejected')
-        canceled = 'canceled', _('Canceled')
         delivered = 'delivered', _('Delivered')
         success = 'success', _('Success')
 
+    customer = models.ForeignKey(Customer, on_delete=models.RESTRICT, related_name='orders')
+    delivery_address = models.ForeignKey(DeliveryAddress, on_delete=models.RESTRICT, related_name='orders')
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.pending)
-    delivery_address = models.ForeignKey(UserDeliveryAddress, on_delete=models.CASCADE, related_name='orders')
-    is_deleted = models.BooleanField(default=False)
-    is_payed = models.BooleanField(default=False)
+    comment = models.TextField(null=True, blank=True)
 
-    def delete_receipts(self):
-        if self.status == self.Status.pending:
-            return
+    # important!: when updating an address, create a new address and mark the old one as deleted
+    shipping_carrier = models.CharField(max_length=50, default='FedEx')
+    shipping_weight = models.IntegerField(verbose_name=_('Shipping weight'), blank=True, null=True)
+    # for correct analytics, the value of conversions for two currencies with yen will be saved here
+    yen_to_usd = models.DecimalField(max_digits=20, decimal_places=10)
+    yen_to_som = models.DecimalField(max_digits=20, decimal_places=10)
 
-        receipts = self.receipts.filter(is_canceled=False)
-        for receipt in receipts:
-            receipt.is_canceled = True
-            receipt.returns = receipt.total_qty
-            receipt.qty = 0
-        self.__class__.objects.bulk_update(receipts, {'is_canceled', 'returns', 'qty'})
+    @property
+    def phone(self):
+        return getattr(self.customer, 'phone', None)
+
+    @property
+    def total_price(self):
+        receipts = getattr(self, 'receipts')
+        if not receipts.exists():
+            return 0.0
+
+        order_id = getattr(self, 'id')
+        receipts_prices = self.__class__.analytics.filter(id=order_id).total_prices().values('yen')
+        return receipts_prices[0]['yen']
 
 
-class ProductReceipt(BaseModel):
+class Receipt(BaseModel):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='receipts')
-    product = models.ForeignKey(Product, on_delete=models.SET_NULL, related_name='receipts', blank=True, null=True)
-    p_id = models.BigIntegerField()
-    product_name = models.CharField(max_length=500)
-    image_url = models.TextField(blank=True, null=True)
-    unit_price = models.FloatField()
-    total_qty = models.PositiveIntegerField(validators=[MinValueValidator(1)])
-    qty = models.PositiveIntegerField(validators=[MinValueValidator(0)])
-    returns = models.PositiveIntegerField(default=0)
-    is_canceled = models.BooleanField(default=False)
+    product = models.ForeignKey('product.Product', on_delete=models.RESTRICT, related_name='receipts')
+    unit_price = models.DecimalField(max_digits=20, decimal_places=10)
+    discount = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)], default=1)
+
+
+class ReceiptTag(models.Model):
+    receipt = models.ForeignKey(Receipt, on_delete=models.CASCADE, related_name='tags')
+    tag = models.ForeignKey('product.Tag', on_delete=models.RESTRICT)

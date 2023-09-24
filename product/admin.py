@@ -1,88 +1,84 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
-from product.filters import ProductRankAdminFilter, ProductHasDetailAdminFilter
-from product.models import Genre, GenreChild, Product, Marker, ProductDetail, ProductReview
+from product.filters import ProductRankAdminFilter
+from product.models import Genre, Tag, TagGroup, Product, ProductTag, ProductGenre, ProductImageUrl, ProductReview
 
 
 @admin.register(Genre)
 class GenreAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'level')
+    list_display = ('id', 'name', 'level', 'deactivated')
     list_display_links = ('id', 'name')
     search_fields = ('id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz')
     search_help_text = _('Search by fields: ID, NAME')
-    list_filter = ('level',)
+    list_filter = ('level', 'deactivated')
     fieldsets = (
-        (_('General Info'), {'fields': ('id', 'name', 'level')}),
+        (_('General Info'), {'fields': ('id', 'name', 'level', 'deactivated')}),
         (_('Another language names'), {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz')}),
     )
     list_per_page = 30
     list_max_show_all = 50
 
 
-@admin.register(GenreChild)
-class GenreChildAdmin(admin.ModelAdmin):
-    list_display = ('id', 'parent', 'child')
-    list_display_links = ('id', 'parent', 'child')
-    search_fields = ('parent__id', 'child__id', 'parent__name', 'child__name')
-    list_filter = ('child__level',)
-    list_per_page = 30
-    list_max_show_all = 50
-
-
-class ProductDetailInline(admin.StackedInline):
-    verbose_name = _('Details')
-    model = ProductDetail
+class ProductImageInline(admin.TabularInline):
+    model = ProductImageUrl
     extra = 0
-    fieldsets = (
-        (
-            _('D...'),
-            {'classes': ['collapse'], 'fields': ('name', 'value', 'name_ru', 'value_ru', 'name_en', 'value_en',
-                                                 'name_tr', 'value_tr', 'name_ky', 'value_ky', 'name_kz', 'value_kz')}
-        ),
-    )
+
+
+@admin.register(TagGroup)
+class TagGroupAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'created_at')
+    search_fields = ('id', 'name', 'created_at')
+    list_filter = ('created_at',)
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'group', 'created_at')
+    search_fields = ('id', 'name', 'group__name', 'group__id')
+    list_filter = ('created_at',)
+
+
+@admin.register(ProductTag)
+class ProductTagAdmin(admin.ModelAdmin):
+    list_display = ('id', 'product', 'tag')
+    search_fields = ('product__id', 'tag__id')
+
+
+@admin.register(ProductGenre)
+class ProductGenreAdmin(admin.ModelAdmin):
+    list_display = ('id', 'product', 'genre')
+    search_fields = ('product__id', 'genre__id')
 
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    inlines = [ProductDetailInline]
-    list_display = ('id', 'rakuten_id', 'name', 'price', 'is_active', 'release_date')
-    list_display_links = ('id', 'rakuten_id', 'name')
-    search_fields = ('id', 'rakuten_id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'genres__name',
-                     'brand_name', 'brand_name_tr', 'brand_name_ru', 'brand_name_en', 'brand_name_ky', 'brand_name_kz')
+    inlines = [ProductImageInline]
+    list_display = ('id', 'name', 'price', 'is_active', 'availability', 'created_at')
+    list_display_links = ('id', 'name')
+    search_fields = ('id', 'name')
     search_help_text = _('Search by fields: ID, Rakuten ID, NAME, GENRE NAME')
-    list_filter = (ProductHasDetailAdminFilter, ProductRankAdminFilter, 'is_active', 'release_date',)
-    readonly_fields = ('created_at', 'modified_at')
+    list_filter = (ProductRankAdminFilter, 'is_active', 'created_at', 'modified_at', 'reference_rank')
+    readonly_fields = ('id', 'created_at', 'modified_at')
     fieldsets = (
         (
             _('General Info'),
-            {'fields': ('rakuten_id', 'name', 'brand_name', 'description', 'price', 'genres', 'rank', 'count')}
+            {'fields': ('id', 'name', 'description', 'price', 'rakuten_price')}
         ),
-        (_('Dates'), {'classes': ['collapse'], 'fields': ('release_date', 'created_at', 'modified_at')}),
-        (_('Marker'), {'classes': ['collapse'], 'fields': ('marker', 'marker_code')}),
-        (_('Control'), {'fields': ('is_active',)}),
-        (_('Links'), {'classes': ['collapse'], 'fields': ('image_url', 'product_url')}),
+        (_('Dates'), {'classes': ['collapse'], 'fields': ('created_at', 'modified_at')}),
+        (_('Control'), {'fields': ('is_active', 'reference_rank')}),
+        (_('Links'), {'classes': ['collapse'], 'fields': ('product_url',)}),
         (
             _('Another language fields'),
             {
                 'classes': ['collapse'],
                 'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'description_tr', 'description_ru',
-                           'description_en', 'description_ky', 'description_kz', 'brand_name_tr',
-                           'brand_name_ru', 'brand_name_en', 'brand_name_ky', 'brand_name_kz')
+                           'description_en', 'description_ky', 'description_kz',)
             }
         )
     )
-    filter_horizontal = ("genres",)
     list_per_page = 30
     list_max_show_all = 50
-
-
-@admin.register(Marker)
-class MarkerAdmin(admin.ModelAdmin):
-    list_display = ('name',)
-    list_display_links = ('name',)
-    search_fields = ('name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz',)
-    search_help_text = _('Search by Marker name')
 
 
 @admin.register(ProductReview)
@@ -91,4 +87,4 @@ class ProductReview(admin.ModelAdmin):
     list_display_links = ('id', 'product', 'user')
     search_fields = ('id', 'product_id', 'user__email')
     list_filter = ('is_active', 'created_at')
-    readonly_fields = ('created_at', 'modified_at')
+    readonly_fields = ('created_at', 'modified_at',)

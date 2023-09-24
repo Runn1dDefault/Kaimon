@@ -5,6 +5,9 @@ import jwt
 from django.conf import settings as server_settings
 from django.core.cache import caches
 from django.utils.crypto import get_random_string
+from django.utils.functional import cached_property
+from django.utils.translation import gettext_lazy
+from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.exceptions import InvalidRestoreCode, RestoreCodeExist
@@ -22,10 +25,13 @@ def get_tokens_for_user(user):
 
 class BaseRestore:
     _cache = caches[settings['CACHE_NAME']]
-    LIVE: int = 60
 
     def __init__(self, sub: Any):
         self.sub = sub
+
+    @cached_property
+    def live_seconds(self):
+        return 60
 
     @property
     def cache_key(self) -> str:
@@ -61,7 +67,9 @@ class BaseRestore:
 
 
 class RestoreCode(BaseRestore):
-    LIVE = settings["CODE_LIVE_SECONDS"]
+    @cached_property
+    def live_seconds(self):
+        return settings["CODE_LIVE_SECONDS"]
 
     @property
     def cache_key(self) -> str:
@@ -83,33 +91,44 @@ class RestoreCode(BaseRestore):
             return True
         return False
 
-    def _generate(self, payload: dict[str, Any]) -> str:
+    def _generate(self, payload: dict[str, Any], live_seconds: int = None) -> str:
         code = get_random_string(
             length=settings["TOKEN_LEN"],
             allowed_chars=settings["CODE_ALLOWED_CHARS"]
         )
         payload['code'] = code
-        self._cache.set(self.cache_key, json.dumps(payload), timeout=self.LIVE)
+        self._cache.set(self.cache_key, json.dumps(payload), timeout=live_seconds)
         return code
 
     def remove(self) -> None:
         self._cache.delete(self.cache_key)
 
     @classmethod
-    def for_user(cls, user_id: int, raise_on_exist: bool = True) -> Self:
+    def for_user(
+        cls,
+        user_id: int,
+        live_seconds: int = None,
+        raise_on_exist: bool = True,
+    ) -> Self:
         restore_code = cls(sub=user_id)
-        if raise_on_exist and restore_code.exist:
+        if raise_on_exist is True and restore_code.exist:
             raise RestoreCodeExist("code exist! Exp: %s seconds" % restore_code.exp)
+
         payload = {'user_id': user_id}
-        restore_code._generate(payload)
+        restore_code._generate(payload, live_seconds=live_seconds or restore_code.live_seconds)
         return restore_code
 
 
 class RestoreToken(BaseRestore):
-    LIVE = settings["TOKEN_LIVE_SECONDS"]
-    ALGORITHM = settings["TOKEN_ALGORITHM"]
+    @cached_property
+    def live_seconds(self):
+        return settings["TOKEN_LIVE_SECONDS"]
 
-    @property
+    @cached_property
+    def algorithm(self):
+        return settings["TOKEN_ALGORITHM"]
+
+    @cached_property
     def cache_key(self) -> str:
         return '%s%s' % (settings["TOKEN_PREFIX"], self.sub)
 
@@ -128,14 +147,14 @@ class RestoreToken(BaseRestore):
         token = jwt.encode(
             payload,
             server_settings.SECRET_KEY,
-            algorithm=self.ALGORITHM
+            algorithm=self.algorithm
         )
-        self._cache.set(self.cache_key, token, timeout=self.LIVE)
+        self._cache.set(self.cache_key, token, timeout=self.live_seconds)
         return token
 
     @classmethod
     def _decode(cls, raw_token):
-        return jwt.decode(raw_token, server_settings.SECRET_KEY, algorithms=[cls.ALGORITHM])
+        return jwt.decode(raw_token, server_settings.SECRET_KEY, algorithms=[cls.algorithm])
 
     @classmethod
     def for_user(cls, user_id: int, code: str) -> Self:
@@ -150,3 +169,37 @@ class RestoreToken(BaseRestore):
     def for_token(cls, raw_token):
         payload = cls._decode(raw_token)
         return cls(sub=payload['user_id'])
+
+
+def generate_restore_token(user_id, code):
+    """
+    method of obtaining and validating code for a specific user
+    if the code is in the cache for the send user_id,
+    then it will be considered valid and a token will be generated
+    the token will be saved in cache for a certain period set in settings.RESTORE_SETTINGS['TOKEN_LIVE_SECONDS']
+    """
+    try:
+        token = RestoreToken.for_user(user_id=user_id, code=code)
+    except InvalidRestoreCode as e:
+        raise ValidationError({'detail': gettext_lazy(str(e))})
+    else:
+        RestoreCode(sub=user_id).remove()
+        return token
+
+
+def generate_confirm_code(user_id, raise_on_exist, live_seconds: int = None):
+    """
+    generates a new code for user_id and saves it in the cache for a certain period
+    that is set in settings.RESTORE_SETTINGS['CODE_LIVE_SECONDS']
+    raise_on_exist: if is True an error will be thrown if the code is already cached
+    """
+    try:
+        code = RestoreCode.for_user(
+            user_id=user_id,
+            raise_on_exist=raise_on_exist,
+            live_seconds=live_seconds
+        )
+    except RestoreCodeExist as e:
+        raise ValidationError({'code': gettext_lazy(str(e))})
+    else:
+        return code

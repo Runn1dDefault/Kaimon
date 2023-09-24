@@ -1,11 +1,131 @@
 from collections import OrderedDict
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
-
+from rest_framework import serializers
 from rest_framework.filters import BaseFilterBackend
 from rest_framework.compat import coreapi, coreschema
+
+
+class ListFilterFields(BaseFilterBackend):
+    description = _('Filtering by field %s ex: query1,query2')
+
+    def get_field_names(self, view):
+        return getattr(view, 'list_filter_fields', {})
+
+    def get_queries_kwargs(self, request, view) -> dict[str, list[str]]:
+        queries = {}
+        for field_name, source in self.get_field_names(view).items():
+            params = [i for i in request.query_params.get(field_name, '').split(',') if i.strip()]
+            if params:
+                queries[source + '__in'] = params
+        return queries
+
+    def filter_queryset(self, request, queryset, view):
+        queries = self.get_queries_kwargs(request, view)
+        if queries:
+            return queryset.filter(**queries)
+        return queryset
+
+    def get_schema_operation_parameters(self, view):
+        return [
+            {
+                'name': field_name,
+                'required': False,
+                'in': 'query',
+                'description': force_str(self.description % source),
+                'schema': {
+                    'type': 'string',
+                },
+            }
+            for field_name, source in self.get_field_names(view).items()
+        ]
+
+
+class DateRangeFilter(BaseFilterBackend):
+    start_field_attr = 'start_field'
+    start_param_attr = 'start_param'
+    description = _('Filter by date')
+
+    end_field_attr = 'end_field'
+    end_param_attr = 'end_param'
+
+    def get_start_field(self, view):
+        return getattr(view, self.start_field_attr)
+
+    def get_start_param_attribute(self, view):
+        return getattr(view, self.start_param_attr)
+
+    def get_start_param(self, request, view):
+        attr_name = self.get_start_param_attribute(view)
+        return request.query_params.get(attr_name)
+
+    def get_end_field(self, view):
+        return getattr(view, self.end_field_attr)
+
+    def get_end_param_attribute(self, view):
+        return getattr(view, self.end_param_attr)
+
+    def get_end_param(self, request, view):
+        attr_name = self.get_end_param_attribute(view)
+        return request.query_params.get(attr_name)
+
+    def filter_queryset(self, request, queryset, view):
+        start = self.get_start_param(request, view)
+        end = self.get_end_param(request, view)
+
+        if not start and not end:
+            return queryset
+
+        range_queries = {}
+        if start:
+            range_queries[self.get_start_field(view) + '__gte'] = start
+        if end:
+            range_queries[self.get_end_field(view) + '__lte'] = end
+        try:
+            return queryset.filter(**range_queries)
+        except ValidationError as e:
+            raise serializers.ValidationError(str(e))
+
+    def get_schema_operation_parameters(self, view):
+        description = force_str(self.description)
+        return [
+            {
+                'name': self.get_start_param_attribute(view),
+                'required': False,
+                'in': 'query',
+                'description': description,
+                'schema': {
+                    'type': 'date',
+                },
+            },
+            {
+                'name': self.get_end_param_attribute(view),
+                'required': False,
+                'in': 'query',
+                'description': description,
+                'schema': {
+                    'type': 'date',
+                },
+            },
+        ]
+
+
+class FilterByLookup(BaseFilterBackend):
+    def filter_queryset(self, request, queryset, view):
+        lookup_url_kwarg = view.lookup_url_kwarg or view.lookup_field
+
+        assert lookup_url_kwarg in view.kwargs, (
+            'Expected view %s to be called with a URL keyword argument '
+            'named "%s". Fix your URL conf, or set the `.lookup_field` '
+            'attribute on the view correctly.' %
+            (view.__class__.__name__, lookup_url_kwarg)
+        )
+
+        filter_kwargs = {view.lookup_field: view.kwargs[lookup_url_kwarg]}
+        return queryset.filter(**filter_kwargs)
 
 
 class FilterByFields(BaseFilterBackend):
@@ -32,6 +152,8 @@ class FilterByFields(BaseFilterBackend):
             if isinstance(db_field, str):
                 filter_kwargs[db_field] = value
             elif isinstance(db_field, dict):
+                if db_field.get('type') == 'boolean':
+                    value = True if value == 'true' else False
                 filter_kwargs[db_field['db_field']] = value
 
         return filtered_queryset.filter(**filter_kwargs)

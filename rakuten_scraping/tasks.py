@@ -1,225 +1,285 @@
+import logging
 from typing import Any
 
-from django.conf import settings
+from django.utils import timezone
 
 from kaimon.celery import app
-from product.models import Genre, GenreChild, Product, ProductDetail, Marker
-from product.tasks import translate_to_fields
 from product.utils import get_last_children, get_genre_parents_tree
+from utils.helpers import import_model
 
 from .settings import app_settings
-from .utils import RakutenRequest, get_db_genre_by_data, collect_product_fields
+from .utils import get_rakuten_client, build_by_fields_map
 
 
+# --------------------------------------- DB SAVING AND UPDATING TASK's ------------------------------------------------
 @app.task()
-def save_genre_from_search(genre_info: dict[str, Any], parse_more: bool = False):
+def save_genre(genre_data: dict[str, Any], parse_more: bool = False):
     conf = app_settings.GENRE_PARSE_SETTINGS
-    current_data = genre_info[conf.CURRENT_KEY]
+    fields_map = conf.PARSE_KEYS._asdict()
+    genre_model = import_model(conf.MODEL)
+
+    current_data = genre_data[conf.CURRENT_KEY]
     if isinstance(current_data, list):
         current_data = current_data[0]
+
     current_id = current_data[conf.PARSE_KEYS.id]
-    saved_ids = Genre.objects.all().values_list('id', flat=True)
-    new_db_genres = []
+    saved_genre_ids = list(genre_model.objects.values_list('id', flat=True))
+    new_genres = []
 
-    if current_id not in saved_ids:
-        current_db_genre = get_db_genre_by_data(current_data, fields=conf.PARSE_KEYS)
-        new_db_genres.append(current_db_genre)
+    if current_id not in saved_genre_ids:
+        new_genres.append(genre_model(**build_by_fields_map(current_data, fields_map=fields_map)))
 
-    saved_children = list(GenreChild.objects.all().values_list('parent_id', 'child_id'))
-    new_db_children = []
+    children = genre_data.get(conf.CHILDREN_KEY) or []
+    for child in children:
+        if child[conf.PARSE_KEYS.id] not in saved_genre_ids:
+            new_child_genre = genre_model(parent_id=current_id, **build_by_fields_map(child, fields_map=fields_map))
+            new_genres.append(new_child_genre)
 
-    for parent in genre_info.get(conf.PARENTS_KEY) or []:
-        parent_id = parent[conf.PARSE_KEYS.id]
-        if parent_id not in saved_ids:
-            new_db_genres.append(get_db_genre_by_data(parent, fields=conf.PARSE_KEYS))
+    if new_genres:
+        genre_model.objects.bulk_create(new_genres)
 
-        if (parent_id, current_id) not in saved_children:
-            new_db_children.append(GenreChild(parent_id=parent_id, child_id=current_id))
-
-    children = genre_info.get(conf.CHILDREN_KEY, [])
-    if parse_more is False:
-        for child in children:
-            child_id = child[conf.PARSE_KEYS.id]
-            if child_id not in saved_ids:
-                new_db_genres.append(get_db_genre_by_data(child, fields=conf.PARSE_KEYS))
-            if (current_id, child_id) not in saved_children:
-                new_db_children.append(GenreChild(parent_id=current_id, child_id=child_id))
-
-    if new_db_genres:
-        genres = Genre.objects.bulk_create(new_db_genres)
-
-        for genre in genres:
-            translate_to_fields.delay(genre.id, settings.GENRE_MODEL_PATH, settings.GENRE_TRANSLATE_FIELDS)
-
-    if new_db_children:
-        GenreChild.objects.bulk_create(new_db_children)
-
-    if parse_more is True:
-        for child in children:
-            parse_and_save_genres.delay(child['genreId'])
+    for child in children if parse_more else []:
+        child_id = child[conf.PARSE_KEYS.id]
+        parse_genres.delay(child_id, parse_more=parse_more)
 
 
 @app.task()
-def parse_and_save_genres(genre_id: int = 0, parse_more: bool = True):
-    with RakutenRequest(delay=app_settings.DELAY) as req:
-        genre_info = req.client.genres_search(genre_id)
-    save_genre_from_search.delay(genre_info, parse_more=parse_more)
+def save_tags(tags: list[dict]):
+    conf = app_settings.TAG_PARSE_SETTINGS
+    tag_model = import_model(conf.MODEL)
+    tag_ids = list(map(lambda x: x[conf.PARSE_KEYS.id], tags))
+    db_tag_ids = list(tag_model.objects.filter(id__in=tag_ids).values_list('id', flat=True))
+    new_tags = []
+    for tag_data in tags:
+        tag_id = tag_data[conf.PARSE_KEYS.id]
+        if tag_id in db_tag_ids:
+            continue
+        new_tags.append(tag_model(id=tag_id, name=tag_data[conf.PARSE_KEYS.name]))
+    if new_tags:
+        tag_model.objects.bulk_create(new_tags)
 
 
 @app.task()
-def update_product_after_scrape(product_data: dict[str, Any], product_id: int, genre_id: int, marker_name: str):
-    product = Product.objects.get(rakuten_id=product_id)
-    save = False
+def save_tags_from_groups(tag_groups: list[dict[str, Any]]):
+    conf = app_settings.TAG_PARSE_SETTINGS
+    tag_group_model = import_model(conf.TAG_GROUP_MODEL)
+    tag_model = import_model(conf.MODEL)
+    db_group_ids = list(tag_group_model.objects.values_list('id', flat=True))
+    db_tag_ids = list(tag_model.objects.values_list('id', flat=True))
+    new_tags, collected_tag_ids = [], []
+    new_groups, collected_group_ids = [], []
 
-    if genre_id and not product.genres.filter(id=genre_id).exists():
-        product.genre = Genre.objects.get(id=genre_id)
-        save = True
+    for group in tag_groups:
+        group_id = group[conf.TAG_GROUP_PARSE_KEYS.id]
+        if group_id not in db_group_ids and group_id not in collected_group_ids:
+            new_groups.append(tag_group_model(id=group_id, name=group[conf.TAG_GROUP_PARSE_KEYS.name]))
+            collected_group_ids.append(group_id)
 
-    if marker_name and product.marker.name != marker_name:
-        product.marker = Marker.objects.get(name=marker_name)
-        save = True
-
-    product_data = collect_product_fields(product_data)
-
-    for field, value in product_data.items():
-        if hasattr(product, field) and getattr(product, field) != value:
-            setattr(product, field, value)
-            save = True
-
-    details_names = list(product.details.values_list('name', flat=True))
-    details = list(product.details.values_list('name', 'value'))
-
-    for detail in product_data.get('ProductDetails') or []:
-        match detail:
-            case {'name': str() as name, 'value': value} if name not in details_names:
-                ProductDetail(product_id=product_id, name=name, value=value).save()
-                continue
-            case {'name': str() as name, 'value': value} if name in details_names and (name, value) not in details:
-                detail = ProductDetail.objects.get(product=product, name=name)
-                if detail.value != value:
-                    detail.value = value
-                    detail.save()
+        for tag in group[conf.TAG_KEY] or []:
+            tag_id = tag[conf.PARSE_KEYS.id]
+            if tag_id in collected_tag_ids:
                 continue
 
-    if save:
+            if tag_id not in db_tag_ids:
+                new_db_tag = tag_model(id=tag_id, name=tag[conf.PARSE_KEYS.name], group_id=group_id)
+                new_tags.append(new_db_tag)
+            collected_tag_ids.append(tag_id)
+
+    if new_groups:
+        tag_group_model.objects.bulk_create(new_groups)
+
+    if new_tags:
+        tag_model.objects.bulk_create(new_tags)
+
+
+@app.task()
+def update_or_create_tag(tag_data: dict[str, Any]):
+    conf = app_settings.TAG_PARSE_SETTINGS
+    tag_group_model = import_model(conf.TAG_GROUP_MODEL)
+    tag_model = import_model(conf.MODEL)
+
+    group = tag_data[conf.TAG_GROUP_KEY][0]
+    db_group = tag_group_model.objects.get_or_create(
+        id=group[conf.TAG_GROUP_PARSE_KEYS.id],
+        name=group[conf.TAG_GROUP_PARSE_KEYS.name]
+    )
+    tag = group[conf.TAG_KEY][0]
+    db_tag, _ = tag_model.objects.get_or_create(id=tag[conf.PARSE_KEYS.id])
+    if db_tag.group is None or db_tag.group.id != db_group.id:
+        db_tag.group = db_group
+    db_tag.name = tag[conf.PARSE_KEYS.name]
+    db_tag.save()
+
+
+@app.task()
+def update_items(items: list[dict[str, Any]]):
+    conf = app_settings.PRODUCT_PARSE_SETTINGS
+    product_model = import_model(conf.MODEL)
+    product_tag_model = import_model(conf.TAG_RELATION_MODEL)
+    fields_map = conf.PARSE_KEYS._asdict()
+    updated_products, update_fields = [], set()
+
+    for item in items:
+        item_code = item[conf.PARSE_KEYS.id]
+        update_delta = timezone.now() - conf.UPDATE_DELTA
+        product_query = product_model.objects.filter(id=item_code, modified_at__lte=update_delta)
+        if not product_query.exists():
+            logging.warning('product with code %s not found or modified_at grater then update delta' % item_code)
+            continue
+
+        db_product = product_query.first()
+        updated = False
+        collected_db_fields = build_by_fields_map(item, fields_map=fields_map)
+        for field, value in collected_db_fields.items():
+            if hasattr(db_product, field) and getattr(db_product, field) != value:
+                setattr(db_product, field, value)
+                update_fields.add(field)
+                updated = True
+
+        if updated:
+            updated_products.append(db_product)
+
+        tag_ids = item[conf.TAG_IDS_KEY]
+        saved_tag_ids = db_product.tags.filter(id__in=tag_ids).values_list('tag_id', flat=True)
+        tags_to_delete = db_product.tags.exclude(id__in=tag_ids)
+        if tags_to_delete.exists():
+            tags_to_delete.delete()
+
+        new_tags = [
+            product_tag_model(product_id=item_code, tag_id=tag_id)
+            for tag_id in tag_ids if tag_id not in saved_tag_ids
+        ]
+
+        if new_tags:
+            product_tag_model.objects.bulk_create(new_tags)
+
+    if updated_products:
+        product_model.objects.bulk_update(updated_products, update_fields)
+
+
+@app.task()
+def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict[str, Any]] = None):
+    conf = app_settings.PRODUCT_PARSE_SETTINGS
+    product_model = import_model(conf.MODEL)
+    increase_price = import_model('product.utils.increase_price')
+    product_genre_model = import_model(conf.GENRE_RELATION_MODEL)
+    product_tag_model = import_model(conf.TAG_RELATION_MODEL)
+    img_model = import_model(conf.IMAGE_MODEL)
+    genre_model = import_model(app_settings.GENRE_PARSE_SETTINGS.MODEL)
+    genre = genre_model.objects.get(id=genre_id)
+    genre_ids = get_genre_parents_tree(genre)
+    fields_map = conf.PARSE_KEYS._asdict()
+
+    if tag_groups:
+        save_tags_from_groups(tag_groups)
+
+    db_product_ids = list(product_model.objects.values_list('id', flat=True))
+
+    new_products, products_to_update = [], []
+    new_product_images, new_product_tags, new_product_genres = [], [], []
+
+    for item in items:
+        item_code = item[conf.PARSE_KEYS.id]
+
+        if item_code in db_product_ids:
+            products_to_update.append(item)
+            continue
+
+        product_data = build_by_fields_map(item, fields_map=fields_map)
+        price = product_data['rakuten_price']
+        if price and price > 0:
+            product_data['price'] = increase_price(price)
+        new_products.append(product_model(**product_data))
+
+        for genre_id in genre_ids:
+            new_product_genres.append(product_genre_model(product_id=item_code, genre_id=genre_id))
+
+        for tag_id in set(item[conf.TAG_IDS_KEY] or []):
+            new_product_tags.append(product_tag_model(product_id=item_code, tag_id=tag_id))
+
+        for img_key in conf.IMG_PARSE_FIELDS or []:
+            image_urls = item.get(img_key)
+
+            if not image_urls:
+                continue
+
+            image_instances = list(
+                map(lambda url: img_model(product_id=item_code, url=url.split('?')[0]), image_urls)
+            )
+            if image_instances:
+                new_product_images.extend(image_instances)
+                break
+
+    if new_products:
+        product_model.objects.bulk_create(new_products)
+
+    if new_product_tags:
+        product_tag_model.objects.bulk_create(new_product_tags)
+
+    if new_product_genres:
+        product_genre_model.objects.bulk_create(new_product_genres)
+
+    if new_product_images:
+        img_model.objects.bulk_create(new_product_images)
+
+    if products_to_update:
+        update_items.delay(products_to_update, genre_id=genre_id)
+
+
+# ----------------------------------------------- REQUEST's TASK's -----------------------------------------------------
+@app.task()
+def parse_genres(genre_id: int = 0, parse_more: bool = False):
+    rakuten = get_rakuten_client(app_settings.DELAY)
+    genre_info = rakuten.genres_search(genre_id)
+    save_genre.delay(genre_info, parse_more=parse_more)
+
+
+@app.task()
+def parse_items(genre_id: int, parse_all: bool = False, page: int = None):
+    conf = app_settings.PRODUCT_PARSE_SETTINGS
+    rakuten = get_rakuten_client(app_settings.DELAY)
+    items_data = rakuten.item_search(genre_id=genre_id, page=page)
+    save_items.delay(
+        items_data[conf.ITEMS_KEY],
+        genre_id,
+        tag_groups=items_data.get(conf.TAG_INFO_KEY) or None
+    )
+
+    for page_num in range(2, items_data[conf.PAGES_COUNT_KEY]) if parse_all else []:
+        parse_items.delay(genre_id=genre_id, page=page_num)
+
+
+@app.task()
+def parse_and_update_tag(tag_id: int):
+    rakuten = get_rakuten_client(delay=app_settings.DELAY)
+    tag_data = rakuten.tag_search(tag_id)
+    update_or_create_tag.delay(tag_data)
+
+
+@app.task()
+def check_product_availability(product_id: str):
+    conf = app_settings.PRODUCT_PARSE_SETTINGS
+    update_delta = timezone.now() - conf.UPDATE_DELTA
+    product_model = import_model(conf.PRODUCT_MODEL)
+    product = product_model.objects.filter(mofied_at__lte=update_delta, id=product_id).first()
+    if not product:
+        logging.warning('Product %s was updated in %s' % (product.id, product.modified_at))
+        return
+
+    rakuten = get_rakuten_client(app_settings.DELAY, validation_client=True)
+    items_data = rakuten.item_search(item_code=product_id).get(conf.ITEMS_KEY) or []
+    if not items_data:
+        product.availability = False
+        # don't add product.is_active=False here, it adds overhead when updating the product
         product.save()
 
 
+# ---------------------------------------------- TOTAL TASK's ----------------------------------------------------------
 @app.task()
-def save_product_from_search(search_data, genre_id: int):
-    genre_info = search_data.get('GenreInformation')
+def parse_all_genre_products():
+    genre_model = import_model(app_settings.GENRE_PARSE_SETTINGS.MODEL)
+    for genre in genre_model.objects.filter(level=1):
+        children = get_last_children(genre)
 
-    if genre_info:
-        save_genre_from_search.delay(genre_info, parse_more=False)
-
-    saved_products = Product.objects.all().values_list('id', 'rakuten_id')
-    saved_products_ids = {r_id: p_id for p_id, r_id in saved_products}
-    saved_markers = list(Marker.objects.all().values_list('name', flat=True))
-    new_products, new_details, new_genres, new_markers = [], [], [], []
-    to_update_products = []
-
-    products = search_data.get('Products')
-    if not products:
-        print("Not found products: ", products)
-
-    for product in products or []:
-        marker_name = product['makerName']
-        if marker_name and marker_name not in saved_markers:
-            new_markers.append(
-                Marker(
-                    rakuten_code=product['makerCode'],
-                    url=product['makerPageUrlPC'],
-                    name=product['makerName']
-                )
-            )
-            saved_markers.append(marker_name)
-
-        product_id = product['productId']
-
-        if product_id not in saved_products_ids.keys():
-            db_product = Product(
-                rakuten_id=product_id,
-                marker_id=marker_name or None,
-                **collect_product_fields(product)
-            )
-            new_products.append(db_product)
-
-            for detail in product.get('ProductDetails') or []:
-                match detail:
-                    case {'name': str() as name, 'value': value} if db_product:
-                        new_details.append(
-                            ProductDetail(product=db_product, name=name, value=value)
-                        )
-        else:
-            to_update_products.append((product, product_id, genre_id, marker_name))
-
-    if new_markers:
-        markers = Marker.objects.bulk_create(new_markers)
-        # for marker in markers:
-            # translate_to_fields.delay(
-            #     instance_id=marker.id,
-            #     model_path=settings.MARKER_MODEL_PATH,
-            #     fields=settings.MARKER_TRANSLATE_FIELDS
-            # )
-
-    if new_products:
-        products = Product.objects.bulk_create(new_products)
-        genre = Genre.objects.get(id=genre_id)
-        genre_parents_ids = get_genre_parents_tree(genre)
-        genres = list(Genre.objects.filter(id__in=genre_parents_ids))
-
-        for product in products:
-            # translate_to_fields.delay(
-            #     instance_id=product.id,
-            #     model_path=settings.PRODUCT_MODEL_PATH,
-            #     fields=settings.PRODUCT_TRANSLATE_FIELDS
-            # )
-            product.genres.add(*genres)
-            product.save()
-
-    if new_details:
-        product_details = ProductDetail.objects.bulk_create(new_details)
-        # for product_detail in product_details:
-        #     translate_to_fields.delay(
-        #         instance_id=product_detail.id,
-        #         model_path=settings.PRODUCT_DETAIL_MODEL_PATH,
-        #         fields=settings.PRODUCT_DETAIL_TRANSLATE_FIELDS
-        #     )
-
-    if to_update_products:
-        for args in to_update_products:
-            update_product_after_scrape.delay(*args)
-
-
-@app.task()
-def parse_and_save_products(genre_id: int, keyword: str = None, product_id: int = None, page: int = None,
-                            parse_all: bool = False):
-    with RakutenRequest(delay=app_settings.DELAY) as req:
-        results = req.client.product_search(
-            genre_id=genre_id,
-            keyword=keyword,
-            product_id=product_id,
-            page=page
-        )
-    save_product_from_search.delay(results, genre_id)
-
-    if parse_all:
-        for page_num in range(2, results['pageCount']):
-            parse_and_save_products.delay(
-                genre_id=genre_id,
-                keyword=keyword,
-                product_id=product_id,
-                page=page_num
-            )
-
-
-@app.task()
-def parse_products():
-    base_genres = Genre.objects.filter(level=1)
-    for genre in base_genres:
-        last_children_ids = get_last_children(genre)
-        if not last_children_ids:
-            print('Not found child for genre: %s' % genre.id)
-
-        for child_genre in Genre.objects.filter(id__in=last_children_ids):
-            parse_and_save_products.delay(child_genre.id, parse_all=True)
+        for child_id in children:
+            parse_items.delay(child_id, parse_all=True)

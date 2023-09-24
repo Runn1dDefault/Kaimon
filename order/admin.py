@@ -1,43 +1,37 @@
 from django.contrib import admin
 
-from .models import Country, UserDeliveryAddress, Order, ProductReceipt
+from .models import Customer, DeliveryAddress, Order, Receipt, ReceiptTag
 
 
-@admin.register(Country)
-class CountryAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'is_active', 'created_at')
-    list_display_links = ('id', 'name', 'is_active')
-    search_fields = ('id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz')
-    list_filter = ('is_active', 'created_at')
-    readonly_fields = ('created_at', 'modified_at')
+@admin.register(Customer)
+class CustomerAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'email')
+    search_fields = ('id', 'name', 'email')
 
 
-@admin.register(UserDeliveryAddress)
-class UserDeliveryAddressAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'country', 'city', 'is_deleted', 'created_at')
-    search_fields = ('id', 'user__email', 'city', 'country__name', 'country__name_ru',
-                     'country__name_en', 'country__name_ky', 'country__name_kz')
-    list_filter = ('is_deleted', 'created_at')
-    readonly_fields = ('created_at', 'modified_at')
-
-
-class ProductReceiptInline(admin.StackedInline):
-    model = ProductReceipt
-    extra = 1
-    fieldsets = (
-        (
-            'R...', {
-                'classes': ['collapse'],
-                'fields': ('name', 'status', 'delivery_address', 'is_deleted', 'is_payed')
-            }
-        ),
-    )
+@admin.register(DeliveryAddress)
+class DeliveryAddressAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'country', 'city', 'state', 'as_deleted', 'created_at')
+    search_fields = ('id', 'user__email', 'country',  'city',)
+    list_filter = ('as_deleted', 'created_at', 'country', 'state')
+    readonly_fields = ('created_at',)
 
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    inlines = [ProductReceiptInline]
-    list_display = ('id', 'status', 'is_deleted', 'delivery_address', 'created_at')
-    search_fields = ('id', 'is_deleted')
-    list_filter = ('is_deleted', 'status', 'created_at')
+    list_display = ('id', 'delivery_address', 'status', 'created_at')
+    list_display_links = ('id', 'delivery_address')
+    search_fields = ('id', 'customer__email', 'customer__phone', 'delivery_address_id')
+    list_filter = ('status', 'created_at')
     readonly_fields = ('created_at', 'modified_at')
+
+
+@admin.register(ReceiptTag)
+class ReceiptTagAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(Receipt)
+class ReceiptAdmin(admin.ModelAdmin):
+    list_display = ('id', 'order', 'product')
+    search_fields = ('id', 'order_id', 'product_id')

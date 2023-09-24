@@ -13,4 +13,6 @@ class FilterByUser(BaseFilterBackend):
 
     def filter_queryset(self, request, queryset, view):
         user_relation_field = self._get_user_relation_field(view, request)
+        assert user_relation_field
         return user_relation_field.filter(**self._get_filters(view))
+

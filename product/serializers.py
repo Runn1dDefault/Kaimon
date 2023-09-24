@@ -1,147 +1,95 @@
-from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
 from rest_framework import serializers
+from rest_framework.fields import empty
 
+from currencies.serializers import ConversionField
 from users.serializers import UserProfileSerializer
-from currency_conversion.mixins import CurrencySerializerMixin
-from utils.mixins import LangSerializerMixin
+from utils.serializers import LangSerializerMixin
 
-from .models import Genre, Product, ProductDetail, GenreChild, ProductReview
-from .utils import round_half_integer
-
-
-class GenreChildSerializer(LangSerializerMixin, serializers.ModelSerializer):
-    id = serializers.SerializerMethodField(read_only=True)
-    name = serializers.SerializerMethodField(read_only=True)
-    level = serializers.SerializerMethodField(read_only=True)
-
-    class Meta:
-        model = GenreChild
-        fields = ('id', 'name', 'level')
-        translate_fields = ('name',)
-
-    def __init__(self, for_children: bool = False, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.for_children = for_children
-
-    def get_fk_field(self, instance):
-        if self.for_children:
-            return instance.child
-        return instance.parent
-
-    def valid_translate_instance(self, instance):
-        return self.get_fk_field(instance)
-
-    def get_id(self, instance):
-        return self.get_fk_field(instance).id
-
-    def get_name(self, instance):
-        return self.get_fk_field(instance).name
-
-    def get_level(self, instance):
-        return self.get_fk_field(instance).level
+from .models import Genre, Product, ProductReview, TagGroup
 
 
 class GenreSerializer(LangSerializerMixin, serializers.ModelSerializer):
-    children = serializers.SerializerMethodField(read_only=True)
-
     class Meta:
         model = Genre
-        fields = ('id', 'name', 'level', 'children')
+        fields = ('id', 'name', 'level')
         translate_fields = ('name',)
 
-    def get_children(self, instance):
-        include_children = self.context.get('include_children', True)
-        if include_children is False:
-            return []
 
-        all_children = instance.children.filter(
-            Q(child__deactivated__isnull=True) | Q(child__deactivated=False)
-        )
-
-        next_level_children = all_children.filter(child__level=instance.level + 1)
-        children = next_level_children
-        if not next_level_children.exists():
-            children = all_children
-        return GenreChildSerializer(instance=children, many=True, for_children=True, context=self.context).data
-
-
-class ProductDetailSerializer(LangSerializerMixin, serializers.ModelSerializer):
-    class Meta:
-        model = ProductDetail
-        fields = ('id', 'name', 'value')
-        translate_fields = ('name', 'value')
-
-
-class ProductReviewSerializer(LangSerializerMixin, serializers.ModelSerializer):
-    user = UserProfileSerializer(hide_fields=['role', 'email'], read_only=True)
-    product_name = serializers.SerializerMethodField(read_only=True)
+class ProductReviewSerializer(serializers.ModelSerializer):
+    user = UserProfileSerializer(hide_fields=('role', 'email', 'email_confirmed', 'registration_payed'), read_only=True)
 
     class Meta:
         model = ProductReview
-        fields = ('id', 'user', 'product', 'product_name', 'rank', 'comment')
+        fields = ('id', 'user', 'product', 'rank', 'comment', 'created_at')
         extra_kwargs = {'product': {'write_only': True, 'required': True}}
 
     def validate(self, attrs):
-        attrs['user'] = self.context['request'].user
-        rank = attrs.get('rank')
-        if rank:
-            attrs['rank'] = round_half_integer(rank)
+        user = self.context['request'].user
+        assert user.is_authenticated, f'Serializer {self.__class__.__name__} not available to {user.__class__.__name__}'
+        attrs['user'] = user
         return attrs
 
-    def get_product_name(self, instance):
-        product = instance.product
-        translate_field = self.get_translate_field('name')
-        return getattr(product, translate_field, None) or product.name
 
-
-class ProductSerializer(CurrencySerializerMixin, LangSerializerMixin, serializers.ModelSerializer):
-    reviews_count = serializers.SerializerMethodField(read_only=True)
-    avg_rank = serializers.SerializerMethodField(read_only=True)
-    discount_price = serializers.SerializerMethodField(read_only=True)
+class ProductListSerializer(LangSerializerMixin, serializers.ModelSerializer):
+    price = ConversionField()
+    sale_price = ConversionField()
+    image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'discount_price', 'image_url', 'avg_rank', 'reviews_count', 'count')
+        fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'image_urls')
         translate_fields = ('name',)
-        currency_convert_fields = ('price',)
 
-    def get_avg_rank(self, instance):
-        reviews = instance.reviews.filter(is_active=True)
-        if reviews.exists():
-            ranks = list(reviews.values_list('rank', flat=True))
-            return sum(ranks) / len(ranks)
-        return 0
+    def __init__(self, instance=None, **kwargs):
+        kwargs['many'] = True
+        super().__init__(instance=instance, data=None, **kwargs)
 
-    def get_reviews_count(self, instance):
-        return instance.reviews.filter(is_active=True).count()
+    def update(self, instance, validated_data):
+        raise NotImplementedError('`update()` not implemented.')
 
-    def get_discount_price(self, instance):
-        if instance.price <= 0:
-            return None
-
-        promotion = instance.promotions.active_promotions().first()
-        if not promotion:
-            return None
-
-        try:
-            discount = promotion.discount
-        except ObjectDoesNotExist:
-            # in the future here can be changed, when new promotion logic will be added
-            return None
-
-        discount_price = discount.calc_price(instance.price)
-        if self.get_currency() == 'yen':
-            return discount_price
-        return self.get_converted_price(discount_price)
+    def create(self, validated_data):
+        raise NotImplementedError('`create()` not implemented.')
 
 
-class ProductRetrieveSerializer(ProductSerializer):
-    details = ProductDetailSerializer(many=True)
+class ProductRetrieveSerializer(LangSerializerMixin, serializers.ModelSerializer):
+    price = ConversionField()
+    sale_price = ConversionField()
+    image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
+    genres = serializers.SerializerMethodField(read_only=True)
+    tags_info = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'description', 'price', 'discount_price', 'image_url', 'brand_name',
-                  'avg_rank', 'reviews_count', 'count', 'details')
-        translate_fields = ('name', 'description', 'brand_name',)
-        currency_convert_fields = ('price',)
+        fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'description',
+                  'genres', 'image_urls', 'tags_info')
+        translate_fields = ('name', 'description')
+
+    def __init__(self, instance, **kwargs):
+        assert isinstance(instance, Product)
+        kwargs['many'] = False
+        super().__init__(instance=instance, data=empty, **kwargs)
+
+    def get_genres(self, instance):
+        genres_fk = instance.genres.filter(genre__deactivated=False)
+        if not genres_fk.exists():
+            return []
+
+        genres = (
+            Genre.objects.exclude(level=0)
+                         .filter(id__in=genres_fk.values_list('genre_id', flat=True))
+                         .order_by('-level')
+        )
+        return GenreSerializer(instance=genres, many=True, context=self.context).data
+
+    def get_tags_info(self, instance):
+        tags_fk = instance.tags.all()
+        if not tags_fk.exists():
+            return []
+
+        group_ids = tags_fk.order_by('tag__group_id').distinct('tag__group_id').values_list('tag__group_id', flat=True)
+        groups_queryset = TagGroup.objects.filter(id__in=group_ids)
+        tag_translate_field = self.get_translate_field('name')
+        return groups_queryset.tags_list(
+            name_field=tag_translate_field,
+            tag_ids=tags_fk.values_list('tag_id', flat=True)
+        )

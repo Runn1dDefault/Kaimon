@@ -1,41 +1,63 @@
-from rest_framework import generics
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework import generics, status, mixins
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from utils.views import PostAPIView
 from .authentication import RestoreJWTAuthentication
-from .serializers import RegistrationSerializer, RestoreSerializer, UpdatePasswordSerializer, UserProfileSerializer
+from .serializers import RegistrationSerializer, RestoreSerializer, UpdatePasswordSerializer, UserProfileSerializer, \
+    ConfirmEmailSerializer
 
 
-class RegistrationView(PostAPIView):
-    permission_classes = (AllowAny,)
+class RegistrationView(generics.CreateAPIView):
+    permission_classes = ()
+    authentication_classes = ()
     serializer_class = RegistrationSerializer
 
 
-class RestorePasswordView(PostAPIView):
-    permission_classes = (AllowAny,)
+class RestorePasswordView(generics.GenericAPIView):
+    permission_classes = ()
+    authentication_classes = ()
     serializer_class = RestoreSerializer
 
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-class UpdatePasswordView(PostAPIView):
+
+class ConfirmPasswordView(generics.GenericAPIView):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = ConfirmEmailSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(instance=request.user, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UpdatePasswordView(mixins.UpdateModelMixin, generics.GenericAPIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (RestoreJWTAuthentication,)
     serializer_class = UpdatePasswordSerializer
 
+    def get_object(self):
+        return self.request.user
 
-class UserInfoView(generics.GenericAPIView):
+    def patch(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)
+
+
+class UserInfoView(generics.RetrieveAPIView):
     permission_classes = (IsAuthenticated,)
     serializer_class = UserProfileSerializer
 
-    def get(self, request):
-        serializer = self.get_serializer(instance=request.user, many=False)
-        return Response(serializer.data)
+    def get_object(self):
+        return self.request.user
 
 
 class UpdateUserInfo(generics.UpdateAPIView):
     permission_classes = (IsAuthenticated,)
     serializer_class = UserProfileSerializer
-    lookup_field = None
 
     def get_object(self):
         return self.request.user

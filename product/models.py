@@ -1,10 +1,13 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from product.querysets import GenreQuerySet, ProductQuerySet
-from product.utils import round_half_integer
+from utils.helpers import round_half_integer
+
+from .querysets import GenreQuerySet, ProductQuerySet, TagGroupQuerySet, ReviewAnalyticsQuerySet
+from .utils import internal_product_id_generation, increase_price
 
 
 class Genre(models.Model):
@@ -13,115 +16,135 @@ class Genre(models.Model):
     id = models.BigIntegerField(primary_key=True)
     level = models.PositiveIntegerField(null=True, blank=True)
 
-    name = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[ja]')
-    name_ky = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[ky]')
-    name_ru = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[ru]')
-    name_en = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[en]')
-    name_tr = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[tr]')
-    name_kz = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[kz]')
+    name = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ja]')
+    name_ru = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ru]')
+    name_en = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[en]')
+    name_tr = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[tr]')
+    name_ky = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ky]')
+    name_kz = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[kz]')
 
     deactivated = models.BooleanField(default=False, null=True)
+    parent = models.ForeignKey('self', on_delete=models.SET_NULL, related_name='children', null=True)
 
     def __str__(self):
-        return f'{self.id}{self.name}'
+        return str(self.id)
 
 
-class GenreChild(models.Model):
-    parent = models.ForeignKey(Genre, on_delete=models.CASCADE, related_name='children')
-    child = models.ForeignKey(Genre, on_delete=models.CASCADE, related_name='parents')
+class BaseTagModel(models.Model):
+    id = models.BigIntegerField(primary_key=True)
+    name = models.CharField(max_length=100)
+    name_tr = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[tr]')
+    name_ru = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ru]')
+    name_en = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[en]')
+    name_ky = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ky]')
+    name_kz = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[kz]')
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name_plural = _('GenreChildren')
+        abstract = True
 
 
-class Marker(models.Model):
-    name = models.CharField(max_length=255, verbose_name=_('Name') + '[ja]', primary_key=True)
-    rakuten_code = models.CharField(max_length=255, blank=True, null=True)
-    url = models.URLField(max_length=1000, blank=True, null=True)
+class TagGroup(BaseTagModel):
+    objects = TagGroupQuerySet.as_manager()
 
-    name_tr = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[tr]')
-    name_ru = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[ru]')
-    name_en = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[en]')
-    name_ky = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[ky]')
-    name_kz = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[kz]')
+    def __str__(self):
+        return f'Tag-group-{self.id}-{self.name}'
+
+
+class Tag(BaseTagModel):
+    group = models.ForeignKey(TagGroup, on_delete=models.CASCADE, related_name='tags', null=True, blank=True)
+
+    def __str__(self):
+        if self.group:
+            return f'#{self.group.name}-{self.id}-{self.name}'
+        return f'#{self.id}-{self.name}'
 
 
 class Product(models.Model):
     objects = ProductQuerySet.as_manager()
-
-    # General Info
-    rakuten_id = models.CharField(max_length=32, unique=True)
-    number = models.CharField(max_length=50, blank=True)
-    marker = models.ForeignKey(Marker, on_delete=models.SET_NULL, related_name='products', null=True, blank=True)
-    marker_code = models.CharField(max_length=255, blank=True)
-
-    name = models.CharField(max_length=500, verbose_name=_('Name') + '[ja]')
-    name_tr = models.CharField(max_length=500, blank=True, null=True, verbose_name=_('Name') + '[tr]')
-    name_ru = models.CharField(max_length=500, blank=True, null=True, verbose_name=_('Name') + '[ru]')
-    name_en = models.CharField(max_length=500, blank=True, null=True, verbose_name=_('Name') + '[en]')
-    name_ky = models.CharField(max_length=500, blank=True, null=True, verbose_name=_('Name') + '[ky]')
-    name_kz = models.CharField(max_length=500, blank=True, null=True, verbose_name=_('Name') + '[kz]')
-
+    id = models.CharField(max_length=255, primary_key=True, default=internal_product_id_generation)
+    # Product Info
+    name = models.CharField(max_length=255, verbose_name=_('Name') + '[ja]')
     description = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ja]')
+    rakuten_price = models.DecimalField(max_digits=20, decimal_places=10, null=True)
+    price = models.DecimalField(max_digits=20, decimal_places=10, null=True)
+    product_url = models.TextField(blank=True, null=True)
+    availability = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+    reference_rank = models.IntegerField(null=True, blank=True)
+
+    # translating fields
+    name_tr = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[tr]')
+    name_ru = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[ru]')
+    name_en = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[en]')
+    name_ky = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[ky]')
+    name_kz = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[kz]')
     description_tr = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[tr]')
     description_ru = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ru]')
     description_en = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[en]')
     description_ky = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ky]')
     description_kz = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[kz]')
 
-    brand_name = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Brand Name') + '[ja]')
-    brand_name_tr = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Brand Name') + '[tr]')
-    brand_name_ru = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Brand Name') + '[ru]')
-    brand_name_en = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Brand Name') + '[en]')
-    brand_name_ky = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Brand Name') + '[ky]')
-    brand_name_kz = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Brand Name') + '[kz]')
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.rakuten_price and not self.price:
+            self.price = increase_price(self.rakuten_price)
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
-    # Genres and rank
-    # Why ManyToManyField? is about making it accessible from the top level of genres.
-    # Without wasting filtering operations
-    genres = models.ManyToManyField(
-        Genre,
-        blank=True,
-        related_name="product_set",
-        related_query_name="product",
-    )
-    rank = models.IntegerField(null=True, blank=True)
+    @property
+    def reviews_count(self) -> int:
+        return self.reviews.filter(is_active=True).count()
 
-    price = models.FloatField(null=True)
+    @property
+    def sale_price(self) -> float | None:
+        price = self.price or self.rakuten_price
+        if not self.availability or not price or price <= 0:
+            return None
 
-    count = models.PositiveIntegerField(null=True, blank=True)
+        promotion = self.promotions.active_promotions().first()
+        if not promotion:
+            return None
 
-    image_url = models.TextField(blank=True, null=True)
-    product_url = models.TextField(blank=True, null=True)
+        try:
+            discount = promotion.discount
+        except ObjectDoesNotExist:
+            # in the future here can be changed, when new promotion logic will be added
+            return None
 
-    release_date = models.DateField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    modified_at = models.DateTimeField(auto_now=True)
-    is_active = models.BooleanField(default=True)
+        return discount.calc_price(price)
+
+    @property
+    def avg_rank(self):
+        reviews = self.reviews.filter(is_active=True)
+        if reviews.exists():
+            return sum(reviews.values_list('rank', flat=True)) / reviews.count()
+        return 0.0
+
+
+class ProductGenre(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='genres')
+    genre = models.ForeignKey(Genre, on_delete=models.CASCADE)
+
+
+class ProductTag(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='tags')
+    tag = models.ForeignKey(Tag, on_delete=models.CASCADE)
+
+
+class ProductImageUrl(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='image_urls')
+    url = models.TextField()
 
     def __str__(self):
-        return f'{self.id}-{self.rakuten_id}'
-
-
-class ProductDetail(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='details')
-    name = models.CharField(max_length=500, verbose_name=_('Name') + '[ja]')
-    name_ky = models.CharField(max_length=500, blank=True, null=True, verbose_name=_('Name') + '[ky]')
-    name_ru = models.CharField(max_length=500, blank=True, null=True, verbose_name=_('Name') + '[ru]')
-    name_en = models.CharField(max_length=500, blank=True, null=True, verbose_name=_('Name') + '[en]')
-    name_tr = models.CharField(max_length=500, blank=True, null=True, verbose_name=_('Name') + '[tr]')
-    name_kz = models.CharField(max_length=500, blank=True, null=True, verbose_name=_('Name') + '[kz]')
-
-    value = models.TextField(blank=True, null=True, verbose_name=_('Value') + '[ja]')
-    value_tr = models.TextField(blank=True, null=True, verbose_name=_('Value') + '[tr]')
-    value_ru = models.TextField(blank=True, null=True, verbose_name=_('Value') + '[ru]')
-    value_en = models.TextField(blank=True, null=True, verbose_name=_('Value') + '[en]')
-    value_ky = models.TextField(blank=True, null=True, verbose_name=_('Value') + '[ky]')
-    value_kz = models.TextField(blank=True, null=True, verbose_name=_('Value') + '[kz]')
+        return self.url
 
 
 class ProductReview(models.Model):
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='product_reviews')
+    analytics = ReviewAnalyticsQuerySet.as_manager()
+    objects = models.Manager()
+
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='reviews')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
     rank = models.FloatField(validators=[MinValueValidator(0), MaxValueValidator(5)], default=0)
     comment = models.TextField(blank=True, null=True)

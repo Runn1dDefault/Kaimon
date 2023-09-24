@@ -1,43 +1,43 @@
+import uuid
+
 from django.conf import settings
-from django.utils.translation import gettext_lazy as _
-from rest_framework.exceptions import ParseError
 
 
-def round_half_integer(number):
-    integer_part = int(number)
-    decimal_part = number - integer_part
+def increase_price(price):
+    return price + (settings.INCREASE_PRICE_PERCENTAGE * price / 100)
 
-    if decimal_part < 0.3:
-        rounded_decimal_part = 0
-    elif decimal_part < 0.6:
-        rounded_decimal_part = 0.5
-    else:
-        rounded_decimal_part = 1.0
 
-    return integer_part + rounded_decimal_part
+def internal_product_id_generation():
+    """
+    a function that returns a new uuid4 with the prefix internal: at the beginning.
+    The prefix can be useful for separating manually created products from other ones
+    """
+    return 'internal:' + str(uuid.uuid4())
 
 
 def get_genre_parents_tree(current_genre) -> list[int]:
+    """
+    recursive way to get all ancestors including the genre itself
+    It is important to remember that with this approach we work from the bottom up.
+     And we get a list from the category itself to the topmost parent
+    """
     collected_parents = [current_genre.id]
-    for fk_parent in current_genre.parents.all():
-        collected_parents.extend(get_genre_parents_tree(fk_parent.parent))
-
+    if not current_genre.parent:
+        return collected_parents
+    collected_parents.extend(get_genre_parents_tree(current_genre.parent))
     return collected_parents
 
 
 def get_last_children(current_genre) -> list[int]:
+    """
+    recursive way to get children that are missing children
+    """
     last_children = []
 
-    for fk_child in current_genre.children.all():
-        child = fk_child.child
+    for child in current_genre.children.all():
         if not child.children.exists():
             last_children.append(child.id)
             continue
 
         last_children.extend(get_last_children(child))
     return last_children
-
-
-def get_field_by_lang(field_name: str, lang: str):
-    if lang in settings.SUPPORTED_LANG:
-        return f'{field_name}_{lang}' if lang != 'ja' else field_name
