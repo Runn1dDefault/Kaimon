@@ -98,7 +98,8 @@ class Product(models.Model):
 
     @property
     def sale_price(self) -> float | None:
-        if not self.availability or self.price <= 0:
+        price = self.price or self.rakuten_price
+        if not self.availability or not price or price <= 0:
             return None
 
         promotion = self.promotions.active_promotions().first()
@@ -111,7 +112,7 @@ class Product(models.Model):
             # in the future here can be changed, when new promotion logic will be added
             return None
 
-        return discount.calc_price(self.price)
+        return discount.calc_price(price)
 
     @property
     def avg_rank(self):
