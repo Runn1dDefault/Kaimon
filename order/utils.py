@@ -5,9 +5,9 @@ from .models import DeliveryAddress
 
 def duplicate_delivery_address(delivery_address, updates: dict[str, Any]):
     new_address = DeliveryAddress(
+        user=delivery_address.user,
         recipient_name=delivery_address.recipient_name,
-        address_line1=delivery_address.address_line1,
-        address_line2=delivery_address.address_line2,
+        address_line=delivery_address.address_line,
         city=delivery_address.city,
         state=delivery_address.state,
         postal_code=delivery_address.postal_code,
