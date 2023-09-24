@@ -56,6 +56,23 @@ services:
       - ../../static:/app/static
       - ../../media:/app/media
 
+  celery-default-dev:
+    container_name: celery-default-dev
+    hostname: celery-default-dev
+    restart: always
+    build:
+      context: ../../
+    links:
+      - "postgres:postgres_kaimono"
+      - "redis:redis_kaimono"
+    command: celery --app kaimon worker -Q default -c 4 --loglevel=info
+    volumes:
+      - ../../:/app
+    env_file:
+      - ../../.env
+    depends_on:
+      - web-dev
+
   celery-beat-dev:
     container_name: celery-beat-dev
     restart: always
@@ -116,23 +133,6 @@ services:
       - "postgres:postgres_kaimono"
       - "redis:redis_kaimono"
     command: celery --app kaimon worker -Q item_saving -c 4 --loglevel=info
-    volumes:
-      - ../../:/app
-    env_file:
-      - ../../.env
-    depends_on:
-      - web-dev
-
-  celery-default-dev:
-    container_name: celery-default-dev
-    hostname: celery-default-dev
-    restart: always
-    build:
-      context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
-    command: celery --app kaimon worker -Q default -c 4 --loglevel=info
     volumes:
       - ../../:/app
     env_file:
