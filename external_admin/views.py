@@ -1,17 +1,20 @@
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, mixins, viewsets, status, filters, parsers
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
 from currencies.models import Conversion
 from product.filters import PopularProductOrdering
-from product.models import Product, ProductReview, Genre, Tag
+from product.models import Product, ProductReview, Genre, Tag, ProductTag, TagGroup
 from promotions.models import Promotion
 from users.models import User
 from order.models import Order
-from utils.filters import FilterByFields, DateRangeFilter
+from utils.filters import FilterByFields, DateRangeFilter, ListFilterFields
+from utils.views import CachingMixin
 
 from .mixins import DirectorViewMixin, StaffViewMixin
 from .paginators import UserListPagination, AdminPagePagination
@@ -20,12 +23,12 @@ from .serializers import (
     ProductAdminSerializer, ProductDetailAdminSerializer,
     ProductImageAdminSerializer, UserAdminSerializer, GenreAdminSerializer, TagAdminSerializer,
     ProductReviewAdminSerializer, OrderAnalyticsSerializer, UserAnalyticsSerializer, ReviewAnalyticsSerializer,
-    OrderAdminSerializer
+    OrderAdminSerializer, TagGroupAdminSerializer
 )
 
 
 # ---------------------------------------------- Users -----------------------------------------------------------------
-class UserAdminView(DirectorViewMixin, viewsets.ReadOnlyModelViewSet):
+class UserAdminViewSet(DirectorViewMixin, viewsets.ReadOnlyModelViewSet):
     queryset = User.objects.filter(role=User.Role.CLIENT)
     pagination_class = UserListPagination
     serializer_class = UserAdminSerializer
@@ -35,47 +38,83 @@ class UserAdminView(DirectorViewMixin, viewsets.ReadOnlyModelViewSet):
     start_param = 'start_date'
     end_field = 'date_joined__date'
     end_param = 'end_date'
+    lookup_url_kwarg = 'user_id'
+    lookup_field = 'id'
 
-    @action(methods=['GET'], detail=True)
+    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
+    @action(methods=['GET'], detail=True, url_path='change-activity')
     def block_or_unblock_user(self, request, **kwargs):
         user = self.get_object()
         user.is_active = not user.is_active
         user.save()
         return Response(status=status.HTTP_202_ACCEPTED)
 
+    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
+    @action(methods=['GET'], detail=True, url_path='mark-register-payed')
+    def mark_payed(self, request):
+        user = self.get_object()
+        user.registration_payed = True
+        user.save()
+        return Response(status=status.HTTP_202_ACCEPTED)
+
 
 # ------------------------------------------------ Genre ---------------------------------------------------------------
-class GenreSearchAdminView(StaffViewMixin, generics.ListAPIView):
+class GenreListAdminView(CachingMixin, StaffViewMixin, generics.ListAPIView):
     queryset = Genre.objects.all()
     serializer_class = GenreAdminSerializer
     pagination_class = AdminPagePagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz']
 
+    @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
+    @action(methods=['GET'], detail=True, url_path='change-activity')
+    def activate_or_deactivate_genre(self, request, **kwargs):
+        genre = self.get_object()
+        genre.is_active = not genre.is_active
+        genre.save()
+        return Response(status=status.HTTP_202_ACCEPTED)
+
 
 # -------------------------------------------------- Tag ---------------------------------------------------------------
-class TagSearchAdminView(StaffViewMixin, generics.ListAPIView):
-    queryset = Tag.objects.all()
+class TagGroupListAdminViewSet(CachingMixin, StaffViewMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
+    queryset = TagGroup.objects.all()
     pagination_class = AdminPagePagination
-    serializer_class = TagAdminSerializer
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz']
+    serializer_class = TagGroupAdminSerializer
+    lookup_field = 'id'
+    lookup_url_kwarg = 'group_id'
+
+    @extend_schema(responses={status.HTTP_200_OK: TagAdminSerializer(many=True)})
+    @action(methods=['GET'], detail=True, url_path='tags')
+    def group_tags(self, request, **kwargs):
+        queryset = Tag.objects.filter(group_id=self.kwargs[self.lookup_url_kwarg or self.lookup_field])
+        page = self.paginate_queryset(queryset)
+        serializer = TagAdminSerializer(
+            instance=page,
+            many=True,
+            context=self.get_serializer_context()
+        )
+        return self.get_paginated_response(serializer.data)
 
 
 # ----------------------------------------------- Product --------------------------------------------------------------
 class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
-    lookup_url_kwarg = 'product_id'
-    lookup_field = 'id'
     queryset = Product.objects.all()
-    serializer_class = ProductDetailAdminSerializer
     list_serializer_class = ProductAdminSerializer
+    serializer_class = ProductDetailAdminSerializer
     pagination_class = AdminPagePagination
     parser_classes = (parsers.JSONParser,)
     filter_backends = [filters.SearchFilter, PopularProductOrdering, filters.OrderingFilter]
-    search_fields_ja = ['name', 'genres__name', 'tags__name', 'name_ru', 'genres__name_ru', 'tags__name_ru', 'name_en',
-                        'genres__name_en', 'tags__name_en', 'name_tr', 'genres__name_tr', 'tags__name_tr', 'name_ky',
-                        'genres__name_ky', 'tags__name_ky', 'name_kz', 'genres__name_kz', 'tags__name_kz']
-    ordering_fields = ['created_at', 'price', 'name', 'id', 'is_active']
+    search_fields = [
+        'name', 'genres__genre__name', 'tags__tag__name',
+        'name_ru', 'genres__genre__name_ru', 'tags__tag__name_ru',
+        'name_en', 'genres__genre__name_en', 'tags__tag__name_en',
+        'name_tr', 'genres__genre__name_tr', 'tags__tag__name_tr',
+        'name_ky', 'genres__genre__name_ky', 'tags__tag__name_ky',
+        'name_kz', 'genres__genre__name_kz', 'tags__tag__name_kz'
+    ]
+    ordering_fields = ['created_at', 'price']
+    lookup_url_kwarg = 'product_id'
+    lookup_field = 'id'
 
     def get_serializer_class(self):
         if self.request.method == 'GET' and self.detail is False:
@@ -96,19 +135,18 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
 
     @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
     @action(
-        methods=['DELETE'],
+        methods=['POST'],
         detail=True,
-        url_path=r'remove-image/(?P<image_id>.+)'
+        url_path='remove-image'
     )
     def remove_image(self, request, **kwargs):
         product = self.get_object()
-        image_id = self.kwargs.get('image_id')
-        if not image_id:
-            return Response({'detail': [_('image_id is required')]}, status=status.HTTP_400_BAD_REQUEST)
-        image_query = product.image_urls.filter(id=image_id)
-        if not image_query.exists():
-            return Response({'detail': [_('image not found!')]}, status=status.HTTP_400_BAD_REQUEST)
-        image_query.first().delete()
+        image_url = request.data.get('image')
+        if not image_url:
+            return Response({'image': [_('is required')]}, status=status.HTTP_400_BAD_REQUEST)
+
+        image_fk = get_object_or_404(product.image_urls.all(), url=image_url)
+        image_fk.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(responses={status.HTTP_202_ACCEPTED: None}, request=ProductImageAdminSerializer)
@@ -130,10 +168,14 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         url_path=r'remove-tag/(?P<tag_id>.+)'
     )
     def remove_tag(self, request, **kwargs):
-        self.get_object().tags.remove(self.kwargs['tag_id'])
+        tag_fk = get_object_or_404(
+            self.get_object().tags.all(),
+            tag_id=self.kwargs['tag_id']
+        )
+        tag_fk.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
+    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
     @action(
         methods=['GET'],
         detail=True,
@@ -144,38 +186,42 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         if not Tag.objects.filter(id=tag_id).exists():
             return Response({'detail': _('Tag does with id %s not exist!') % tag_id})
         product = self.get_object()
-        product.tags.add(int(tag_id))
-        product.save()
+        ProductTag.objects.create(product=product, tag_id=tag_id)
         return Response(status=status.HTTP_202_ACCEPTED)
 
 
 # ---------------------------------------------- Reviews ---------------------------------------------------------------
-class ProductReviewAdminView(StaffViewMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, mixins.ListModelMixin,
-                             viewsets.GenericViewSet):
+class ProductReviewAdminViewSet(
+    StaffViewMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet
+):
     queryset = ProductReview.objects.all()
     serializer_class = ProductReviewAdminSerializer
     pagination_class = AdminPagePagination
-    lookup_field = 'id'
-    lookup_url_kwarg = 'review_id'
     filter_backends = [FilterByFields, filters.SearchFilter, DateRangeFilter]
+    filter_fields = {'is_read': {'db_field': 'is_read', 'type': 'boolean'},
+                     'is_active': {'db_field': 'is_active', 'type': 'boolean'}}
+    search_fields = ('user__email', 'product__id', 'comment')
     start_field = 'created_at__date'
     start_param = 'start_date'
     end_field = 'created_at__date'
     end_param = 'end_date'
-    filter_fields = {
-        'is_read': {'db_field': 'is_read', 'type': 'boolean'},
-        'is_active': {'db_field': 'is_active', 'type': 'boolean'}
-    }
-    search_fields = ('user__email', 'product__id', 'comment')
+    lookup_field = 'id'
+    lookup_url_kwarg = 'review_id'
 
-    @action(methods=['PATCH'], detail=True)
+    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
+    @action(methods=['GET'], detail=True, url_path='change-activity')
     def activate_or_deactivate_review(self, request, **kwargs):
         review = self.get_object()
         review.is_active = not review.is_active
         review.save()
         return Response(status=status.HTTP_202_ACCEPTED)
 
-    @action(methods=['PATCH'], detail=True, url_path='set-read')
+    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
+    @action(methods=['GET'], detail=True, url_path='mark-read')
     def set_read(self, request, **kwargs):
         review = self.get_object()
         review.is_read = True
@@ -188,46 +234,40 @@ class OrderAdminViewSet(StaffViewMixin, viewsets.ReadOnlyModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderAdminSerializer
     pagination_class = AdminPagePagination
-    filter_backends = [filters.SearchFilter, FilterByFields, filters.OrderingFilter, DateRangeFilter]
-    start_field = 'created_at__date'
+    filter_backends = [filters.SearchFilter, ListFilterFields, filters.OrderingFilter, DateRangeFilter]
+    list_filter_fields = {'status': 'status'}
     start_param = 'start_date'
-    end_field = 'created_at__date'
     end_param = 'end_date'
-    filter_fields = {
-        'status': {'db_field': 'status', 'type': 'enum', 'choices': Order.Status.choices},
-        'payed': {'db_field': 'is_payed', 'type': 'boolean'},
-        'deleted': {'db_field': 'is_deleted', 'type': 'boolean'},
-    }
+    start_field = 'created_at__date'
+    end_field = 'created_at__date'
     ordering_fields = ['id', 'created_at']
-    search_fields = [
-        'delivery_address__user__email',
-        'delivery_address__user__full_name',
-        'delivery_address__country__name',
-        'delivery_address__country__name_ru',
-        'delivery_address__country__name_en',
-        'delivery_address__country__name_tr',
-        'delivery_address__country__name_ky',
-        'delivery_address__country__name_kz',
-        'delivery_address__city',
-        'delivery_address__phone',
-        'delivery_address__zip_code',
-        'receipts__product_name',
-        'receipts__p_id'
-    ]
+    search_fields = ['customer__email', 'customer__name', 'customer__phone']
+    lookup_field = 'id'
+    lookup_url_kwarg = 'order_id'
 
-    @action(methods=['PATCH'], detail=True)
-    def update_status(self, request, **kwargs):
+    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
+    @action(methods=['GET'], detail=True, url_path="mark-delivered")
+    def mark_delivered_order(self, request, **kwargs):
         order = self.get_object()
-        order_status = request.query_params.get('status')
-        if not order_status:
-            return Response({'detail': [_('status is required')]}, status=status.HTTP_400_BAD_REQUEST)
-        order.status = order_status
+        if order.status in [Order.Status.success, Order.Status.rejected]:
+            return Response({'detail': _('Cannot update order status')})
+        order.status = Order.Status.delivered
+        order.save()
+        return Response(status=status.HTTP_202_ACCEPTED)
+
+    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
+    @action(methods=['GET'], detail=True, url_path="mark-reject")
+    def mark_reject_order(self, request, **kwargs):
+        order = self.get_object()
+        if order.status == Order.Status.success:
+            return Response({'detail': _('Cannot update order status')})
+        order.status = Order.Status.rejected
         order.save()
         return Response(status=status.HTTP_202_ACCEPTED)
 
 
 # ----------------------------------------------- Promotions -----------------------------------------------------------
-class PromotionAdminViewSet(viewsets.ModelViewSet):
+class PromotionAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     queryset = Promotion.objects.filter(is_deleted=False)
     pagination_class = AdminPagePagination
     serializer_class = PromotionAdminSerializer
@@ -237,6 +277,12 @@ class PromotionAdminViewSet(viewsets.ModelViewSet):
                      'banner__name_kz']
     filter_fields = {'deactivated': {'db_field': 'deactivated', 'type': 'boolean'}}
     ordering_fields = ['id', 'created_at', 'start_date', 'end_date']
+    lookup_field = 'id'
+    lookup_url_kwarg = 'promotion_id'
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            super().perform_create(serializer)
 
     def perform_destroy(self, instance):
         instance.is_deleted = True
@@ -245,14 +291,16 @@ class PromotionAdminViewSet(viewsets.ModelViewSet):
 
 
 # ----------------------------------------- Currencies conversion ------------------------------------------------------
-class ConversionListAdminView(DirectorViewMixin, generics.ListAPIView):
-    queryset = Conversion.objects.all().order_by('-id')
-    serializer_class = ConversionAdminSerializer
-
-
-class UpdateConversionAdminView(DirectorViewMixin, generics.UpdateAPIView):
+class ConversionAdminViewSet(
+    DirectorViewMixin,
+    mixins.ListModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet
+):
     queryset = Conversion.objects.all()
     serializer_class = ConversionAdminSerializer
+    lookup_url_kwarg = 'conversion_id'
+    lookup_field = 'id'
 
 
 # ------------------------------------------------ Analytics -----------------------------------------------------------
@@ -269,6 +317,7 @@ class AnalyticsView(StaffViewMixin, generics.GenericAPIView):
 
 
 class OrderAnalyticsView(AnalyticsView):
+    parser_classes = (parsers.JSONParser,)
     serializer_class = OrderAnalyticsSerializer
 
 

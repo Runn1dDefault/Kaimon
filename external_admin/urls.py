@@ -2,19 +2,20 @@ from django.urls import path, re_path, include
 from rest_framework.routers import SimpleRouter
 
 from .views import (
-    ProductAdminViewSet, ProductReviewAdminView,
-    GenreSearchAdminView, TagSearchAdminView,
     OrderAnalyticsView, UserAnalyticsView, ReviewAnalyticsView,
-    PromotionAdminViewSet,
-    ConversionListAdminView, UpdateConversionAdminView, UserAdminView, OrderAdminViewSet
+    ProductAdminViewSet, ProductReviewAdminViewSet,
+    GenreListAdminView, TagGroupListAdminViewSet, PromotionAdminViewSet,
+    OrderAdminViewSet, ConversionAdminViewSet, UserAdminViewSet,
 )
 
 router = SimpleRouter()
-router.register('reviews', ProductReviewAdminView, basename='admin-reviews')
 router.register('products', ProductAdminViewSet, basename='admin-products')
+router.register('reviews', ProductReviewAdminViewSet, basename='admin-reviews')
 router.register('orders', OrderAdminViewSet, basename='admin-orders')
 router.register('promotions', PromotionAdminViewSet, basename='admin-promotions')
-router.register('users', UserAdminView, basename='admin-users')
+router.register('users', UserAdminViewSet, basename='admin-users')
+router.register('tag-groups', TagGroupListAdminViewSet, basename='admin-tag-groups')
+router.register('conversions', ConversionAdminViewSet, basename='admin-conversions')
 
 analytics_urlpatterns = [
     path('analytics/orders/', OrderAnalyticsView.as_view(), name='admin-analytics-orders'),
@@ -23,9 +24,6 @@ analytics_urlpatterns = [
 ]
 
 urlpatterns = analytics_urlpatterns + [
-    path('products/genres/', GenreSearchAdminView.as_view(), name='admin-genres-list'),
-    path('products/tags/', TagSearchAdminView.as_view(), name='admin-tags-list'),
-    path('conversions/', ConversionListAdminView.as_view(), name='admin-conversions-list'),
-    re_path('^conversions/(?P<id>.+)/$', UpdateConversionAdminView.as_view(), name='admin-conversion-update'),
+    path('products/genres/', GenreListAdminView.as_view(), name='admin-genres-list'),
     path('', include(router.urls)),
 ]
