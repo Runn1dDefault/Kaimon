@@ -14,6 +14,8 @@ from .serializers import PromotionSerializer
 
 @extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
 class PromotionListView(LanguageMixin, generics.ListAPIView):
+    permission_classes = ()
+    authentication_classes = ()
     queryset = Promotion.objects.active_promotions()
     serializer_class = PromotionSerializer
     pagination_class = PagePagination
@@ -22,6 +24,8 @@ class PromotionListView(LanguageMixin, generics.ListAPIView):
 @extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM,
                                                   settings.CURRENCY_QUERY_SCHEMA_PARAM]))
 class PromotionProductListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
+    permission_classes = ()
+    authentication_classes = ()
     lookup_field = 'id'
     promotion_queryset = Promotion.objects.active_promotions()
     serializer_class = ProductListSerializer
