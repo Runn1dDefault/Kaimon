@@ -1,13 +1,11 @@
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import permissions
 
-from users.permissions import IsDirectorPermission
+from users.permissions import IsDirectorPermission, IsStaffUser
 
 
 class DirectorViewMixin:
-    # permission_classes = (permissions.IsAuthenticated, IsDirectorPermission,)
-    pass
+    permission_classes = (permissions.IsAuthenticated, IsDirectorPermission,)
 
 
 class StaffViewMixin:
-    # permission_classes = (permissions.IsAuthenticated, IsStaffUser,)
-    pass
+    permission_classes = (permissions.IsAuthenticated, IsStaffUser,)
