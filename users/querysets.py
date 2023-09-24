@@ -13,7 +13,8 @@ class UserAnalyticsQuerySet(AnalyticsQuerySet):
                     id=F('id'),
                     email=F('email'),
                     is_active=F('is_active'),
-                    registration_payd=F('registration_payed'),
+                    registration_payed=F('registration_payed'),
+                    email_confirmed=F('email_confirmed'),
                     date_joined=TruncDate('date_joined'),
                     image=F('image')
                 )
