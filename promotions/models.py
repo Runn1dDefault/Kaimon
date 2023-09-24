@@ -59,4 +59,4 @@ class Discount(models.Model):
         return price - (self.percentage * price / 100)
 
     def __str__(self):
-        return self.percentage
+        return str(self.percentage)
