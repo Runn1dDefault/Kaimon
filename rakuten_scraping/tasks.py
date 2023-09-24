@@ -186,7 +186,7 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
             continue
 
         product_data = build_by_fields_map(item, fields_map=fields_map)
-        price = product_data[conf.PARSE_KEYS.rakuten_price]
+        price = product_data['rakuten_price']
         if price and price > 0:
             product_data['price'] = increase_price(price)
         new_products.append(product_model(**product_data))
