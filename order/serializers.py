@@ -1,6 +1,6 @@
 import logging
 
-from django.db import transaction
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
@@ -54,22 +54,34 @@ class ReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer):
 
     def validate(self, attrs):
         tags = attrs.get('tag_ids')
-        if tags:
-            product = attrs['product_id']
-            for tag in tags:
-                if not product.tags.filter(id=tag.id).exists():
-                    raise serializers.ValidationError(
-                        {'tag_ids': _("Invalid pk \"%s\" - object does not exist.") % tag.id}
-                    )
+        product = attrs['product_id']
+        for tag in tags or []:
+            if not product.tags.filter(tag_id=tag.id).exists():
+                raise serializers.ValidationError(
+                    {'tag_ids': _("Invalid pk \"%s\" - object does not exist.") % tag.id}
+                )
         return attrs
 
     def get_tags(self, instance):
-        field = self.get_translate_field('name')
+        field = self.get_translate_field('tag__name')
         return list(instance.tags.values_list(field, flat=True))
+
+    def create(self, validated_data):
+        product = validated_data['product_id']
+        validated_data['unit_price'] = product.price
+        try:
+            validated_data['discount'] = product.discount.percentage
+        except ObjectDoesNotExist:
+            validated_data['discount'] = 0.0
+        return super().create(validated_data)
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    phone = serializers.CharField(max_length=13, required=True, validators=[only_digit_validator])
+    phone = serializers.CharField(
+        max_length=13,
+        required=True,
+        validators=[only_digit_validator]
+    )
     address_id = serializers.PrimaryKeyRelatedField(
         queryset=DeliveryAddress.objects.filter(as_deleted=False),
         write_only=True,
@@ -82,7 +94,7 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = ('id', 'status', 'delivery_address', 'receipts', 'products', 'address_id', 'phone', 'comment')
-        extra_kwargs = {'status': {'read_only': True}, 'phone': {'source': 'customer__phone'}}
+        extra_kwargs = {'status': {'read_only': True}}
 
     def validate(self, attrs):
         address = attrs.get('address_id')
