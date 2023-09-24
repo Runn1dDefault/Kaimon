@@ -1,6 +1,8 @@
 import calendar
+from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import pandas as pd
 from django.conf import settings
@@ -27,9 +29,19 @@ class AnalyticsSerializer(ModelSerializer):
     filter_by = ChoiceField(choices=FILTER_BY, write_only=True, required=True)
 
     class Meta:
-        fields = ('start', 'end', 'filter_by')
+        model = None
+        fields = '__all__'
         hide_fields = ()
-        empty_data_template = {}
+        empty_template = {}
+        start_field = None
+        end_field = None
+
+    @property
+    def _analytic_fields(self):
+        return ['start', 'end', 'filter_by']
+
+    def get_field_names(self, declared_fields, info):
+        return self._analytic_fields + list(declared_fields.keys())
 
     def save(self, **kwargs):
         return None
@@ -50,7 +62,8 @@ class AnalyticsSerializer(ModelSerializer):
     def validate(self, attrs):
         start, end = attrs['start'], attrs['end']
         if start >= end:
-            raise ValidationError({'start': _(f'Cannot be equal or grater than {end}')})
+            raise ValidationError({'start': _(f'Cannot be equal or grater than {end}'),
+                                   'end': _(f'Cannot be equal or grater than {start}')})
         today = localtime(now()).date()
         if start > today:
             raise ValidationError({'start': _(f'Cannot be grater than {today}')})
@@ -58,20 +71,44 @@ class AnalyticsSerializer(ModelSerializer):
             attrs['end'] = today
         return attrs
 
-    def filtered_analytics(self, start, end, filter_by) -> AnalyticsQuerySet:
-        raise NotImplementedError('`filter_queryset` must be implemented!')
+    def build_queries(self) -> dict[str, Any]:
+        model = getattr(self.Meta, 'model')
+        start_field = getattr(self.Meta, 'start_field')
+        end_field = getattr(self.Meta, 'end_field')
+        start, end = self.validated_data['start'], self.validated_data['end']
+        queries = {start_field + '__gte': start, end_field + '__lte': end}
+        extra_kwargs = self.get_extra_kwargs()
+
+        for field in self.Meta.fields:
+            source = extra_kwargs.get(field, {}).get('source', field)
+            assert hasattr(model, source)
+            field_value = self.validated_data.get(source)
+            if field_value is None:
+                continue
+
+            if isinstance(field_value, set | list):
+                queries[field + '__in'] = field_value
+            else:
+                queries[field] = field_value
+        return queries
+
+    def _base_queryset(self):
+        model = getattr(self.Meta, 'model')
+        return model.analytics.filter(**self.build_queries())
+
+    def filtered_analytics(self) -> AnalyticsQuerySet:
+        filter_by = self.validated_data['filter_by']
+        return self._base_queryset().by_dates(filter_by)
 
     @property
     def data(self):
-        start, end = self.validated_data['start'], self.validated_data['end']
-        filter_by = self.validated_data['filter_by']
-        analytics = self.filtered_analytics(start, end, filter_by)
-        df = analytics.to_df() if analytics.exists() else pd.DataFrame()
+        analytics_queryset = self.filtered_analytics()
+        df = analytics_queryset.to_df() if analytics_queryset.exists() else pd.DataFrame()
         return ReturnDict(self.to_representation(df), serializer=self)
 
     @property
-    def empty_data_template(self):
-        return getattr(self.Meta, 'empty_data_template', {})
+    def empty_template(self):
+        return getattr(self.Meta, 'empty_template', {})
 
     def add_empty_rows(self, found_dates, start, end, filter_by):
         match filter_by:
@@ -89,7 +126,7 @@ class AnalyticsSerializer(ModelSerializer):
         not_found_dates = []
         for _ in range(iters):
             if iter_date not in found_dates:
-                template = deepcopy(self.empty_data_template)
+                template = deepcopy(self.empty_template)
                 template['date'] = iter_date
                 not_found_dates.append(template)
 
@@ -126,13 +163,18 @@ class AnalyticsSerializer(ModelSerializer):
             remove_fields = [field for field in self.hide_fields or [] if field in df.columns]
             if remove_fields:
                 df = df.drop(columns=list(self.hide_fields))
-        return df.to_dict('index')
+
+        rep = OrderedDict()
+        rep['total_count'] = self._base_queryset().count()
+        rep['data'] = df.to_dict('index')
+        return rep
 
 
 class LangSerializerMixin:
     """
     A mixin for serializers that handle translated fields.
     """
+
     @cached_property
     def translate_fields(self):
         return getattr(self.Meta, 'translate_fields', [])
