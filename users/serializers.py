@@ -1,5 +1,6 @@
 from typing import Iterable
 
+from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -109,8 +110,12 @@ class RegistrationSerializer(PasswordSerializer):
             email_confirmed=False,
             image=validated_data.get('image', None)
         )
-        # email confirmation code
-        new_code = generate_confirm_code(user_id=user.id, raise_on_exist=False)
+        # send email confirmation code
+        new_code = generate_confirm_code(
+            user_id=user.id,
+            raise_on_exist=False,
+            live_seconds=settings.EMAIL_CONFIRM_CODE_LIVE
+        )
         send_code_template.delay(email=email, code=str(new_code))
         return user
 

@@ -123,8 +123,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'users.User'
 AUTHENTICATION_BACKENDS = ['users.backends.EmailOrUsernameAuthBackend']
-LOGIN_URL = '/admin/login/'
-
 
 # Caches
 REDIS_CONNECTION_URL = config("REDIS_URL")
@@ -142,7 +140,7 @@ CACHES = {
         "LOCATION": REDIS_CONNECTION_URL + '/2'
     },
 }
-PAGE_CACHED_SECONDS = 43200
+PAGE_CACHED_SECONDS = 21600
 
 # Celery settings
 CELERY_BROKER_URL = REDIS_CONNECTION_URL + '/0'
@@ -172,7 +170,8 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
-    "COERCE_DECIMAL_TO_STRING": False
+    "COERCE_DECIMAL_TO_STRING": False,
+    'TEST_REQUEST_DEFAULT_FORMAT': 'json',
 }
 
 CORS_ALLOW_ALL_ORIGINS = True  # TODO: off after testing
@@ -181,9 +180,10 @@ CORS_ALLOW_ALL_ORIGINS = True  # TODO: off after testing
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Kaimono Project API',
     'DESCRIPTION': '',
-    'VERSION': '1.0.0',
+    'VERSION': '2.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
-    'COMPONENT_SPLIT_REQUEST': True
+    'COMPONENT_SPLIT_REQUEST': True,
+    # 'SERVE_PUBLIC': False # TODO: change after deploy
 }
 
 # Mailing settings
@@ -223,6 +223,7 @@ RESTORE_SETTINGS = {
     "TOKEN_ALGORITHM": "HS256",
     "MAIL_SUBJECT": ""
 }
+EMAIL_CONFIRM_CODE_LIVE = 43200
 
 PARSING_SETTINGS = {'CACHE_NAME': "scraping"}
 INCREASE_PRICE_PERCENTAGE = 10

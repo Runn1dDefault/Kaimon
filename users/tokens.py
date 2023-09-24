@@ -91,25 +91,31 @@ class RestoreCode(BaseRestore):
             return True
         return False
 
-    def _generate(self, payload: dict[str, Any]) -> str:
+    def _generate(self, payload: dict[str, Any], live_seconds: int = None) -> str:
         code = get_random_string(
             length=settings["TOKEN_LEN"],
             allowed_chars=settings["CODE_ALLOWED_CHARS"]
         )
         payload['code'] = code
-        self._cache.set(self.cache_key, json.dumps(payload), timeout=self.live_seconds)
+        self._cache.set(self.cache_key, json.dumps(payload), timeout=live_seconds)
         return code
 
     def remove(self) -> None:
         self._cache.delete(self.cache_key)
 
     @classmethod
-    def for_user(cls, user_id: int, raise_on_exist: bool = True) -> Self:
+    def for_user(
+        cls,
+        user_id: int,
+        live_seconds: int = None,
+        raise_on_exist: bool = True,
+    ) -> Self:
         restore_code = cls(sub=user_id)
         if raise_on_exist is True and restore_code.exist:
             raise RestoreCodeExist("code exist! Exp: %s seconds" % restore_code.exp)
+
         payload = {'user_id': user_id}
-        restore_code._generate(payload)
+        restore_code._generate(payload, live_seconds=live_seconds or restore_code.live_seconds)
         return restore_code
 
 
@@ -181,14 +187,18 @@ def generate_restore_token(user_id, code):
         return token
 
 
-def generate_confirm_code(user_id, raise_on_exist):
+def generate_confirm_code(user_id, raise_on_exist, live_seconds: int = None):
     """
     generates a new code for user_id and saves it in the cache for a certain period
     that is set in settings.RESTORE_SETTINGS['CODE_LIVE_SECONDS']
     raise_on_exist: if is True an error will be thrown if the code is already cached
     """
     try:
-        code = RestoreCode.for_user(user_id=user_id, raise_on_exist=raise_on_exist)
+        code = RestoreCode.for_user(
+            user_id=user_id,
+            raise_on_exist=raise_on_exist,
+            live_seconds=live_seconds
+        )
     except RestoreCodeExist as e:
         raise ValidationError({'code': gettext_lazy(str(e))})
     else:
