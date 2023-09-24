@@ -8,7 +8,7 @@ from services.clients import RakutenClient
 
 
 def get_rakuten_client(delay: int | float, validation_client: bool = False) -> RakutenClient:
-    db_client = Oauth2Client.cached_objects.filter(to_validation=validation_client).free_client()
+    db_client = Oauth2Client.cached_objects.free_client(validation_client)
     rakuten_client = RakutenClient(
         app_id=db_client.app_id,
         partner_id=db_client.partner_id or None
