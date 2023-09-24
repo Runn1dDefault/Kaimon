@@ -56,17 +56,14 @@ class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductImageInline]
     list_display = ('id', 'name', 'price', 'is_active', 'availability', 'created_at')
     list_display_links = ('id', 'name')
-    search_fields = ('id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz',
-                     'tags__name', 'tags__name_ru', 'tags__name_en', 'tags__name_ky', 'tags__name_kz', 'tags__name_tr',
-                     'genres__name', 'genres__name_ru', 'genres__name_en', 'genres__name_tr', 'genres__name_ky',
-                     'genres__name_kz')
+    search_fields = ('id', 'name')
     search_help_text = _('Search by fields: ID, Rakuten ID, NAME, GENRE NAME')
     list_filter = (ProductRankAdminFilter, 'is_active', 'created_at', 'modified_at', 'reference_rank')
     readonly_fields = ('id', 'created_at', 'modified_at')
     fieldsets = (
         (
             _('General Info'),
-            {'fields': ('id', 'name', 'description', 'price')}
+            {'fields': ('id', 'name', 'description', 'price', 'rakuten_price')}
         ),
         (_('Dates'), {'classes': ['collapse'], 'fields': ('created_at', 'modified_at')}),
         (_('Control'), {'fields': ('is_active', 'reference_rank')}),
