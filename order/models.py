@@ -67,15 +67,21 @@ class Order(BaseModel):
     shipping_carrier = models.CharField(max_length=50, default='FedEx')
     shipping_weight = models.IntegerField(verbose_name=_('Shipping weight'), blank=True, null=True)
     # for correct analytics, the value of conversions for two currencies with yen will be saved here
-    yen_to_usd = models.FloatField()
-    yen_to_som = models.FloatField()
+    yen_to_usd = models.DecimalField(max_digits=20, decimal_places=10)
+    yen_to_som = models.DecimalField(max_digits=20, decimal_places=10)
+
+    @property
+    def phone(self):
+        return getattr(self.customer, 'phone', None)
 
     @property
     def total_price(self):
-        if not self.receipts.exists():
+        receipts = getattr(self, 'receipts')
+        if not receipts.exists():
             return 0.0
 
-        receipts_prices = self.__class__analytics.filter(id=self.id).total_prices().values('yen')
+        order_id = getattr(self, 'id')
+        receipts_prices = self.__class__.analytics.filter(id=order_id).total_prices().values('yen')
         return receipts_prices[0]['yen']
 
 
