@@ -1,7 +1,6 @@
 import logging
 from typing import Any
 
-from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
 from kaimon.celery import app
@@ -162,6 +161,7 @@ def update_items(items: list[dict[str, Any]]):
 def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict[str, Any]] = None):
     conf = app_settings.PRODUCT_PARSE_SETTINGS
     product_model = import_model(conf.MODEL)
+    increase_price = import_model('product.utils.increase_price')
     product_genre_model = import_model(conf.GENRE_RELATION_MODEL)
     product_tag_model = import_model(conf.TAG_RELATION_MODEL)
     img_model = import_model(conf.IMAGE_MODEL)
@@ -174,6 +174,7 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
         save_tags_from_groups(tag_groups)
 
     db_product_ids = list(product_model.objects.values_list('id', flat=True))
+
     new_products, products_to_update = [], []
     new_product_images, new_product_tags, new_product_genres = [], [], []
 
@@ -184,12 +185,16 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
             products_to_update.append(item)
             continue
 
-        new_products.append(product_model(**build_by_fields_map(item, fields_map=fields_map)))
+        product_data = build_by_fields_map(item, fields_map=fields_map)
+        price = product_data[conf.PARSE_KEYS.rakuten_price]
+        if price and price > 0:
+            product_data['price'] = increase_price(price)
+        new_products.append(product_model(**product_data))
 
         for genre_id in genre_ids:
             new_product_genres.append(product_genre_model(product_id=item_code, genre_id=genre_id))
 
-        for tag_id in item[conf.TAG_IDS_KEY] or []:
+        for tag_id in set(item[conf.TAG_IDS_KEY] or []):
             new_product_tags.append(product_tag_model(product_id=item_code, tag_id=tag_id))
 
         for img_key in conf.IMG_PARSE_FIELDS or []:
@@ -278,5 +283,3 @@ def parse_all_genre_products():
 
         for child_id in children:
             parse_items.delay(child_id, parse_all=True)
-
-
