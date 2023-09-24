@@ -9,11 +9,13 @@ class UserManager(BaseUserManager):
     def create_user(self, username, email=None, password=None, **extra_fields):
         extra_fields.setdefault('registration_payed', False)
         extra_fields.setdefault('is_active', False)
+        extra_fields.setdefault('email_confirmed', False)
         return super().create_user(username, email=email, password=password, **extra_fields)
 
     def create_superuser(self, username, email=None, password=None, **extra_fields):
         extra_fields.setdefault('registration_payed', True)
         extra_fields.setdefault('is_active', True)
+        extra_fields.setdefault('email_confirmed', True)
         extra_fields.setdefault('role', User.Role.DEVELOPER)
         return super().create_superuser(username, email=email, password=password, **extra_fields)
 

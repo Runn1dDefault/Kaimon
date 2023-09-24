@@ -31,18 +31,19 @@ class CustomUserAdmin(UserAdmin):
             _("Advanced options"),
             {
                 "classes": ("collapse",),
-                "fields": ("role", "image", "registration_payed"),
+                "fields": ("role", "image", "registration_payed", ),
             }
         )
     )
     fieldsets = (
         (_("Credentials"), {"fields": ("email", "username", "password")}),
-        (_("Personal info"), {"fields": ("full_name", "image", "email_confirmed",)}),
+        (_("Personal info"), {"fields": ("full_name", "image",)}),
         (
             _("Permissions"),
             {
                 "fields": (
                     "role",
+                    "email_confirmed",
                     "registration_payed",
                     "is_active",
                     "is_staff",
