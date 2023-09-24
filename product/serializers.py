@@ -16,7 +16,7 @@ class GenreSerializer(LangSerializerMixin, serializers.ModelSerializer):
 
 
 class ProductReviewSerializer(serializers.ModelSerializer):
-    user = UserProfileSerializer(hide_fields=('role', 'email'), read_only=True)
+    user = UserProfileSerializer(hide_fields=('role', 'email', 'email_confirmed', 'registration_payed'), read_only=True)
 
     class Meta:
         model = ProductReview

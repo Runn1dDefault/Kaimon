@@ -58,7 +58,7 @@ class RestoreSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('email', 'full_name', 'role', 'image')
+        fields = ('email', 'full_name', 'role', 'image', 'email_confirmed', 'registration_payed')
         extra_kwargs = {'role': {'read_only': True}}
 
     def __init__(self, hide_fields: Iterable[str] = None, instance=None, data=None, **kwargs):
