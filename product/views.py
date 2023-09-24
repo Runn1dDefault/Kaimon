@@ -5,13 +5,13 @@ from rest_framework import generics, status, filters
 from rest_framework.response import Response
 
 from currencies.mixins import CurrencyMixin
-from users.permissions import RegistrationPayedPermission
+from users.permissions import RegistrationPayedPermission, EmailConfirmedPermission
 from utils.filters import FilterByLookup
 from utils.paginators import PagePagination
 from utils.views import CachingMixin, LanguageMixin
 
 from .filters import SearchFilterByLang, GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter, FilterByTag
-from .models import Genre, Product, TagGroup
+from .models import Genre, Product, TagGroup, ProductReview
 from .paginators import GenrePagination
 from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer
 from .utils import get_genre_parents_tree
@@ -29,6 +29,8 @@ currency_and_lang_params = [settings.LANGUAGE_QUERY_SCHEMA_PARAM, settings.CURRE
     )
 )
 class GenreListView(CachingMixin, LanguageMixin, generics.ListAPIView):
+    permission_classes = ()
+    authentication_classes = ()
     queryset = Genre.objects.filter(deactivated=False)
     filter_backends = [GenreLevelFilter]
     pagination_class = GenrePagination
@@ -37,6 +39,8 @@ class GenreListView(CachingMixin, LanguageMixin, generics.ListAPIView):
 
 @extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
 class GenreChildrenView(CachingMixin, LanguageMixin, generics.ListAPIView):
+    permission_classes = ()
+    authentication_classes = ()
     lookup_field = 'id'
     queryset = Genre.objects.filter(deactivated=False)
     serializer_class = GenreSerializer
@@ -60,6 +64,8 @@ class GenreChildrenView(CachingMixin, LanguageMixin, generics.ListAPIView):
 
 @extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
 class GenreParentsView(CachingMixin, LanguageMixin, generics.ListAPIView):
+    permission_classes = ()
+    authentication_classes = ()
     lookup_field = 'id'
     queryset = Genre.objects.filter(deactivated=False)
     serializer_class = GenreSerializer
@@ -79,6 +85,8 @@ class GenreParentsView(CachingMixin, LanguageMixin, generics.ListAPIView):
 # ------------------------------------------------ Products ------------------------------------------------------------
 @extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
 class ProductsListByGenreView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
+    permission_classes = ()
+    authentication_classes = ()
     queryset = Product.objects.filter(is_active=True, availability=True)
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
@@ -96,13 +104,15 @@ class ProductsListByGenreView(CurrencyMixin, LanguageMixin, generics.ListAPIView
 
 @extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
 class TagByGenreListView(CachingMixin, LanguageMixin, generics.ListAPIView):
+    permission_classes = ()
+    authentication_classes = ()
     queryset = TagGroup.objects.all()
     lookup_url_kwarg = 'id'
     name_field = 'name'
 
     def list(self, request, *args, **kwargs):
         groups = self.get_queryset().filter(
-            tags__producttag__product__productgenre__genre_id=self.kwargs[self.lookup_url_kwarg]
+            tags__producttag__product__genres__genre_id=self.kwargs[self.lookup_url_kwarg]
         ).distinct()
         if not groups.exists():
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -115,18 +125,42 @@ class TagByGenreListView(CachingMixin, LanguageMixin, generics.ListAPIView):
 
 @extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
 class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView):
+    permission_classes = ()
+    authentication_classes = ()
     lookup_field = 'id'
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductRetrieveSerializer
 
 
 # ------------------------------------------------- Reviews ------------------------------------------------------------
+class UserReviewListView(generics.ListAPIView):
+    permission_classes = [EmailConfirmedPermission, RegistrationPayedPermission]
+    pagination_class = PagePagination
+    queryset = ProductReview.objects.filter(is_active=True)
+    serializer_class = ProductReviewSerializer
+
+    def get_queryset(self):
+        return super().get_queryset().filter(user=self.request.user)
+
+
 class ProductReviewCreateView(generics.CreateAPIView):
     serializer_class = ProductReviewSerializer
-    permission_classes = [RegistrationPayedPermission]
+    permission_classes = [EmailConfirmedPermission, RegistrationPayedPermission]
+
+
+class ProductReviewDestroyView(generics.DestroyAPIView):
+    lookup_field = 'id'
+    queryset = Product.objects.filter(is_active=True)
+    serializer_class = ProductReviewSerializer
+    permission_classes = [EmailConfirmedPermission, RegistrationPayedPermission]
+
+    def get_queryset(self):
+        return self.request.user.reviews.all()
 
 
 class ProductReviewListView(generics.ListAPIView):
+    permission_classes = ()
+    authentication_classes = ()
     lookup_field = 'id'
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductReviewSerializer
@@ -148,6 +182,8 @@ class ProductReviewListView(generics.ListAPIView):
 # -------------------------------------------- Recommendations ---------------------------------------------------------
 @extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
 class ReferenceListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
+    permission_classes = ()
+    authentication_classes = ()
     queryset = Product.objects.filter(is_active=True, availability=True)
     filter_backends = [ProductReferenceFilter]
     serializer_class = ProductListSerializer
