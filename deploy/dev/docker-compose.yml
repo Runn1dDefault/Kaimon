@@ -81,7 +81,7 @@ services:
     links:
       - "postgres:postgres_kaimono"
       - "redis:redis_kaimono"
-    command: celery --app kaimon beat --loglevel=info
+    command: celery --app kaimon beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
     volumes:
       - ../../:/app
     env_file:
