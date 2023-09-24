@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import DeliveryAddress, Order, Receipt, ReceiptTag
+from .models import Customer, DeliveryAddress, Order, Receipt, ReceiptTag
+
+
+@admin.register(Customer)
+class CustomerAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'email')
+    search_fields = ('id', 'name', 'email')
 
 
 @admin.register(DeliveryAddress)
