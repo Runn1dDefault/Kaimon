@@ -37,8 +37,7 @@ class ProductListSerializer(LangSerializerMixin, serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'image_urls',
-                  'created_at', 'genre_id')
+        fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'image_urls')
         translate_fields = ('name',)
 
     def __init__(self, instance=None, **kwargs):
@@ -56,18 +55,31 @@ class ProductRetrieveSerializer(LangSerializerMixin, serializers.ModelSerializer
     price = ConversionField()
     sale_price = ConversionField()
     image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
+    genres = serializers.SerializerMethodField(read_only=True)
     tags_info = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'image_urls',
-                  'created_at', 'genre_id', 'description', 'tags_info')
+        fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'description',
+                  'genres', 'image_urls', 'tags_info')
         translate_fields = ('name', 'description')
 
     def __init__(self, instance, **kwargs):
         assert isinstance(instance, Product)
         kwargs['many'] = False
         super().__init__(instance=instance, data=empty, **kwargs)
+
+    def get_genres(self, instance):
+        genres_fk = instance.genres.filter(genre__deactivated=False)
+        if not genres_fk.exists():
+            return []
+
+        genres = (
+            Genre.objects.exclude(level=0)
+                         .filter(id__in=genres_fk.values_list('genre_id', flat=True))
+                         .order_by('-level')
+        )
+        return GenreSerializer(instance=genres, many=True, context=self.context).data
 
     def get_tags_info(self, instance):
         tags_fk = instance.tags.all()
