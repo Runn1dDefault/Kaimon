@@ -5,6 +5,7 @@ from rest_framework import generics, status, filters
 from rest_framework.response import Response
 
 from currencies.mixins import CurrencyMixin
+from rakuten_scraping.tasks import check_product_availability
 from users.permissions import RegistrationPayedPermission, EmailConfirmedPermission
 from utils.filters import FilterByLookup
 from utils.paginators import PagePagination
@@ -130,6 +131,12 @@ class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView
     lookup_field = 'id'
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductRetrieveSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        check_product_availability.delay(product_id=instance.id)
+        return Response(serializer.data)
 
 
 # ------------------------------------------------- Reviews ------------------------------------------------------------

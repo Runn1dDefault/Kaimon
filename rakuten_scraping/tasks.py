@@ -257,7 +257,7 @@ def parse_and_update_tag(tag_id: int):
 
 
 @app.task()
-def check_products_availability(product_id: str):
+def check_product_availability(product_id: str):
     conf = app_settings.PRODUCT_PARSE_SETTINGS
     update_delta = timezone.now() - conf.UPDATE_DELTA
     product_model = import_model(conf.PRODUCT_MODEL)

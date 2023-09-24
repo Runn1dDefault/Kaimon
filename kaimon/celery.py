@@ -42,4 +42,5 @@ app.conf.task_routes = {
     'rakuten_scraping.tasks.save_tags_for_product': ITEM_SAVING_QUEUE_ROUTE,
     'rakuten_scraping.tasks.update_or_create_tag': ITEM_SAVING_QUEUE_ROUTE,
     'rakuten_scraping.tasks.save_tags_from_groups': ITEM_SAVING_QUEUE_ROUTE,
+    'rakuten_scraping.tasks.check_product_availability': RAKUTEN_REQUESTS_QUEUE_ROUTE,
 }
