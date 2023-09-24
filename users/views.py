@@ -8,12 +8,14 @@ from .serializers import RegistrationSerializer, RestoreSerializer, UpdatePasswo
 
 
 class RegistrationView(generics.CreateAPIView):
-    permission_classes = (AllowAny,)
+    permission_classes = ()
+    authentication_classes = ()
     serializer_class = RegistrationSerializer
 
 
 class RestorePasswordView(generics.GenericAPIView):
-    permission_classes = (AllowAny,)
+    permission_classes = ()
+    authentication_classes = ()
     serializer_class = RestoreSerializer
 
     def post(self, request, *args, **kwargs):
