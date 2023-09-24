@@ -6,7 +6,7 @@ from rest_framework import serializers
 
 from .models import User
 from .tasks import send_code_template
-from .tokens import get_tokens_for_user, create_restore_token, create_confirm_code
+from .tokens import get_tokens_for_user, generate_restore_token, generate_confirm_code
 
 
 class RestoreSerializer(serializers.Serializer):
@@ -35,12 +35,12 @@ class RestoreSerializer(serializers.Serializer):
             raise serializers.ValidationError({'code': _('Invalid code!')})
 
         if code:
-            token = create_restore_token(user_id=user.id, code=code)
+            token = generate_restore_token(user_id=user.id, code=code)
             return {'token': str(token)}
 
         if send_new_code is True:
             # if you need to restrict sending for a user who has already sent, then change raise_on_exist to True
-            new_code = create_confirm_code(user_id=user.id, raise_on_exist=False)
+            new_code = generate_confirm_code(user_id=user.id, raise_on_exist=False)
             send_code_template.delay(email=email, code=str(new_code))
             return {'sent': True}
         raise serializers.ValidationError({'detail': _('Something went wrong!')}, code=500)
@@ -109,7 +109,8 @@ class RegistrationSerializer(PasswordSerializer):
             email_confirmed=False,
             image=validated_data.get('image', None)
         )
-        new_code = create_confirm_code(user_id=user.id, raise_on_exist=False)
+        # email confirmation code
+        new_code = generate_confirm_code(user_id=user.id, raise_on_exist=False)
         send_code_template.delay(email=email, code=str(new_code))
         return user
 
@@ -121,20 +122,11 @@ class RegistrationSerializer(PasswordSerializer):
 
 
 class ConfirmEmailSerializer(serializers.Serializer):
-    email = serializers.EmailField(write_only=True, required=True)
     code = serializers.CharField(write_only=True, required=True, max_length=6, min_length=6)
 
     def validate(self, attrs):
-        email = attrs['email']
-        self.instance = User.objects.filter(email=email).first()
-        if not self.instance:
-            raise serializers.ValidationError({'email': _('User with email %s not exist!') % email})
-
-        if not self.instance.check_password(attrs['password']):
-            raise serializers.ValidationError({'password': _('Invalid')})
-
         code = attrs['code']
-        create_restore_token(user_id=self.instance.id, code=code)
+        generate_restore_token(user_id=self.instance.id, code=code)
         return attrs
 
     def update(self, instance, validated_data):

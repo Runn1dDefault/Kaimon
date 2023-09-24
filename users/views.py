@@ -1,5 +1,5 @@
 from rest_framework import generics, status, mixins
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .authentication import RestoreJWTAuthentication
@@ -25,11 +25,11 @@ class RestorePasswordView(generics.GenericAPIView):
 
 
 class ConfirmPasswordView(generics.GenericAPIView):
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated,)
     serializer_class = ConfirmEmailSerializer
 
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        serializer = self.get_serializer(instance=request.user, data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
