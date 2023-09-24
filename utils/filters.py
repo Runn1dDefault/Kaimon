@@ -16,13 +16,18 @@ class ListFilterFields(BaseFilterBackend):
         return getattr(view, 'list_filter_fields', {})
 
     def get_queries_kwargs(self, request, view) -> dict[str, list[str]]:
-        return {
-            source + '__in': [i for i in request.query_params.get(field_name, '').split(',') if i.strip()]
-            for field_name, source in self.get_field_names(view).items()
-        }
+        queries = {}
+        for field_name, source in self.get_field_names(view).items():
+            params = [i for i in request.query_params.get(field_name, '').split(',') if i.strip()]
+            if params:
+                queries[source + '__in'] = params
+        return queries
 
     def filter_queryset(self, request, queryset, view):
-        return queryset.filter(**self.get_queries_kwargs(request, view))
+        queries = self.get_queries_kwargs(request, view)
+        if queries:
+            return queryset.filter(**queries)
+        return queryset
 
     def get_schema_operation_parameters(self, view):
         return [
