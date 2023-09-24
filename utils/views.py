@@ -16,6 +16,6 @@ class CachingMixin:
     cache_timeout = settings.PAGE_CACHED_SECONDS  # Default cache timeout in seconds
 
     @classmethod
-    def as_view(cls, **initkwargs):
-        view = super().as_view(**initkwargs)
+    def as_view(cls, *args, **kwargs):
+        view = super().as_view(*args, **kwargs)
         return cache_page(cls.cache_timeout)(view)
