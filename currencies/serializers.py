@@ -23,11 +23,12 @@ class ConversionField(serializers.FloatField):
         if self.all_conversions:
             som_conversion = self.get_conversation_instance(Conversion.Currencies.som)
             dollar_conversion = self.get_conversation_instance(Conversion.Currencies.dollar)
-            return {
-                Conversion.Currencies.yen: value,
-                Conversion.Currencies.som: som_conversion.calc_price(value),
-                Conversion.Currencies.dollar: dollar_conversion.calc_price(value)
-            }
+            if som_conversion and dollar_conversion:
+                return {
+                    Conversion.Currencies.yen: value,
+                    Conversion.Currencies.som: som_conversion.calc_price(value),
+                    Conversion.Currencies.dollar: dollar_conversion.calc_price(value)
+                }
 
         currency = self.get_currency()
         if currency == Conversion.Currencies.yen or not value:
