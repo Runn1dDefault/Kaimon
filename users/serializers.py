@@ -117,6 +117,12 @@ class BaseRecoverySerializer(serializers.Serializer):
             raise serializers.ValidationError({'email': _('User with email %s not exist!') % email})
         return email
 
+    def create(self, validated_data):
+        raise NotImplementedError('`create()` not implemented!')
+
+    def update(self, instance, validated_data):
+        raise NotImplementedError('`update()` not implemented!')
+
     def to_representation(self, validated_data):
         return validated_data
 
