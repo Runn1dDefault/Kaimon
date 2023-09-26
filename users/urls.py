@@ -1,16 +1,17 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .views import RegistrationView, RestorePasswordView, UpdatePasswordView, UserInfoView, UpdateUserInfo
-
+from .views import RegistrationView, UserInfoView, UpdateUserInfo, \
+    ConfirmEmailView, RecoveryCodeView, RecoveryTokenView, RecoveryPasswordView
 
 urlpatterns = [
-    path('registration/', RegistrationView.as_view(), name='auth_registration'),
-    path('confirm/email/', RegistrationView.as_view(), name='auth_registration'),
-    path('token/', TokenObtainPairView.as_view(), name='auth_token_obtain_pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='auth_token_refresh'),
-    path('restore/password/', RestorePasswordView.as_view(), name='auth_restore_pwd'),
-    path('update/password/', UpdatePasswordView.as_view(), name='auth_update_pwd'),
-    path('me-info/', UserInfoView.as_view(), name='auth_me_info'),
-    path('me-info/update/', UpdateUserInfo.as_view(), name='auth_me_info_update'),
+    path('registration/', RegistrationView.as_view(), name='auth-registration'),
+    path('token/', TokenObtainPairView.as_view(), name='auth-token-obtain-pair'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='auth-token-refresh'),
+    path('confirm/email/', ConfirmEmailView.as_view(), name='auth-email-confirm'),
+    path('me-info/', UserInfoView.as_view(), name='auth-me-info'),
+    path('me-info/update/', UpdateUserInfo.as_view(), name='auth-me-info-update'),
+    path('forgot-pwd/', RecoveryCodeView.as_view(), name='auth-restore-mailing-code'),
+    path('forgot-pwd-token/', RecoveryTokenView.as_view(), name='auth-restore-token'),
+    path('recovery/password/', RecoveryPasswordView.as_view(), name='auth-update-pwd')
 ]

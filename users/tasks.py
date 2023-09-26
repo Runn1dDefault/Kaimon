@@ -7,16 +7,11 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 
 from kaimon.celery import app
+from users.utils import smp_cache_key_for_email
 
 
 @app.task()
 def send_code_template(email: str, code: str | int):
-    cache = caches['users']
-    cache_key = 'smtp:' + email
-    if cache.get(cache_key):
-        logging.error("Can't send message to email %s for another %s seconds" % (email, cache.ttl(cache_key)))
-        return
-
     template_data = deepcopy(settings.RESTORE_VERIFY_TEMPLATE)
     template_data['code'] = code
 
@@ -33,4 +28,5 @@ def send_code_template(email: str, code: str | int):
     except Exception as e:
         logging.error(e)
     else:
-        cache.set(cache_key, code, timeout=300)
+        cache = caches['users']
+        cache.set(smp_cache_key_for_email(email), code, timeout=300)
