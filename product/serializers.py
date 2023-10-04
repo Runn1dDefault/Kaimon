@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from rest_framework.fields import empty
 
 from currencies.serializers import ConversionField
 from users.serializers import UserProfileSerializer
@@ -28,6 +27,14 @@ class ProductReviewSerializer(serializers.ModelSerializer):
         assert user.is_authenticated, f'Serializer {self.__class__.__name__} not available to {user.__class__.__name__}'
         attrs['user'] = user
         return attrs
+
+
+class ProductIdsSerializer(serializers.Serializer):
+    product_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.filter(is_active=True),
+        required=True,
+        many=True
+    )
 
 
 class ProductListSerializer(LangSerializerMixin, serializers.ModelSerializer):
@@ -63,11 +70,6 @@ class ProductRetrieveSerializer(LangSerializerMixin, serializers.ModelSerializer
         fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'description',
                   'genres', 'image_urls', 'tags_info')
         translate_fields = ('name', 'description')
-
-    def __init__(self, instance, **kwargs):
-        assert isinstance(instance, Product)
-        kwargs['many'] = False
-        super().__init__(instance=instance, data=empty, **kwargs)
 
     def get_genres(self, instance):
         genres_fk = instance.genres.filter(genre__deactivated=False)
