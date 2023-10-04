@@ -76,6 +76,14 @@ class GenreListAdminView(CachingMixin, StaffViewMixin, generics.ListAPIView):
 
 
 # -------------------------------------------------- Tag ---------------------------------------------------------------
+class TagListAdminView(CachingMixin, StaffViewMixin, generics.ListAPIView):
+    queryset = Tag.objects.all()
+    pagination_class = AdminPagePagination
+    serializer_class = TagAdminSerializer
+    filter_backends = [SearchFilter]
+    search_fields = ['name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz']
+
+
 class TagGroupListAdminViewSet(CachingMixin, StaffViewMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
     queryset = TagGroup.objects.all()
     pagination_class = AdminPagePagination

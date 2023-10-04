@@ -1,10 +1,10 @@
-from django.urls import path, re_path, include
+from django.urls import path, include
 from rest_framework.routers import SimpleRouter
 
 from .views import (
     OrderAnalyticsView, UserAnalyticsView, ReviewAnalyticsView,
     ProductAdminViewSet, ProductReviewAdminViewSet,
-    GenreListAdminView, TagGroupListAdminViewSet, PromotionAdminViewSet,
+    GenreListAdminView, TagListAdminView, TagGroupListAdminViewSet, PromotionAdminViewSet,
     OrderAdminViewSet, ConversionAdminViewSet, UserAdminViewSet,
 )
 
@@ -24,6 +24,7 @@ analytics_urlpatterns = [
 ]
 
 urlpatterns = analytics_urlpatterns + [
-    path('products/genres/', GenreListAdminView.as_view(), name='admin-genres-list'),
+    path('products/genres/', GenreListAdminView.as_view(), name='admin-genre-list'),
+    path('products/tags/', TagListAdminView.as_view(), name='admin-tag-list'),
     path('', include(router.urls)),
 ]
