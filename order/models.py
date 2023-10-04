@@ -55,7 +55,8 @@ class Order(BaseModel):
     class Status(models.TextChoices):
         pending = 'pending', _('Pending')
         rejected = 'rejected', _('Rejected')
-        delivered = 'delivered', _('Delivered')
+        in_process = 'in_process', _('In Process')
+        in_delivering = 'in_delivering', _('In Delivering')
         success = 'success', _('Success')
 
     customer = models.ForeignKey(Customer, on_delete=models.RESTRICT, related_name='orders')
