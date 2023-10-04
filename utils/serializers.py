@@ -72,7 +72,6 @@ class AnalyticsSerializer(ModelSerializer):
         return attrs
 
     def build_queries(self) -> dict[str, Any]:
-        model = getattr(self.Meta, 'model')
         start_field = getattr(self.Meta, 'start_field')
         end_field = getattr(self.Meta, 'end_field')
         start, end = self.validated_data['start'], self.validated_data['end']
@@ -81,7 +80,6 @@ class AnalyticsSerializer(ModelSerializer):
 
         for field in self.Meta.fields:
             source = extra_kwargs.get(field, {}).get('source', field)
-            assert hasattr(model, source)
             field_value = self.validated_data.get(source)
             if field_value is None:
                 continue

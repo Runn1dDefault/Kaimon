@@ -316,7 +316,7 @@ class OrderAnalyticsSerializer(AnalyticsSerializer):
 
 
 class UserAnalyticsSerializer(AnalyticsSerializer):
-    AVAILABLE_ROLES = (User.Role.CLIENT, User.Role.MANAGER, User.Role.DIRECTOR)
+    AVAILABLE_ROLES = (User.Role.CLIENT,)
     is_active = serializers.BooleanField(required=False, write_only=True)
     registration_payed = serializers.BooleanField(required=False, write_only=True)
     email_confirmed = serializers.BooleanField(required=False, write_only=True)
