@@ -4,7 +4,7 @@ from .views import (
     GenreListView, GenreChildrenView, GenreParentsView, TagByGenreListView,
     ProductsByIdsView, ProductsListByGenreView, ProductRetrieveView, ProductReviewDestroyView,
     UserReviewListView, ProductReviewCreateView, ProductReviewListView,
-    ReferenceListView,
+    ReferenceListView
 )
 
 genres_urlpatterns = [
