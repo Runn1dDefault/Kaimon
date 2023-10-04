@@ -66,7 +66,7 @@ class ProductAdmin(admin.ModelAdmin):
             {'fields': ('id', 'name', 'description', 'price', 'rakuten_price')}
         ),
         (_('Dates'), {'classes': ['collapse'], 'fields': ('created_at', 'modified_at')}),
-        (_('Control'), {'fields': ('is_active', 'reference_rank')}),
+        (_('Control'), {'fields': ('availability', 'is_active', 'reference_rank')}),
         (_('Links'), {'classes': ['collapse'], 'fields': ('product_url',)}),
         (
             _('Another language fields'),
