@@ -14,7 +14,8 @@ from utils.views import CachingMixin, LanguageMixin
 from .filters import SearchFilterByLang, GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter, FilterByTag
 from .models import Genre, Product, TagGroup, ProductReview
 from .paginators import GenrePagination
-from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer
+from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer, \
+    ProductIdsSerializer
 from .utils import get_genre_parents_tree
 
 currency_and_lang_params = [settings.LANGUAGE_QUERY_SCHEMA_PARAM, settings.CURRENCY_QUERY_SCHEMA_PARAM]
@@ -84,6 +85,33 @@ class GenreParentsView(CachingMixin, LanguageMixin, generics.ListAPIView):
 
 
 # ------------------------------------------------ Products ------------------------------------------------------------
+@extend_schema_view(post=extend_schema(parameters=currency_and_lang_params))
+class ProductsByIdsView(CurrencyMixin, LanguageMixin, generics.GenericAPIView):
+    permission_classes = ()
+    authentication_classes = ()
+    queryset = Product.objects.filter(is_active=True)
+    pagination_class = PagePagination
+    serializer_class = ProductIdsSerializer
+    list_serializer_class = ProductRetrieveSerializer
+
+    def get_serializer(self, *args, **kwargs):
+        kwargs.setdefault('context', self.get_serializer_context())
+        if kwargs.get('instance') is not None and kwargs.get('many') is True:
+            serializer_class = self.list_serializer_class
+        else:
+            serializer_class = self.get_serializer_class()
+        return serializer_class(*args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, many=False)
+        serializer.is_valid(raise_exception=True)
+        products = serializer.validated_data['product_ids']
+        if products:
+            list_serializer = self.get_serializer(instance=products, many=True)
+            return Response(list_serializer.data)
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+
 @extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
 class ProductsListByGenreView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
     permission_classes = ()
