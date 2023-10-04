@@ -32,6 +32,7 @@ class DeliveryAddressViewSet(viewsets.ModelViewSet):
 class OrderViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
+    mixins.DestroyModelMixin,
     viewsets.GenericViewSet
 ):
     queryset = Order.objects.all()
@@ -49,5 +50,3 @@ class OrderViewSet(
 
     def get_queryset(self):
         return super().get_queryset().filter(delivery_address__user=self.request.user)
-
-    # TODO: add cancel order if order.status == Order.Status.pending
