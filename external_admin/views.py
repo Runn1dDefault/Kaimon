@@ -246,12 +246,22 @@ class OrderAdminViewSet(StaffViewMixin, viewsets.ReadOnlyModelViewSet):
     lookup_url_kwarg = 'order_id'
 
     @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
-    @action(methods=['GET'], detail=True, url_path="mark-delivered")
-    def mark_delivered_order(self, request, **kwargs):
+    @action(methods=['GET'], detail=True, url_path="mark-in-delivering")
+    def mark_in_delivering_order(self, request, **kwargs):
         order = self.get_object()
-        if order.status in [Order.Status.success, Order.Status.rejected]:
-            return Response({'detail': _('Cannot update order status')})
-        order.status = Order.Status.delivered
+        if order.status != Order.Status.in_process:
+            return Response({'detail': _('To update you need to set the %s' % Order.Status.in_process.value)})
+        order.status = Order.Status.in_delivering
+        order.save()
+        return Response(status=status.HTTP_202_ACCEPTED)
+
+    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
+    @action(methods=['GET'], detail=True, url_path="mark-in-process")
+    def mark_in_process_order(self, request, **kwargs):
+        order = self.get_object()
+        if order.status != Order.Status.pending:
+            return Response({'detail': _('To update you need to set the %s' % Order.Status.pending.value)})
+        order.status = Order.Status.in_process
         order.save()
         return Response(status=status.HTTP_202_ACCEPTED)
 
@@ -259,11 +269,13 @@ class OrderAdminViewSet(StaffViewMixin, viewsets.ReadOnlyModelViewSet):
     @action(methods=['GET'], detail=True, url_path="mark-reject")
     def mark_reject_order(self, request, **kwargs):
         order = self.get_object()
-        if order.status == Order.Status.success:
+        if order.status in (Order.Status.pending, Order.Status.in_process):
             return Response({'detail': _('Cannot update order status')})
         order.status = Order.Status.rejected
         order.save()
         return Response(status=status.HTTP_202_ACCEPTED)
+
+    # TODO: maybe we need add mark order success action
 
 
 # ----------------------------------------------- Promotions -----------------------------------------------------------
