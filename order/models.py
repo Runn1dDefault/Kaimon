@@ -61,7 +61,7 @@ class Order(BaseModel):
 
     customer = models.ForeignKey(Customer, on_delete=models.RESTRICT, related_name='orders')
     delivery_address = models.ForeignKey(DeliveryAddress, on_delete=models.RESTRICT, related_name='orders')
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.pending)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.pending)
     comment = models.TextField(null=True, blank=True)
 
     # important!: when updating an address, create a new address and mark the old one as deleted
