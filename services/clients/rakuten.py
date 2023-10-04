@@ -1,7 +1,6 @@
-from json import JSONDecodeError
 from typing import Any
 
-from requests import Request, Response, HTTPError
+from requests import Request
 
 from services.clients.base import BaseClient
 from services.clients.types import ProductSort, ItemSort
@@ -31,23 +30,7 @@ class RakutenClient(BaseClient):
         request.params['applicationId'] = self.app_id
         if self.partner_id:
             request.params['affiliateId'] = self.partner_id
-        return super().process_request(request)
-
-    def process_response(self, response: Response):
-        if response.status_code in self.ERROR_STATUSES:
-            raise HTTPError(
-                "Status: %s\nBody: %s\nURL:%s" % (
-                    response.status_code,
-                    response.text,
-                    response.request.url
-                )
-            )
-
-        try:
-            return response.json()
-        except (JSONDecodeError, ValueError):
-            response.raise_for_status()
-            raise
+        super().process_request(request)
 
     def product_search(
         self,
