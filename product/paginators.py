@@ -12,7 +12,7 @@ class GenrePagination(PageNumberPagination):
 
 class QuerysetPagination(PageNumberPagination):
     page_size = 10
-    max_page_size = 100
+    max_page_size = 30
     page_size_query_param = 'page_size'
 
     def paginate_queryset(self, queryset, request, view=None) -> QuerySet | None:
@@ -28,9 +28,9 @@ class QuerysetPagination(PageNumberPagination):
         if top + paginator.orphans >= paginator.count:
             top = paginator.count
 
-        paginated_queryset = queryset[bottom:top]
+        sliced_queryset = queryset[bottom:top]
         try:
-            self.page = Page(paginated_queryset, number, paginator)
+            self.page = Page(sliced_queryset, number, paginator)
         except InvalidPage as exc:
             msg = self.invalid_page_message.format(
                 page_number=page_number, message=str(exc)
@@ -41,4 +41,4 @@ class QuerysetPagination(PageNumberPagination):
             # The browsable API should display pagination controls.
             self.display_page_controls = True
         self.request = request
-        return paginated_queryset
+        return queryset.filter(id__in=sliced_queryset.values_list('id', flat=True))
