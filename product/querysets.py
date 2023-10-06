@@ -39,7 +39,7 @@ class TagGroupQuerySet(QuerySet):
                     name=F('tags__' + name_field)
                 ),
                 filter=Q(tags__id__in=tag_ids) if tag_ids else None,
-                distinct=True
+                distinct=True  # required
             )
         )
 
