@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from django.conf import settings
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter, extend_schema_view
@@ -13,7 +15,7 @@ from utils.views import CachingMixin, LanguageMixin
 
 from .filters import SearchFilterByLang, GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter, FilterByTag
 from .models import Genre, Product, TagGroup, ProductReview
-from .paginators import GenrePagination
+from .paginators import GenrePagination, QuerysetPagination
 from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer, \
     ProductIdsSerializer
 from .utils import get_genre_parents_tree
@@ -102,7 +104,7 @@ class ProductsByIdsView(CurrencyMixin, LanguageMixin, generics.GenericAPIView):
             serializer_class = self.get_serializer_class()
         return serializer_class(*args, **kwargs)
 
-    def post(self, request, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, many=False)
         serializer.is_valid(raise_exception=True)
         products = serializer.validated_data['product_ids']
@@ -111,17 +113,17 @@ class ProductsByIdsView(CurrencyMixin, LanguageMixin, generics.GenericAPIView):
             return Response(list_serializer.data)
         return Response(status=status.HTTP_404_NOT_FOUND)
 
+    def post(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
 
-@extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
-class ProductsListByGenreView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
+
+class BaseProductsListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     queryset = Product.objects.filter(is_active=True, availability=True)
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
-    filter_backends = [FilterByLookup, SearchFilterByLang, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
-    lookup_url_kwarg = 'id'
-    lookup_field = 'genres__genre_id'
+    filter_backends = [SearchFilterByLang, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
     search_fields_ja = ['name', 'genres__genre__name', 'tags__tag__name']
     search_fields_ru = ['name_ru', 'genres__genre__name_ru', 'tags__tag__name_ru']
     search_fields_en = ['name_en', 'genres__genre__name_en', 'tags__tag__name_en']
@@ -131,25 +133,55 @@ class ProductsListByGenreView(CurrencyMixin, LanguageMixin, generics.ListAPIView
     ordering_fields = ['created_at', 'price']
 
 
+@extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
+class ProductsListByGenreView(BaseProductsListView):
+    lookup_url_kwarg = 'id'
+    lookup_field = 'genres__genre_id'
+    filter_backends = (FilterByLookup, *BaseProductsListView.filter_backends)
+
+
+@extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
+class ProductsListView(BaseProductsListView):
+    pagination_class = QuerysetPagination
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page_queryset = self.paginate_queryset(queryset)
+
+        filtered_queryset = page_queryset or queryset
+        serializer = self.get_serializer(filtered_queryset, many=True)
+
+        data = OrderedDict()
+        data['products'] = serializer.data
+        data['tags'] = filtered_queryset.tags_list(name_field=self.build_translate_field('name'))
+
+        if page_queryset is not None:
+            return self.get_paginated_response(data)
+        return Response(data)
+
+
 @extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
-class TagByGenreListView(CachingMixin, LanguageMixin, generics.ListAPIView):
+class TagByGenreListView(LanguageMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     queryset = TagGroup.objects.all()
     lookup_url_kwarg = 'id'
     name_field = 'name'
 
-    def list(self, request, *args, **kwargs):
-        groups = self.get_queryset().filter(
+    def get_queryset(self):
+        return super().get_queryset().filter(
             tags__producttag__product__genres__genre_id=self.kwargs[self.lookup_url_kwarg]
         ).distinct()
-        if not groups.exists():
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(groups.tags_list(self.get_name_field()))
 
     def get_name_field(self):
         lang = self.get_lang()
         return f'{self.name_field}_{lang}' if lang != 'ja' else self.name_field
+
+    def list(self, request, *args, **kwargs):
+        groups = self.get_queryset()
+        if not groups.exists():
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        return Response(groups.tags_list(self.get_name_field()))
 
 
 @extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
