@@ -3,6 +3,11 @@ from django.views.decorators.cache import cache_page
 
 
 class LanguageMixin:
+
+    def build_translate_field(self, field: str):
+        lang = self.get_lang()
+        return '%s_%s' % (field, lang) if lang != 'ja' else field
+
     def get_lang(self):
         return self.request.query_params.get(settings.LANGUAGE_QUERY_PARAM, 'ja')
 
