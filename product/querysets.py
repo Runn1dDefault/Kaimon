@@ -1,5 +1,5 @@
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import QuerySet, F, Count, Avg, Q, ExpressionWrapper
+from django.db.models import QuerySet, F, Count, Avg, Q
 from django.db.models.functions import JSONObject, Round
 
 from utils.querysets import AnalyticsQuerySet
@@ -40,8 +40,7 @@ class TagGroupQuerySet(QuerySet):
                 ),
                 filter=Q(tags__id__in=tag_ids) if tag_ids else None,
                 distinct=True  # required
-            ),
-            tags_count=Count('tags__id', filter=Q(tags__id__in=tag_ids) if tag_ids else None, distinct=True)
+            )
         )
 
 

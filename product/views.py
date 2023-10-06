@@ -143,7 +143,6 @@ class ProductsListByGenreView(BaseProductsListView):
 @extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
 class ProductsListView(BaseProductsListView):
     pagination_class = QuerysetPagination
-    serializer_class = ProductRetrieveSerializer
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -154,13 +153,11 @@ class ProductsListView(BaseProductsListView):
 
         data = OrderedDict()
         data['products'] = serializer.data
-
-        data['tags'] = TagGroup.objects.filter(
-            id__in=sliced_queryset.values_list('tags__tag__group_id', flat=True)
-        ).tags_list(
+        base_q = TagGroup.objects.filter(id__in=sliced_queryset.values_list('tags__tag__group_id', flat=True))
+        data['tags'] = base_q.tags_list(
             name_field=self.build_translate_field('name'),
             tag_ids=sliced_queryset.values_list('tags__tag_id', flat=True)
-        ).filter(tags_count__gt=0)
+        )
 
         if page_queryset is not None:
             return self.get_paginated_response(data)
