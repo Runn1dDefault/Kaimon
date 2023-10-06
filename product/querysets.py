@@ -37,7 +37,9 @@ class TagGroupQuerySet(QuerySet):
                 JSONObject(
                     id=F('tags__id'),
                     name=F('tags__' + name_field)
-                ), filter=Q(tags__id__in=tag_ids) if tag_ids else None
+                ),
+                filter=Q(tags__id__in=tag_ids) if tag_ids else None,
+                distinct=True
             )
         )
 
@@ -72,6 +74,18 @@ class ProductQuerySet(QuerySet):
             average_rank=Avg('reviews__rank', filter=Q(reviews__is_active=True)),
             receipts_qty=Count('receipts__order_id', distinct=True)
         ).order_by(F('receipts_qty').desc(nulls_last=True), F('average_rank').desc(nulls_last=True))
+
+    def tags_list(self, name_field: str = 'name', tag_ids=None):
+        return self.values(group_id=F('tags__tag__group_id'), group_name=F('tags__tag__group__' + name_field)).annotate(
+            tag_info=ArrayAgg(
+                JSONObject(
+                    id=F('tags__tag_id'),
+                    name=F('tags__tag__' + name_field)
+                ),
+                filter=Q(tags__tag_id__in=tag_ids) if tag_ids else None,
+                distinct=True
+            )
+        )
 
 
 class ReviewAnalyticsQuerySet(AnalyticsQuerySet):
