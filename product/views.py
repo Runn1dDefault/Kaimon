@@ -13,7 +13,7 @@ from utils.filters import FilterByLookup
 from utils.paginators import PagePagination
 from utils.views import CachingMixin, LanguageMixin
 
-from .filters import SearchFilterByLang, GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter, FilterByTag
+from .filters import SearchFilterByLang, GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter, FilterByTag, SearchFilterWithTranslating
 from .models import Genre, Product, TagGroup, ProductReview
 from .paginators import GenrePagination, QuerysetPagination
 from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer, \
@@ -143,6 +143,8 @@ class ProductsListByGenreView(BaseProductsListView):
 @extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
 class ProductsListView(BaseProductsListView):
     pagination_class = QuerysetPagination
+    filter_backends = [SearchFilterWithTranslating, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
+    search_fields = ('name',)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
