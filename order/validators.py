@@ -1,6 +1,10 @@
-from django.core.exceptions import ValidationError
+import phonenumbers
 
 
-def only_digit_validator(value: str):
-    if value.isdigit() is False:
-        raise ValidationError('must contains only digit')
+def validate_phone_number(phone_number):
+    try:
+        parsed_number = phonenumbers.parse(phone_number)
+        return phonenumbers.is_valid_number(parsed_number)
+    except phonenumbers.phonenumberutil.NumberParseException:
+        return False
+

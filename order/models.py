@@ -5,11 +5,13 @@ from django.utils.translation import gettext_lazy as _
 
 from users.utils import get_sentinel_user
 
-from .validators import only_digit_validator
+from .validators import validate_phone_number
 from .querysets import OrderAnalyticsQuerySet
 
 
 class BaseModel(models.Model):
+    objects = models.Manager()
+
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
 
@@ -23,19 +25,21 @@ class Customer(BaseModel):
     """
     name = models.CharField(max_length=100)
     email = models.EmailField()
-    phone = models.CharField(max_length=20, validators=[only_digit_validator])
+    phone = models.CharField(max_length=20, validators=[validate_phone_number])
 
     def __str__(self):
         return self.name
 
 
 class DeliveryAddress(BaseModel):
+    objects = models.Manager()
+
     user = models.ForeignKey(get_user_model(), on_delete=models.SET(get_sentinel_user),
                              related_name='delivery_addresses')
     recipient_name = models.CharField(max_length=100)
     country = models.CharField(max_length=100)
     city = models.CharField(max_length=100)
-    postal_code = models.CharField(max_length=20)  # TODO: maybe this is not required field
+    postal_code = models.CharField(max_length=20)
     state = models.CharField(max_length=100, blank=True, null=True)
     address_line = models.TextField(blank=True, null=True)
     as_deleted = models.BooleanField(default=False)
@@ -53,15 +57,23 @@ class Order(BaseModel):
     analytics = OrderAnalyticsQuerySet.as_manager()
 
     class Status(models.TextChoices):
-        pending = 'pending', _('Pending')
-        rejected = 'rejected', _('Rejected')
-        in_process = 'in_process', _('In Process')
-        in_delivering = 'in_delivering', _('In Delivering')
-        success = 'success', _('Success')
+        in_processing = 'in process', _('In processing')
+        in_stock = 'in stock', _('In stock')
+        shipment = 'prepare for shipment', _('Prepare for shipment')
+        sent = 'Sent', _('Sent')
+        completed = 'completed', _('Completed')
+
+        @classmethod
+        def update_statuses(cls):
+            return (cls.in_processing,)
+
+        @classmethod
+        def delete_statuses(cls):
+            return ()
 
     customer = models.ForeignKey(Customer, on_delete=models.RESTRICT, related_name='orders')
     delivery_address = models.ForeignKey(DeliveryAddress, on_delete=models.RESTRICT, related_name='orders')
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.pending)
+    status = models.CharField(max_length=50, choices=Status.choices, default=Status.in_processing)
     comment = models.TextField(null=True, blank=True)
 
     # important!: when updating an address, create a new address and mark the old one as deleted
@@ -88,6 +100,7 @@ class Order(BaseModel):
 
 class Receipt(BaseModel):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='receipts')
+    # TODO: remove Product ForeignKey
     product = models.ForeignKey('product.Product', on_delete=models.RESTRICT, related_name='receipts')
     unit_price = models.DecimalField(max_digits=20, decimal_places=10)
     discount = models.DecimalField(
@@ -99,5 +112,7 @@ class Receipt(BaseModel):
 
 
 class ReceiptTag(models.Model):
+    objects = models.Manager()
+
     receipt = models.ForeignKey(Receipt, on_delete=models.CASCADE, related_name='tags')
     tag = models.ForeignKey('product.Tag', on_delete=models.RESTRICT)

@@ -6,11 +6,10 @@ from rest_framework import serializers
 
 from currencies.models import Conversion
 from product.models import Product, Tag
-from utils.serializers import LangSerializerMixin
 
 from .models import DeliveryAddress, Order, Receipt, Customer, ReceiptTag
 from .utils import duplicate_delivery_address
-from .validators import only_digit_validator
+from .validators import validate_phone_number
 
 
 class DeliveryAddressSerializer(serializers.ModelSerializer):
@@ -32,8 +31,8 @@ class DeliveryAddressSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class ReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer):
-    tags = serializers.SerializerMethodField(read_only=True)
+class ReceiptSerializer(serializers.ModelSerializer):
+    tags = serializers.SlugRelatedField(many=True, read_only=True, slug_field='tag__name')
     product_id = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.filter(is_active=True, availability=True),
         write_only=True,
@@ -62,10 +61,6 @@ class ReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer):
                 )
         return attrs
 
-    def get_tags(self, instance):
-        field = self.get_translate_field('tag__name')
-        return list(instance.tags.values_list(field, flat=True))
-
     def create(self, validated_data):
         product = validated_data['product_id']
         validated_data['unit_price'] = product.price
@@ -77,11 +72,7 @@ class ReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    phone = serializers.CharField(
-        max_length=13,
-        required=True,
-        validators=[only_digit_validator]
-    )
+    phone = serializers.CharField(max_length=20, required=True, validators=[validate_phone_number])
     address_id = serializers.PrimaryKeyRelatedField(
         queryset=DeliveryAddress.objects.filter(as_deleted=False),
         write_only=True,
@@ -169,28 +160,5 @@ class OrderSerializer(serializers.ModelSerializer):
         if not validated_data:
             return instance
 
-        if instance.status != Order.Status.pending:
-            raise serializers.ValidationError({'detail': _("not available for update")})
-
-        receipts = validated_data.pop('products', [])
-
-        for receipt in receipts:
-            receipt_id = receipt.pop('id', None)
-            if not receipt_id:
-                raise serializers.ValidationError({"products": [{"id": _("required")}]})
-
-            receipt_obj = instance.receipts.filter(id=receipt_id).first()
-            if not receipt_obj:
-                raise serializers.ValidationError(
-                    {'products': [{"id": _("Invalid pk \"%s\" - object does not exist.")}]}
-                )
-
-            save = False
-            for key, value in receipt.items():
-                if hasattr(receipt_obj, key) and value != getattr(receipt_obj, key):
-                    setattr(receipt_obj, key, value)
-                    save = True
-
-            if save:
-                receipt.save()
+        # TODO: maybe need updating receipts
         return instance

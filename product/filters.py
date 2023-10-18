@@ -1,32 +1,11 @@
-import requests
-
 from django.contrib.admin import SimpleListFilter
 from django.db.models import Avg, Q, F, Sum, Count, Case, When, Value, IntegerField
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
-from rest_framework.filters import SearchFilter, BaseFilterBackend
+from rest_framework.filters import BaseFilterBackend
 from rest_framework.generics import get_object_or_404
 
-from utils.views import LanguageMixin
-
 from .querysets import ProductQuerySet
-
-
-class SearchFilterWithTranslating(SearchFilter):
-    def get_search_terms(self, request):
-        terms = super().get_search_terms(request)
-        query = request.query_params.get(self.search_param, '')
-        if query:
-            try:
-                response = requests.get('https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=auto&tl=ja&q=' + query)
-                x = str(response.json()[0][0][0]).split()
-                print(terms, ': ', x)
-                if x:
-                    terms = x
-            except Exception as err:
-                print(err)
-        return terms
-
 
 
 class FilterByTag(BaseFilterBackend):
@@ -115,17 +94,17 @@ class PopularProductOrdering(BaseFilterBackend):
     popular_param = 'popular'
     popular_description = _("Ordering by popular (enabled when equal to 1)")
 
-    def get_popular_param(self, request, view):
+    def get_popular_param(self, request):
         return request.query_params.get(self.popular_param, '0')
 
-    def ordering_included(self, request, view) -> bool:
-        popular_param = self.get_popular_param(request, view)
+    def ordering_included(self, request) -> bool:
+        popular_param = self.get_popular_param(request)
         if popular_param == '1':
             return True
         return False
 
     def filter_queryset(self, request, queryset, view):
-        if self.ordering_included(request, view):
+        if self.ordering_included(request):
             assert isinstance(queryset, ProductQuerySet)
             return queryset.order_by_popular()
         return queryset
@@ -142,13 +121,6 @@ class PopularProductOrdering(BaseFilterBackend):
                 }
             }
         ]
-
-
-class SearchFilterByLang(SearchFilter):
-    def get_search_fields(self, view, request):
-        assert isinstance(view, LanguageMixin)
-        lang = view.get_lang()
-        return getattr(view, f'search_fields_{lang}', None)
 
 
 class GenreLevelFilter(BaseFilterBackend):

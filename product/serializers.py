@@ -2,16 +2,14 @@ from rest_framework import serializers
 
 from currencies.serializers import ConversionField
 from users.serializers import UserProfileSerializer
-from utils.serializers import LangSerializerMixin
 
 from .models import Genre, Product, ProductReview, TagGroup
 
 
-class GenreSerializer(LangSerializerMixin, serializers.ModelSerializer):
+class GenreSerializer(serializers.ModelSerializer):
     class Meta:
         model = Genre
         fields = ('id', 'name', 'level')
-        translate_fields = ('name',)
 
 
 class ProductReviewSerializer(serializers.ModelSerializer):
@@ -37,7 +35,7 @@ class ProductIdsSerializer(serializers.Serializer):
     )
 
 
-class ProductListSerializer(LangSerializerMixin, serializers.ModelSerializer):
+class ProductListSerializer(serializers.ModelSerializer):
     price = ConversionField()
     sale_price = ConversionField()
     image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
@@ -45,11 +43,6 @@ class ProductListSerializer(LangSerializerMixin, serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'image_urls')
-        translate_fields = ('name',)
-
-    def __init__(self, instance=None, **kwargs):
-        kwargs['many'] = True
-        super().__init__(instance=instance, data=None, **kwargs)
 
     def update(self, instance, validated_data):
         raise NotImplementedError('`update()` not implemented.')
@@ -58,7 +51,7 @@ class ProductListSerializer(LangSerializerMixin, serializers.ModelSerializer):
         raise NotImplementedError('`create()` not implemented.')
 
 
-class ProductRetrieveSerializer(LangSerializerMixin, serializers.ModelSerializer):
+class ProductRetrieveSerializer(serializers.ModelSerializer):
     price = ConversionField()
     sale_price = ConversionField()
     image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
@@ -69,7 +62,6 @@ class ProductRetrieveSerializer(LangSerializerMixin, serializers.ModelSerializer
         model = Product
         fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'description',
                   'genres', 'image_urls', 'tags_info')
-        translate_fields = ('name', 'description')
 
     def get_genres(self, instance):
         genres_fk = instance.genres.filter(genre__deactivated=False)
@@ -83,15 +75,12 @@ class ProductRetrieveSerializer(LangSerializerMixin, serializers.ModelSerializer
         )
         return GenreSerializer(instance=genres, many=True, context=self.context).data
 
-    def get_tags_info(self, instance):
+    @staticmethod
+    def get_tags_info(instance):
         tags_fk = instance.tags.all()
         if not tags_fk.exists():
             return []
 
         group_ids = tags_fk.order_by('tag__group_id').distinct('tag__group_id').values_list('tag__group_id', flat=True)
         groups_queryset = TagGroup.objects.filter(id__in=group_ids)
-        tag_translate_field = self.get_translate_field('name')
-        return groups_queryset.tags_list(
-            name_field=tag_translate_field,
-            tag_ids=tags_fk.values_list('tag_id', flat=True)
-        )
+        return groups_queryset.tags_list(tag_ids=tags_fk.values_list('tag_id', flat=True))

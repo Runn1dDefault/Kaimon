@@ -13,30 +13,20 @@ class TagGroupQuerySet(QuerySet):
     def tags_data(self, tag_ids=None):
         return self.values(group_id=F('id')).annotate(
             group_name=F('name'),
-            group_name_ru=F('name_ru'),
-            group_name_en=F('name_en'),
-            group_name_tr=F('name_tr'),
-            group_name_ky=F('name_ky'),
-            group_name_kz=F('name_kz'),
             tags=ArrayAgg(
                 JSONObject(
                     id=F('tags__id'),
-                    name=F('tags__name'),
-                    name_ru=F('tags__name_ru'),
-                    name_en=F('tags__name_en'),
-                    name_tr=F('tags__name_tr'),
-                    name_ky=F('tags__name_ky'),
-                    name_kz=F('tags__name_kz'),
+                    name=F('tags__name')
                 ), filter=Q(tags__id__in=tag_ids) if tag_ids else None
             )
         )
 
-    def tags_list(self, name_field: str = 'name', tag_ids=None):
-        return self.values(group_id=F('id'), group_name=F(name_field)).annotate(
+    def tags_list(self, tag_ids=None):
+        return self.values(group_id=F('id'), group_name=F('name')).annotate(
             tags=ArrayAgg(
                 JSONObject(
                     id=F('tags__id'),
-                    name=F('tags__' + name_field)
+                    name=F('tags__name')
                 ),
                 filter=Q(tags__id__in=tag_ids) if tag_ids else None,
                 distinct=True  # required

@@ -5,10 +5,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pandas as pd
-from django.conf import settings
 from django.utils.timezone import localtime, now
 from django.utils.translation import gettext_lazy as _
-from django.utils.functional import cached_property
 from rest_framework.exceptions import ValidationError
 from rest_framework.fields import DateField, ChoiceField
 from rest_framework.serializers import ModelSerializer
@@ -166,39 +164,3 @@ class AnalyticsSerializer(ModelSerializer):
         rep['total_count'] = self._base_queryset().count()
         rep['data'] = df.to_dict('index')
         return rep
-
-
-class LangSerializerMixin:
-    """
-    A mixin for serializers that handle translated fields.
-    """
-
-    @cached_property
-    def translate_fields(self):
-        return getattr(self.Meta, 'translate_fields', [])
-
-    def get_translate_field(self, field_name: str) -> str:
-        lang = self.context.get('lang', 'ja')
-        if lang not in settings.SUPPORTED_LANG:
-            raise ValidationError({'detail': _('Language `%s` does not support!') % lang})
-
-        translate_field = f'{field_name}_{lang}' if lang != 'ja' else field_name
-        return translate_field
-
-    def get_extra_kwargs(self):
-        # This approach is more efficient because it doesn't require you to manually manipulate the serialized data.
-        # It updates the field attributes directly.
-        extra_kwargs = super().get_extra_kwargs()
-        for original_field in self.translate_fields:
-            kwargs = extra_kwargs.get(original_field, {})
-            source = kwargs.get('source', '*')
-            if source == '*':
-                source = original_field
-
-            translate_field_name = self.get_translate_field(source)
-            if translate_field_name == original_field:
-                continue
-
-            kwargs['source'] = translate_field_name
-            extra_kwargs[original_field] = kwargs
-        return extra_kwargs

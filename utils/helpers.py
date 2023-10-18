@@ -26,3 +26,6 @@ def round_half_integer(number):
 
 def convert_date(date_string: str):
     return datetime.strptime(date_string, "%Y-%m-%d").date()
+
+
+# def generate_barcode()

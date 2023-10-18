@@ -1,16 +1,13 @@
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
-from utils.serializers import LangSerializerMixin
-
 from .models import Banner, Promotion
 
 
-class BannerSerializer(LangSerializerMixin, serializers.ModelSerializer):
+class BannerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Banner
         fields = ('id', 'name', 'description', 'image')
-        translate_fields = ('name', 'description')
 
 
 class PromotionSerializer(serializers.ModelSerializer):
@@ -26,11 +23,13 @@ class PromotionSerializer(serializers.ModelSerializer):
         model = Promotion
         fields = ('id', 'banner', 'discount', 'created_at', 'start_date', 'end_date', 'products_count')
 
-    def get_discount(self, instance):
+    @staticmethod
+    def get_discount(instance):
         try:
             return instance.discount.percentage
         except ObjectDoesNotExist:
             return None
 
-    def get_products_count(self, instance) -> int:
+    @staticmethod
+    def get_products_count(instance) -> int:
         return instance.products.filter(is_active=True).count()

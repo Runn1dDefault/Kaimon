@@ -17,12 +17,6 @@ class Genre(models.Model):
     level = models.PositiveIntegerField(null=True, blank=True)
 
     name = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ja]')
-    name_ru = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ru]')
-    name_en = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[en]')
-    name_tr = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[tr]')
-    name_ky = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ky]')
-    name_kz = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[kz]')
-
     deactivated = models.BooleanField(default=False, null=True)
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, related_name='children', null=True)
 
@@ -33,11 +27,6 @@ class Genre(models.Model):
 class BaseTagModel(models.Model):
     id = models.BigIntegerField(primary_key=True)
     name = models.CharField(max_length=100)
-    name_tr = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[tr]')
-    name_ru = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ru]')
-    name_en = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[en]')
-    name_ky = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ky]')
-    name_kz = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[kz]')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -52,6 +41,8 @@ class TagGroup(BaseTagModel):
 
 
 class Tag(BaseTagModel):
+    objects = models.Manager()
+
     group = models.ForeignKey(TagGroup, on_delete=models.CASCADE, related_name='tags', null=True, blank=True)
 
     def __str__(self):
@@ -75,18 +66,6 @@ class Product(models.Model):
     is_active = models.BooleanField(default=True)
     reference_rank = models.IntegerField(null=True, blank=True)
 
-    # translating fields
-    name_tr = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[tr]')
-    name_ru = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[ru]')
-    name_en = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[en]')
-    name_ky = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[ky]')
-    name_kz = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[kz]')
-    description_tr = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[tr]')
-    description_ru = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ru]')
-    description_en = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[en]')
-    description_ky = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ky]')
-    description_kz = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[kz]')
-
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if self.rakuten_price and not self.price:
             self.price = increase_price(self.rakuten_price)
@@ -94,7 +73,9 @@ class Product(models.Model):
 
     @property
     def reviews_count(self) -> int:
-        return self.reviews.filter(is_active=True).count()
+        reviews = getattr(self, 'reviews')
+        assert reviews
+        return reviews.filter(is_active=True).count()
 
     @property
     def sale_price(self) -> float | None:
@@ -102,7 +83,9 @@ class Product(models.Model):
         if not self.availability or not price or price <= 0:
             return None
 
-        promotion = self.promotions.active_promotions().first()
+        promotions = getattr(self, 'promotions')
+        assert promotions
+        promotion = promotions.active_promotions().first()
         if not promotion:
             return None
 
@@ -115,26 +98,35 @@ class Product(models.Model):
         return discount.calc_price(price)
 
     @property
-    def avg_rank(self):
-        reviews = self.reviews.filter(is_active=True)
-        if reviews.exists():
-            return sum(reviews.values_list('rank', flat=True)) / reviews.count()
+    def avg_rank(self) -> float:
+        reviews = getattr(self, 'reviews')
+        assert reviews
+        filtered_reviews = reviews.filter(is_active=True)
+        if filtered_reviews.exists():
+            return sum(filtered_reviews.values_list('rank', flat=True)) / filtered_reviews.count()
         return 0.0
 
 
 class ProductGenre(models.Model):
+    objects = models.Manager()
+
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='genres')
     genre = models.ForeignKey(Genre, on_delete=models.CASCADE)
 
 
 class ProductTag(models.Model):
+    objects = models.Manager()
+
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='tags')
     tag = models.ForeignKey(Tag, on_delete=models.CASCADE)
 
 
 class ProductImageUrl(models.Model):
+    objects = models.Manager()
+
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='image_urls')
     url = models.TextField()
+    # TODO: add image file field
 
     def __str__(self):
         return self.url

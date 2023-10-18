@@ -5,6 +5,8 @@ from django.utils.translation import gettext_lazy as _
 
 
 class Conversion(models.Model):
+    objects = models.Manager()
+
     class Currencies(models.TextChoices):
         dollar = 'dollar', _('Dollar')
         som = 'som', _('Som')
@@ -28,4 +30,6 @@ class Conversion(models.Model):
     def calc_price(self, current_price: float | Decimal | int):
         if not isinstance(current_price, Decimal):
             current_price = Decimal(current_price)
-        return round(current_price * self.price_per, 2)
+        price_per = getattr(self, 'price_per')
+        assert price_per
+        return round(current_price * price_per, 2)
