@@ -1,3 +1,5 @@
+import requests
+
 from django.contrib.admin import SimpleListFilter
 from django.db.models import Avg, Q, F, Sum, Count, Case, When, Value, IntegerField
 from django.utils.encoding import force_str
@@ -8,6 +10,23 @@ from rest_framework.generics import get_object_or_404
 from utils.views import LanguageMixin
 
 from .querysets import ProductQuerySet
+
+
+class SearchFilterWithTranslating(SearchFilter):
+    def get_search_terms(self, request):
+        terms = super().get_search_terms(request)
+        query = request.query_params.get(self.search_param, '')
+        if query:
+            try:
+                response = requests.get('https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=auto&tl=ja&q=' + query)
+                x = str(response.json()[0][0][0]).split()
+                print(terms, ': ', x)
+                if x:
+                    terms = x
+            except Exception as err:
+                print(err)
+        return terms
+
 
 
 class FilterByTag(BaseFilterBackend):
