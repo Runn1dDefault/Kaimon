@@ -1,6 +1,7 @@
 from django.db import transaction
 from rest_framework import viewsets, mixins, parsers
 
+from currencies.mixins import CurrencyMixin
 from product.serializers import ProductListSerializer
 from users.filters import FilterByUser
 from users.permissions import RegistrationPayedPermission, EmailConfirmedPermission
@@ -30,6 +31,7 @@ class DeliveryAddressViewSet(viewsets.ModelViewSet):
 
 
 class OrderViewSet(
+    CurrencyMixin,
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.DestroyModelMixin,

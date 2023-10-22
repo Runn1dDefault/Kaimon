@@ -85,6 +85,14 @@ class Order(BaseModel):
         receipts_prices = self.__class__.analytics.filter(id=order_id).total_prices().values('yen')
         return receipts_prices[0]['yen']
 
+    @property
+    def total_prices(self):
+        receipts = getattr(self, 'receipts')
+        if not receipts.exists():
+            return 0.0
+        order_id = getattr(self, 'id')
+        return self.__class__.analytics.filter(id=order_id).total_prices().values()[0]
+
 
 class Receipt(BaseModel):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='receipts')

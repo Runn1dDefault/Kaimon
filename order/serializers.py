@@ -45,10 +45,13 @@ class ReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer):
         required=False,
         many=True
     )
+    product_name = serializers.SerializerMethodField(read_only=True)
+    product_image = serializers.SerializerMethodField(read_only=True)
+    unit_price = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Receipt
-        fields = ('order', 'product_id', 'unit_price', 'discount', 'quantity', 'tags', 'tag_ids',)
+        fields = ('order', 'product_id', 'product_name', 'product_image', 'unit_price', 'discount', 'quantity', 'tags', 'tag_ids',)
         extra_kwargs = {'order': {'read_only': True}, 'unit_price': {'read_only': True},
                         'discount': {'read_only': True}}
 
@@ -61,6 +64,26 @@ class ReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer):
                     {'tag_ids': _("Invalid pk \"%s\" - object does not exist.") % tag.id}
                 )
         return attrs
+
+    def get_currency(self) -> str:
+        return self.context.get('currency', 'yen')
+
+    def get_unit_price(self, instance):
+        currency = self.get_currency()
+        match currency:
+            case 'dollar':
+                return instance.unit_price * instance.order.yen_to_usd
+            case 'som':
+                return instance.unit_price * instance.order.yen_to_som
+        return instance.unit_price
+
+    def get_product_name(self, instance):
+        name_field = self.get_translate_field('name')
+        return getattr(instance.product, name_field, instance.product.name)
+
+    def get_product_image(self, instance):
+        if instance.product.image_urls.exists():
+            return instance.product.image_urls.first().url
 
     def get_tags(self, instance):
         field = self.get_translate_field('tag__name')
@@ -90,10 +113,11 @@ class OrderSerializer(serializers.ModelSerializer):
     delivery_address = DeliveryAddressSerializer(many=False, read_only=True)
     receipts = ReceiptSerializer(many=True, read_only=True)
     products = ReceiptSerializer(many=True, write_only=True, required=True)
+    total_price = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Order
-        fields = ('id', 'status', 'delivery_address', 'receipts', 'products', 'address_id', 'phone', 'comment')
+        fields = ('id', 'status', 'delivery_address', 'receipts', 'products', 'address_id', 'phone', 'comment', 'created_at', 'total_price')
         extra_kwargs = {'status': {'read_only': True}}
 
     def validate(self, attrs):
@@ -194,3 +218,12 @@ class OrderSerializer(serializers.ModelSerializer):
             if save:
                 receipt.save()
         return instance
+
+    def get_total_price(self, instance):
+        if not instance.receipts.exists():
+            return 0.0
+
+        currency = self.context.get('currency', 'yen')
+        total_prices = instance.total_prices or {}
+        return instance.total_prices.get(currency) or instance.total_prices['yen']
+

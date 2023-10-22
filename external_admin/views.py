@@ -236,6 +236,11 @@ class ProductReviewAdminViewSet(
         review.save()
         return Response(status=status.HTTP_202_ACCEPTED)
 
+    @action(methods=['GET'], detail=False, url_path='new-count')
+    def new_count(self, request, **kwargs):
+        queryset = self.get_queryset().filter(is_read=False, is_active=True)
+        return Response({'count': queryset.count()})
+
 
 # ---------------------------------------------- Order -----------------------------------------------------------------
 class OrderAdminViewSet(StaffViewMixin, viewsets.ReadOnlyModelViewSet):
@@ -282,6 +287,11 @@ class OrderAdminViewSet(StaffViewMixin, viewsets.ReadOnlyModelViewSet):
         order.status = Order.Status.rejected
         order.save()
         return Response(status=status.HTTP_202_ACCEPTED)
+
+    @action(methods=['GET'], detail=False, url_path='new-count')
+    def new_count(self, request, **kwargs):
+        queryset = self.get_queryset().filter(status=Order.Status.pending)
+        return Response({'count': queryset.count()})
 
     # TODO: maybe we need add mark order success action
 

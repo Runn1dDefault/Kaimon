@@ -16,6 +16,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://176.126.166.140:9010",
     "http://176.126.166.140",
     "http://localhost:9010",
+    "http://kaimono.vip",
 ]
 # Application definition
 

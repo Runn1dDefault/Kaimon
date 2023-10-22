@@ -59,6 +59,9 @@ class RegistrationSerializer(PasswordSerializer):
 
     def create(self, validated_data):
         email = validated_data['email']
+        if User.objects.filter(email=email).exists():
+            raise serializers.ValidationError({'email': 'Already exists!'})
+
         user = User.objects.create_user(
             username=email,
             email=email,
