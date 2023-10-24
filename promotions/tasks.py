@@ -7,7 +7,15 @@ from .models import Promotion
 
 @app.task()
 def deactivate_promotions():
-    today = timezone.now().date()
-    promotions = Promotion.objects.filter(deactivated=False, end_date__lte=today)
+    promotions = Promotion.objects.filter(end_date=timezone.now().date())
+
     if promotions.exists():
         promotions.update(deactivated=True)
+
+
+@app.task()
+def activate_promotions():
+    promotions = Promotion.objects.filter(start_date=timezone.now().date())
+
+    if promotions.exists():
+        promotions.update(deactivated=False)

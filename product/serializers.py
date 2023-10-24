@@ -1,21 +1,28 @@
+from typing import Iterable
+
 from rest_framework import serializers
 
 from currencies.serializers import ConversionField
+from language.serializers import TranslateField
 from users.serializers import UserProfileSerializer
-from utils.serializers import LangSerializerMixin
+from .helpers import grouped_tags
 
-from .models import Genre, Product, ProductReview, TagGroup
+from .models import Genre, Product, ProductReview, TagGroup, Tag
 
 
-class GenreSerializer(LangSerializerMixin, serializers.ModelSerializer):
+class GenreSerializer(serializers.ModelSerializer):
+    name = TranslateField(read_only=True)
+
     class Meta:
         model = Genre
         fields = ('id', 'name', 'level')
-        translate_fields = ('name',)
 
 
 class ProductReviewSerializer(serializers.ModelSerializer):
-    user = UserProfileSerializer(hide_fields=('role', 'email', 'email_confirmed', 'registration_payed'), read_only=True)
+    user = UserProfileSerializer(
+        hide_fields=('role', 'email', 'email_confirmed', 'registration_payed'),
+        read_only=True
+    )
 
     class Meta:
         model = ProductReview
@@ -37,39 +44,70 @@ class ProductIdsSerializer(serializers.Serializer):
     )
 
 
-class ProductListSerializer(LangSerializerMixin, serializers.ModelSerializer):
+class ProductListSerializer(serializers.ModelSerializer):
+    name = TranslateField(read_only=True)
+    description = TranslateField(read_only=True)
+
     price = ConversionField()
     sale_price = ConversionField()
     image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'image_urls')
-        translate_fields = ('name',)
+        fields = ('id', 'name', 'description', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count',
+                  'image_urls')
 
     def __init__(self, instance=None, **kwargs):
         kwargs['many'] = True
+        kwargs['read_only'] = True
         super().__init__(instance=instance, data=None, **kwargs)
 
-    def update(self, instance, validated_data):
-        raise NotImplementedError('`update()` not implemented.')
 
-    def create(self, validated_data):
-        raise NotImplementedError('`create()` not implemented.')
+class TagSerializer(serializers.ModelSerializer):
+    name = TranslateField(read_only=True)
+
+    class Meta:
+        model = Tag
+        fields = ('id', 'name')
 
 
-class ProductRetrieveSerializer(LangSerializerMixin, serializers.ModelSerializer):
+class TagGroupSerializer(serializers.ModelSerializer):
+    name = TranslateField(read_only=True)
+    tags = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = TagGroup
+        fields = ('id', 'name', 'tags')
+
+    def __init__(self, instance=None, data=None, tag_ids: Iterable[int] = None, **kwargs):
+        self.tag_ids = tag_ids
+        super().__init__(instance=instance, data=data, **kwargs)
+
+    def get_tags(self, instance):
+        if not instance.tags.exists():
+            return []
+
+        queryset = instance.tags.all()
+        if self.tag_ids:
+            queryset = queryset.filter(id__in=self.tag_ids)
+
+        return TagSerializer(instance=queryset, many=True, context=self.context).data
+
+
+class ProductRetrieveSerializer(serializers.ModelSerializer):
+    name = TranslateField(read_only=True)
+    description = TranslateField(read_only=True)
     price = ConversionField()
     sale_price = ConversionField()
-    image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
+
+    images = serializers.SlugRelatedField(slug_field='url', read_only=True, many=True)
     genres = serializers.SerializerMethodField(read_only=True)
-    tags_info = serializers.SerializerMethodField(read_only=True)
+    tag_groups = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'sale_price', 'availability', 'avg_rank', 'reviews_count', 'description',
-                  'genres', 'image_urls', 'tags_info')
-        translate_fields = ('name', 'description')
+        fields = ('id', 'name', 'description', 'price', 'sale_price', 'availability', 'avg_rank',
+                  'reviews_count', 'genres', 'images', 'tag_groups')
 
     def get_genres(self, instance):
         genres_fk = instance.genres.filter(genre__deactivated=False)
@@ -78,20 +116,23 @@ class ProductRetrieveSerializer(LangSerializerMixin, serializers.ModelSerializer
 
         genres = (
             Genre.objects.exclude(level=0)
-                         .filter(id__in=genres_fk.values_list('genre_id', flat=True))
-                         .order_by('-level')
+            .filter(id__in=genres_fk.values_list('genre_id', flat=True))
+            .order_by('-level')
         )
         return GenreSerializer(instance=genres, many=True, context=self.context).data
 
-    def get_tags_info(self, instance):
-        tags_fk = instance.tags.all()
-        if not tags_fk.exists():
+    def get_tag_groups(self, instance):
+        if not instance.tags.exists():
             return []
 
-        group_ids = tags_fk.order_by('tag__group_id').distinct('tag__group_id').values_list('tag__group_id', flat=True)
-        groups_queryset = TagGroup.objects.filter(id__in=group_ids)
-        tag_translate_field = self.get_translate_field('name')
-        return groups_queryset.tags_list(
-            name_field=tag_translate_field,
-            tag_ids=tags_fk.values_list('tag_id', flat=True)
+        tags_queryset = instance.tags.all()
+        group_ids = (
+            tags_queryset.order_by('tag__group_id')
+            .distinct('tag__group_id')
+            .values_list('tag__group_id', flat=True)
+        )
+        return grouped_tags(
+            group_queryset=TagGroup.objects.filter(id__in=group_ids),
+            lang=self.context.get('lang', 'ja'),
+            tag_ids=tags_queryset.values_list('tag_id', flat=True)
         )

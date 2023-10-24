@@ -1,16 +1,18 @@
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
-from utils.serializers import LangSerializerMixin
+from language.serializers import TranslateField
 
 from .models import Banner, Promotion
 
 
-class BannerSerializer(LangSerializerMixin, serializers.ModelSerializer):
+class BannerSerializer(serializers.ModelSerializer):
+    name = TranslateField(read_only=True)
+    description = TranslateField(read_only=True)
+
     class Meta:
         model = Banner
         fields = ('id', 'name', 'description', 'image')
-        translate_fields = ('name', 'description')
 
 
 class PromotionSerializer(serializers.ModelSerializer):

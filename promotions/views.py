@@ -4,9 +4,9 @@ from rest_framework import generics, filters
 from rest_framework.generics import get_object_or_404
 
 from currencies.mixins import CurrencyMixin
+from language.mixins import LanguageMixin
 from product.serializers import ProductListSerializer
 from utils.paginators import PagePagination
-from utils.views import LanguageMixin
 
 from .models import Promotion
 from .serializers import PromotionSerializer

@@ -7,18 +7,20 @@ from rest_framework import generics, status, filters
 from rest_framework.response import Response
 
 from currencies.mixins import CurrencyMixin
+from language.mixins import LanguageMixin
 from rakuten_scraping.tasks import check_product_availability
 from users.permissions import RegistrationPayedPermission, EmailConfirmedPermission
 from utils.filters import FilterByLookup
 from utils.paginators import PagePagination
-from utils.views import CachingMixin, LanguageMixin
 
-from .filters import SearchFilterByLang, GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter, FilterByTag, SearchFilterWithTranslating
+from .filters import GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter, FilterByTag
 from .models import Genre, Product, TagGroup, ProductReview
+from .helpers import grouped_tags
 from .paginators import GenrePagination, QuerysetPagination
 from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer, \
     ProductIdsSerializer
 from .utils import get_genre_parents_tree
+
 
 currency_and_lang_params = [settings.LANGUAGE_QUERY_SCHEMA_PARAM, settings.CURRENCY_QUERY_SCHEMA_PARAM]
 
@@ -32,7 +34,7 @@ currency_and_lang_params = [settings.LANGUAGE_QUERY_SCHEMA_PARAM, settings.CURRE
         ]
     )
 )
-class GenreListView(CachingMixin, LanguageMixin, generics.ListAPIView):
+class GenreListView(LanguageMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     queryset = Genre.objects.filter(deactivated=False)
@@ -42,7 +44,7 @@ class GenreListView(CachingMixin, LanguageMixin, generics.ListAPIView):
 
 
 @extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
-class GenreChildrenView(CachingMixin, LanguageMixin, generics.ListAPIView):
+class GenreChildrenView(LanguageMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     lookup_field = 'id'
@@ -67,7 +69,7 @@ class GenreChildrenView(CachingMixin, LanguageMixin, generics.ListAPIView):
 
 
 @extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
-class GenreParentsView(CachingMixin, LanguageMixin, generics.ListAPIView):
+class GenreParentsView(LanguageMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     lookup_field = 'id'
@@ -123,13 +125,8 @@ class BaseProductsListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
     queryset = Product.objects.filter(is_active=True, availability=True)
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
-    filter_backends = [SearchFilterByLang, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
-    search_fields_ja = ['name', 'genres__genre__name', 'tags__tag__name']
-    search_fields_ru = ['name_ru', 'genres__genre__name_ru', 'tags__tag__name_ru']
-    search_fields_en = ['name_en', 'genres__genre__name_en', 'tags__tag__name_en']
-    search_fields_tr = ['name_tr', 'genres__genre__name_tr', 'tags__tag__name_tr']
-    search_fields_ky = ['name_ky', 'genres__genre__name_ky', 'tags__tag__name_ky']
-    search_fields_kz = ['name_kz', 'genres__genre__name_kz', 'tags__tag__name_kz']
+    filter_backends = [filters.SearchFilter, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
+    search_fields = ['translations__name']
     ordering_fields = ['created_at', 'price']
 
 
@@ -143,8 +140,8 @@ class ProductsListByGenreView(BaseProductsListView):
 @extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
 class ProductsListView(BaseProductsListView):
     pagination_class = QuerysetPagination
-    filter_backends = [SearchFilterWithTranslating, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
-    search_fields = ('name',)
+    filter_backends = [filters.SearchFilter, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
+    search_fields = ('translations__name', 'genres__genre__translations__name')
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -155,9 +152,11 @@ class ProductsListView(BaseProductsListView):
 
         data = OrderedDict()
         data['products'] = serializer.data
-        base_q = TagGroup.objects.filter(id__in=sliced_queryset.values_list('tags__tag__group_id', flat=True))
-        data['tags'] = base_q.tags_list(
-            name_field=self.build_translate_field('name'),
+        data['tags'] = grouped_tags(
+            group_queryset=TagGroup.objects.filter(
+                id__in=sliced_queryset.values_list('tags__tag__group_id', flat=True)
+            ),
+            lang=self.get_lang(),
             tag_ids=sliced_queryset.values_list('tags__tag_id', flat=True)
         )
 
@@ -172,22 +171,17 @@ class TagByGenreListView(LanguageMixin, generics.ListAPIView):
     authentication_classes = ()
     queryset = TagGroup.objects.all()
     lookup_url_kwarg = 'id'
-    name_field = 'name'
 
     def get_queryset(self):
         return super().get_queryset().filter(
             tags__producttag__product__genres__genre_id=self.kwargs[self.lookup_url_kwarg]
         ).distinct()
 
-    def get_name_field(self):
-        lang = self.get_lang()
-        return f'{self.name_field}_{lang}' if lang != 'ja' else self.name_field
-
     def list(self, request, *args, **kwargs):
         groups = self.get_queryset()
         if not groups.exists():
             return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(groups.tags_list(self.get_name_field()))
+        return Response(grouped_tags(group_queryset=groups, lang=self.get_lang()))
 
 
 @extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
@@ -200,8 +194,8 @@ class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        serializer = self.get_serializer(instance)
         check_product_availability.delay(product_id=instance.id)
+        serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
 

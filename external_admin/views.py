@@ -8,7 +8,8 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
 from currencies.models import Conversion
-from product.filters import PopularProductOrdering
+from language.mixins import LanguageMixin
+from product.filters import PopularProductOrdering, FilterByTag
 from product.models import Product, ProductReview, Genre, Tag, ProductTag, TagGroup
 from promotions.models import Promotion
 from users.models import User
@@ -23,7 +24,7 @@ from .serializers import (
     ProductAdminSerializer, ProductDetailAdminSerializer,
     ProductImageAdminSerializer, UserAdminSerializer, GenreAdminSerializer, TagAdminSerializer,
     ProductReviewAdminSerializer, OrderAnalyticsSerializer, UserAnalyticsSerializer, ReviewAnalyticsSerializer,
-    OrderAdminSerializer, TagGroupAdminSerializer
+    OrderAdminSerializer, TagGroupAdminSerializer, ProductTranslationSerializer
 )
 
 
@@ -59,8 +60,8 @@ class UserAdminViewSet(DirectorViewMixin, viewsets.ReadOnlyModelViewSet):
 
 
 # ------------------------------------------------ Genre ---------------------------------------------------------------
-class GenreListAdminView(CachingMixin, StaffViewMixin, generics.ListAPIView):
-    queryset = Genre.objects.all()
+class GenreListAdminView(StaffViewMixin, generics.ListAPIView):
+    queryset = Genre.objects.exclude(level=0)
     serializer_class = GenreAdminSerializer
     pagination_class = AdminPagePagination
     filter_backends = [filters.SearchFilter]
@@ -76,7 +77,7 @@ class GenreListAdminView(CachingMixin, StaffViewMixin, generics.ListAPIView):
 
 
 # -------------------------------------------------- Tag ---------------------------------------------------------------
-class TagListAdminView(CachingMixin, StaffViewMixin, generics.ListAPIView):
+class TagListAdminView(StaffViewMixin, generics.ListAPIView):
     queryset = Tag.objects.all()
     pagination_class = AdminPagePagination
     serializer_class = TagAdminSerializer
@@ -105,21 +106,14 @@ class TagGroupListAdminViewSet(CachingMixin, StaffViewMixin, mixins.ListModelMix
 
 
 # ----------------------------------------------- Product --------------------------------------------------------------
-class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
+class ProductAdminViewSet(StaffViewMixin, LanguageMixin, viewsets.ModelViewSet):
     queryset = Product.objects.all()
     list_serializer_class = ProductAdminSerializer
     serializer_class = ProductDetailAdminSerializer
     pagination_class = AdminPagePagination
     parser_classes = (parsers.JSONParser,)
-    filter_backends = [filters.SearchFilter, PopularProductOrdering, filters.OrderingFilter]
-    search_fields = [
-        'name', 'genres__genre__name', 'tags__tag__name',
-        'name_ru', 'genres__genre__name_ru', 'tags__tag__name_ru',
-        'name_en', 'genres__genre__name_en', 'tags__tag__name_en',
-        'name_tr', 'genres__genre__name_tr', 'tags__tag__name_tr',
-        'name_ky', 'genres__genre__name_ky', 'tags__tag__name_ky',
-        'name_kz', 'genres__genre__name_kz', 'tags__tag__name_kz'
-    ]
+    filter_backends = [filters.SearchFilter, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
+    search_fields = ['id', 'translations__name', 'genres__genre__translations__name']
     ordering_fields = ['created_at', 'price']
     lookup_url_kwarg = 'product_id'
     lookup_field = 'id'
@@ -140,6 +134,34 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
             )
         self.perform_destroy(product)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        methods=['POST'],
+        detail=True,
+        url_path='create-translation'
+    )
+    def add_product_translation(self, request, **kwargs):
+        product = self.get_object()
+        data = dict(request.data)
+        data.update({'product_id': product.id})
+        serializer = ProductTranslationSerializer(data=data, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(
+        methods=['PATCH'],
+        detail=True,
+        url_path='update-translation'
+    )
+    def update_product_translation(self, request, **kwargs):
+        product = self.get_object()
+        translation_obj = get_object_or_404(product.translations.all(), {'language_code': self.get_lang()})
+        serializer = ProductTranslationSerializer(instance=translation_obj, data=request.data, partial=True,
+                                                  context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
     @action(

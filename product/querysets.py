@@ -31,18 +31,6 @@ class TagGroupQuerySet(QuerySet):
             )
         )
 
-    def tags_list(self, name_field: str = 'name', tag_ids=None):
-        return self.values(group_id=F('id'), group_name=F(name_field)).annotate(
-            tags=ArrayAgg(
-                JSONObject(
-                    id=F('tags__id'),
-                    name=F('tags__' + name_field)
-                ),
-                filter=Q(tags__id__in=tag_ids) if tag_ids else None,
-                distinct=True  # required
-            )
-        )
-
 
 class GenreQuerySet(QuerySet):
     def genre_info_with_relations(self, name_field: str = 'name'):

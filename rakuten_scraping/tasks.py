@@ -8,15 +8,17 @@ from product.utils import get_last_children, get_genre_parents_tree
 from utils.helpers import import_model
 
 from .settings import app_settings
-from .utils import get_rakuten_client, build_by_fields_map
+from .utils import get_rakuten_client, build_by_fields_map, update_obj_by_map
 
 
 # --------------------------------------- DB SAVING AND UPDATING TASK's ------------------------------------------------
 @app.task()
 def save_genre(genre_data: dict[str, Any], parse_more: bool = False):
     conf = app_settings.GENRE_PARSE_SETTINGS
-    fields_map = conf.PARSE_KEYS._asdict()
     genre_model = import_model(conf.MODEL)
+    trans_model = import_model(conf.TRANS_MODEL)
+    fields_map = conf.PARSE_KEYS._asdict()
+    trans_fields_map = conf.TRANS_KEYS._asdict()
 
     current_data = genre_data[conf.CURRENT_KEY]
     if isinstance(current_data, list):
@@ -24,19 +26,22 @@ def save_genre(genre_data: dict[str, Any], parse_more: bool = False):
 
     current_id = current_data[conf.PARSE_KEYS.id]
     saved_genre_ids = list(genre_model.objects.values_list('id', flat=True))
-    new_genres = []
+    new_genres, new_trans = [], []
 
     if current_id not in saved_genre_ids:
         new_genres.append(genre_model(**build_by_fields_map(current_data, fields_map=fields_map)))
+        new_trans.append(trans_model(**build_by_fields_map(current_data, fields_map=trans_fields_map)))
 
     children = genre_data.get(conf.CHILDREN_KEY) or []
     for child in children:
         if child[conf.PARSE_KEYS.id] not in saved_genre_ids:
             new_child_genre = genre_model(parent_id=current_id, **build_by_fields_map(child, fields_map=fields_map))
             new_genres.append(new_child_genre)
+            new_trans.append(trans_model(**build_by_fields_map(child, fields_map=trans_fields_map)))
 
     if new_genres:
         genre_model.objects.bulk_create(new_genres)
+        trans_model.objects.bulk_create(new_trans)
 
     for child in children if parse_more else []:
         child_id = child[conf.PARSE_KEYS.id]
@@ -47,32 +52,41 @@ def save_genre(genre_data: dict[str, Any], parse_more: bool = False):
 def save_tags(tags: list[dict]):
     conf = app_settings.TAG_PARSE_SETTINGS
     tag_model = import_model(conf.MODEL)
+    trans_model = import_model(conf.TRANS_MODEL)
+
     tag_ids = list(map(lambda x: x[conf.PARSE_KEYS.id], tags))
     db_tag_ids = list(tag_model.objects.filter(id__in=tag_ids).values_list('id', flat=True))
-    new_tags = []
+    new_tags, new_trans = [], []
     for tag_data in tags:
         tag_id = tag_data[conf.PARSE_KEYS.id]
         if tag_id in db_tag_ids:
             continue
-        new_tags.append(tag_model(id=tag_id, name=tag_data[conf.PARSE_KEYS.name]))
+        new_tags.append(tag_model(id=tag_id))
+        new_trans.append(trans_model(tag_id=tag_id, name=tag_data[conf.TRANS_KEYS.name]))
+
     if new_tags:
         tag_model.objects.bulk_create(new_tags)
+        trans_model.objects.bulk_create(new_trans)
 
 
 @app.task()
 def save_tags_from_groups(tag_groups: list[dict[str, Any]]):
     conf = app_settings.TAG_PARSE_SETTINGS
-    tag_group_model = import_model(conf.TAG_GROUP_MODEL)
     tag_model = import_model(conf.MODEL)
+    tag_trans_model = import_model(conf.TRANS_MODEL)
+    tag_group_model = import_model(conf.TAG_GROUP_MODEL)
+    tag_group_trans_model = import_model(conf.TAG_GROUP_TRANS_MODEL)
+
     db_group_ids = list(tag_group_model.objects.values_list('id', flat=True))
     db_tag_ids = list(tag_model.objects.values_list('id', flat=True))
-    new_tags, collected_tag_ids = [], []
-    new_groups, collected_group_ids = [], []
+    new_tags, new_trans_tag, collected_tag_ids = [], [], []
+    new_groups, new_trans_group, collected_group_ids = [], [], []
 
     for group in tag_groups:
         group_id = group[conf.TAG_GROUP_PARSE_KEYS.id]
         if group_id not in db_group_ids and group_id not in collected_group_ids:
-            new_groups.append(tag_group_model(id=group_id, name=group[conf.TAG_GROUP_PARSE_KEYS.name]))
+            new_groups.append(tag_group_model(id=group_id))
+            new_trans_group.append(tag_group_trans_model(group_id=group_id, name=group[conf.TAG_GROUP_TRANS_KEYS.name]))
             collected_group_ids.append(group_id)
 
         for tag in group[conf.TAG_KEY] or []:
@@ -81,63 +95,86 @@ def save_tags_from_groups(tag_groups: list[dict[str, Any]]):
                 continue
 
             if tag_id not in db_tag_ids:
-                new_db_tag = tag_model(id=tag_id, name=tag[conf.PARSE_KEYS.name], group_id=group_id)
+                new_db_tag = tag_model(id=tag_id, group_id=group_id)
                 new_tags.append(new_db_tag)
+                new_trans_tag.append(tag_trans_model(tag_id=tag_id, name=tag[conf.TRANS_KEYS.name]))
+
             collected_tag_ids.append(tag_id)
 
     if new_groups:
         tag_group_model.objects.bulk_create(new_groups)
+        tag_group_trans_model.objects.bulk_create(new_trans_group)
 
     if new_tags:
         tag_model.objects.bulk_create(new_tags)
+        tag_trans_model.objects.bulk_create(new_trans_tag)
 
 
 @app.task()
 def update_or_create_tag(tag_data: dict[str, Any]):
     conf = app_settings.TAG_PARSE_SETTINGS
-    tag_group_model = import_model(conf.TAG_GROUP_MODEL)
     tag_model = import_model(conf.MODEL)
+    tag_trans_model = import_model(conf.TRANS_MODEL)
+    tag_group_model = import_model(conf.TAG_GROUP_MODEL)
+    tag_group_trans_model = import_model(conf.TAG_GROUP_TRANS_MODEL)
 
     group = tag_data[conf.TAG_GROUP_KEY][0]
-    db_group = tag_group_model.objects.get_or_create(
-        id=group[conf.TAG_GROUP_PARSE_KEYS.id],
-        name=group[conf.TAG_GROUP_PARSE_KEYS.name]
+    db_group, _ = tag_group_model.objects.get_or_create(id=group[conf.TAG_GROUP_PARSE_KEYS.id])
+    tag_group_trans_model.objects.get_or_create(
+        group_id=db_group.id,
+        name=group[conf.TAG_GROUP_TRANS_KEYS]
     )
+
     tag = group[conf.TAG_KEY][0]
     db_tag, _ = tag_model.objects.get_or_create(id=tag[conf.PARSE_KEYS.id])
     if db_tag.group is None or db_tag.group.id != db_group.id:
         db_tag.group = db_group
-    db_tag.name = tag[conf.PARSE_KEYS.name]
-    db_tag.save()
+
+    tag_trans_model.objects.get_or_create(tag_id=db_tag.id, name=tag[conf.TRANS_KEYS.name])
 
 
 @app.task()
 def update_items(items: list[dict[str, Any]]):
     conf = app_settings.PRODUCT_PARSE_SETTINGS
     product_model = import_model(conf.MODEL)
+    trans_model = import_model(conf.TRANS_MODEL)
+
     product_tag_model = import_model(conf.TAG_RELATION_MODEL)
     fields_map = conf.PARSE_KEYS._asdict()
+    trans_fields_map = conf.TRANS_KEYS._asdict()
+
     updated_products, update_fields = [], set()
+    update_trans, update_trans_fields = [], set()
+
+    item_codes = [item[conf.PARSE_KEYS.id] for item in items]
+    update_delta = timezone.now() - conf.UPDATE_DELTA
+    to_update_products = product_model.objects.filter(id__in=item_codes, modified_at__lte=update_delta)
+    db_products = {product.id: product for product in to_update_products}
+    trans_query = trans_model.objects.select_related('product').filter(
+        language_code='ja',
+        product_id__in=item_codes
+    )
+    db_product_trans = {tran.product.id: tran for tran in trans_query}
 
     for item in items:
         item_code = item[conf.PARSE_KEYS.id]
-        update_delta = timezone.now() - conf.UPDATE_DELTA
-        product_query = product_model.objects.filter(id=item_code, modified_at__lte=update_delta)
-        if not product_query.exists():
-            logging.warning('product with code %s not found or modified_at grater then update delta' % item_code)
+        if item_code not in db_products:
             continue
 
-        db_product = product_query.first()
-        updated = False
-        collected_db_fields = build_by_fields_map(item, fields_map=fields_map)
-        for field, value in collected_db_fields.items():
-            if hasattr(db_product, field) and getattr(db_product, field) != value:
-                setattr(db_product, field, value)
-                update_fields.add(field)
-                updated = True
+        db_product = db_products[item_code]
+        updated_product_fields = update_obj_by_map(db_product, build_by_fields_map(item, fields_map=fields_map))
 
-        if updated:
+        if updated_product_fields:
+            update_fields.update(updated_product_fields)
             updated_products.append(db_product)
+
+        db_tran = db_product_trans.get(item_code)
+        if db_tran:
+            updated_tran_fields = update_obj_by_map(db_tran, build_by_fields_map(item, fields_map=trans_fields_map))
+
+            if updated_tran_fields:
+                update_trans_fields.update(updated_tran_fields)
+                update_trans.append(db_tran)
 
         tag_ids = item[conf.TAG_IDS_KEY]
         saved_tag_ids = db_product.tags.filter(id__in=tag_ids).values_list('tag_id', flat=True)
@@ -161,6 +198,7 @@ def update_items(items: list[dict[str, Any]]):
 def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict[str, Any]] = None):
     conf = app_settings.PRODUCT_PARSE_SETTINGS
     product_model = import_model(conf.MODEL)
+    product_trans_model = import_model(conf.TRANS_MODEL)
     increase_price = import_model('product.utils.increase_price')
     product_genre_model = import_model(conf.GENRE_RELATION_MODEL)
     product_tag_model = import_model(conf.TAG_RELATION_MODEL)
@@ -169,13 +207,16 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
     genre = genre_model.objects.get(id=genre_id)
     genre_ids = get_genre_parents_tree(genre)
     fields_map = conf.PARSE_KEYS._asdict()
+    trans_fields_map = conf.TRANS_KEYS._asdict()
 
     if tag_groups:
         save_tags_from_groups(tag_groups)
 
     db_product_ids = list(product_model.objects.values_list('id', flat=True))
+    db_product_tag_ids = list(product_tag_model.objects.values_list('product_id', 'tag_id'))
+    db_product_genre_ids = list(product_genre_model.objects.values_list('product_id', 'genre_id'))
 
-    new_products, products_to_update = [], []
+    new_products, new_product_trans, products_to_update = [], [], []
     new_product_images, new_product_tags, new_product_genres = [], [], []
 
     for item in items:
@@ -186,16 +227,22 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
             continue
 
         product_data = build_by_fields_map(item, fields_map=fields_map)
+        product_trans_data = build_by_fields_map(item, fields_map=trans_fields_map)
+
         price = product_data['rakuten_price']
         if price and price > 0:
             product_data['price'] = increase_price(price)
+
         new_products.append(product_model(**product_data))
+        new_product_trans.append(product_trans_model(**product_trans_data))
 
         for genre_id in genre_ids:
-            new_product_genres.append(product_genre_model(product_id=item_code, genre_id=genre_id))
+            if (item_code, genre_id) not in db_product_genre_ids:
+                new_product_genres.append(product_genre_model(product_id=item_code, genre_id=genre_id))
 
         for tag_id in set(item[conf.TAG_IDS_KEY] or []):
-            new_product_tags.append(product_tag_model(product_id=item_code, tag_id=tag_id))
+            if (item_code, tag_id) not in db_product_tag_ids:
+                new_product_tags.append(product_tag_model(product_id=item_code, tag_id=tag_id))
 
         for img_key in conf.IMG_PARSE_FIELDS or []:
             image_urls = item.get(img_key)
@@ -212,6 +259,7 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
 
     if new_products:
         product_model.objects.bulk_create(new_products)
+        product_trans_model.objects.bulk_create(new_product_trans)
 
     if new_product_tags:
         product_tag_model.objects.bulk_create(new_product_tags)

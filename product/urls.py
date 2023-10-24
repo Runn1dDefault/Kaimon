@@ -34,4 +34,6 @@ products_urlpatterns = [
     re_path('^(?P<id>.+)/$', ProductRetrieveView.as_view(), name='product-detail'),
 ]
 
-urlpatterns = additions_urlpatterns + genres_urlpatterns + reviews_urlpatterns + products_urlpatterns
+# urlpatterns = additions_urlpatterns + genres_urlpatterns + reviews_urlpatterns + products_urlpatterns
+urlpatterns = genres_urlpatterns + products_urlpatterns
+

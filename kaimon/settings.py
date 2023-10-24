@@ -35,9 +35,10 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'drf_spectacular',
 
-    'users',  # ready
-    'product',  # ready
-    'rakuten_scraping',  # ready
+    'users',
+    'language',
+    'product',
+    'rakuten_scraping',
     'currencies',
     'promotions',
     'order',

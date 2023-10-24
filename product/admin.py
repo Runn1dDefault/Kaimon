@@ -2,19 +2,24 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
 from product.filters import ProductRankAdminFilter
-from product.models import Genre, Tag, TagGroup, Product, ProductTag, ProductGenre, ProductImageUrl, ProductReview
+from product.models import Genre, GenreTranslation, Tag, TagGroup, Product, ProductTag, ProductGenre, ProductImageUrl, \
+    ProductReview, ProductTranslation, TagTranslation, TagGroupTranslation
+
+
+class GenreTranslationInline(admin.TabularInline):
+    model = GenreTranslation
+    extra = 0
 
 
 @admin.register(Genre)
 class GenreAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'level', 'deactivated')
-    list_display_links = ('id', 'name')
-    search_fields = ('id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz')
+    inlines = [GenreTranslationInline]
+    list_display = ('id', 'level', 'deactivated')
+    search_fields = ('id', 'translations__name',)
     search_help_text = _('Search by fields: ID, NAME')
     list_filter = ('level', 'deactivated')
     fieldsets = (
-        (_('General Info'), {'fields': ('id', 'name', 'level', 'deactivated')}),
-        (_('Another language names'), {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz')}),
+        (_('General Info'), {'fields': ('id', 'level', 'deactivated')}),
     )
     list_per_page = 30
     list_max_show_all = 50
@@ -25,17 +30,29 @@ class ProductImageInline(admin.TabularInline):
     extra = 0
 
 
+class TagGroupTranslationInline(admin.StackedInline):
+    model = TagGroupTranslation
+    extra = 0
+
+
 @admin.register(TagGroup)
 class TagGroupAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'created_at')
-    search_fields = ('id', 'name', 'created_at')
+    inlines = [TagGroupTranslationInline]
+    list_display = ('id', 'created_at')
+    search_fields = ('id', 'created_at')
     list_filter = ('created_at',)
+
+
+class TagTranslationInline(admin.StackedInline):
+    model = TagTranslation
+    extra = 0
 
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'group', 'created_at')
-    search_fields = ('id', 'name', 'group__name', 'group__id')
+    inlines = [TagTranslationInline]
+    list_display = ('id', 'group', 'created_at')
+    search_fields = ('id', 'group__translations__name', 'group__id')
     list_filter = ('created_at',)
 
 
@@ -51,31 +68,24 @@ class ProductGenreAdmin(admin.ModelAdmin):
     search_fields = ('product__id', 'genre__id')
 
 
+class ProductTranslationInline(admin.StackedInline):
+    model = ProductTranslation
+    extra = 0
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    inlines = [ProductImageInline]
-    list_display = ('id', 'name', 'price', 'is_active', 'availability', 'created_at')
-    list_display_links = ('id', 'name')
-    search_fields = ('id', 'name')
+    inlines = [ProductImageInline, ProductTranslationInline]
+    list_display = ('id', 'price', 'is_active', 'availability', 'created_at')
+    search_fields = ('id',)
     search_help_text = _('Search by fields: ID, Rakuten ID, NAME, GENRE NAME')
     list_filter = (ProductRankAdminFilter, 'is_active', 'created_at', 'modified_at', 'reference_rank')
     readonly_fields = ('id', 'created_at', 'modified_at')
     fieldsets = (
-        (
-            _('General Info'),
-            {'fields': ('id', 'name', 'description', 'price', 'rakuten_price')}
-        ),
+        (_('General Info'), {'fields': ('id', 'price', 'rakuten_price')}),
         (_('Dates'), {'classes': ['collapse'], 'fields': ('created_at', 'modified_at')}),
         (_('Control'), {'fields': ('availability', 'is_active', 'reference_rank')}),
         (_('Links'), {'classes': ['collapse'], 'fields': ('product_url',)}),
-        (
-            _('Another language fields'),
-            {
-                'classes': ['collapse'],
-                'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz', 'description_tr', 'description_ru',
-                           'description_en', 'description_ky', 'description_kz',)
-            }
-        )
     )
     list_per_page = 30
     list_max_show_all = 50

@@ -27,3 +27,12 @@ def build_by_fields_map(data: dict[str, Any], fields_map: dict[str, str]):
     for db_field, rakuten_field in fields_map.items():
         query[db_field] = data[rakuten_field]
     return query
+
+
+def update_obj_by_map(obj, map_fields):
+    update_fields = set()
+    for field, value in map_fields.items():
+        if hasattr(obj, field) and getattr(obj, field) != value:
+            setattr(obj, field, value)
+            update_fields.add(field)
+    return update_fields
