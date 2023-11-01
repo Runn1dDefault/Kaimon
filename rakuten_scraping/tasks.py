@@ -64,26 +64,33 @@ def save_tags_from_groups(tag_groups: list[dict[str, Any]]):
     conf = app_settings.TAG_PARSE_SETTINGS
     tag_group_model = import_model(conf.TAG_GROUP_MODEL)
     tag_model = import_model(conf.MODEL)
-    db_group_ids = list(tag_group_model.objects.values_list('id', flat=True))
-    db_tag_ids = list(tag_model.objects.values_list('id', flat=True))
-    new_tags, collected_tag_ids = [], []
-    new_groups, collected_group_ids = [], []
+
+    db_groups = list(tag_group_model.objects.values_list('id', flat=True))
+    db_tags = list(tag_model.objects.values_list('id', flat=True))
+
+    new_tags, new_groups = {}, {}
 
     for group in tag_groups:
         group_id = group[conf.TAG_GROUP_PARSE_KEYS.id]
-        if group_id not in db_group_ids and group_id not in collected_group_ids:
-            new_groups.append(tag_group_model(id=group_id, name=group[conf.TAG_GROUP_PARSE_KEYS.name]))
-            collected_group_ids.append(group_id)
+        if group_id not in db_groups and group_id not in new_groups:
+            new_groups[group_id] = tag_group_model(id=group_id, name=group[conf.TAG_GROUP_PARSE_KEYS.name])
 
         for tag in group[conf.TAG_KEY] or []:
             tag_id = tag[conf.PARSE_KEYS.id]
-            if tag_id in collected_tag_ids:
+
+            if tag_id in new_tags or db_tags in db_tags:
                 continue
 
-            if tag_id not in db_tag_ids:
-                new_db_tag = tag_model(id=tag_id, name=tag[conf.PARSE_KEYS.name], group_id=group_id)
-                new_tags.append(new_db_tag)
-            collected_tag_ids.append(tag_id)
+            new_tags[tag_id] = tag_model(id=tag_id, name=tag[conf.PARSE_KEYS.name], group_id=group_id)
+
+    new_groups = [
+        instance for group_id, instance in new_groups.items()
+        if not tag_group_model.objects.filter(id=group_id).exists()
+    ]
+    new_tags = [
+        instance for tag_id, instance in new_tags.items()
+        if not tag_model.objects.filter(id=tag_id).exists()
+    ]
 
     if new_groups:
         tag_group_model.objects.bulk_create(new_groups)
@@ -223,7 +230,7 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
         img_model.objects.bulk_create(new_product_images)
 
     if products_to_update:
-        update_items.delay(products_to_update, genre_id=genre_id)
+        update_items.delay(products_to_update)
 
 
 # ----------------------------------------------- REQUEST's TASK's -----------------------------------------------------

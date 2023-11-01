@@ -86,25 +86,22 @@ class Product(models.Model):
     description_en = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[en]')
     description_ky = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ky]')
     description_kz = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[kz]')
+    avg_rank = models.FloatField(default=0)
+    receipts_qty = models.PositiveIntegerField(default=0)
+    reviews_count = models.PositiveIntegerField(default=0)
+    sale_price = models.DecimalField(max_digits=20, decimal_places=10, null=True, default=None)
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-        if self.rakuten_price and not self.price:
-            self.price = increase_price(self.rakuten_price)
-        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
+    def update_sale_price(self):
+        self.sale_price = None
+        if not self.availability or not self.price or self.price <= 0:
+            self.save()
+            return
 
-    @property
-    def reviews_count(self) -> int:
-        return self.reviews.filter(is_active=True).count()
-
-    @property
-    def sale_price(self) -> float | None:
-        price = self.price or self.rakuten_price
-        if not self.availability or not price or price <= 0:
-            return None
-
-        promotion = self.promotions.active_promotions().first()
+        promotions = getattr(self, 'promotions')
+        promotion = promotions.active_promotions().first()
         if not promotion:
-            return None
+            self.save()
+            return
 
         try:
             discount = promotion.discount
@@ -112,14 +109,28 @@ class Product(models.Model):
             # in the future here can be changed, when new promotion logic will be added
             return None
 
-        return discount.calc_price(price)
+        self.sale_price = discount.calc_price(self.price)
+        self.save()
 
-    @property
-    def avg_rank(self):
-        reviews = self.reviews.filter(is_active=True)
-        if reviews.exists():
-            return sum(reviews.values_list('rank', flat=True)) / reviews.count()
-        return 0.0
+    def update_reviews_count(self):
+        reviews = getattr(self, 'reviews')
+        self.reviews_count = reviews.filter(is_active=True).values('id').distinct().count() or 0
+        self.save()
+
+    def update_average_rank(self):
+        reviews = getattr(self, 'reviews')
+        self.avg_rank = reviews.filter(is_active=True).aggregate(models.Avg('rank'))['rank__avg']
+        self.save()
+
+    def update_receipts_qty(self):
+        receipts = getattr(self, 'receipts')
+        self.receipts_qty = receipts.values('order_id').distinct().count() or 0
+        self.save()
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.rakuten_price and not self.price:
+            self.price = increase_price(self.rakuten_price)
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
 
 class ProductGenre(models.Model):

@@ -9,6 +9,7 @@ from utils.paginators import PagePagination
 from utils.views import LanguageMixin
 
 from .models import Promotion
+from product.models import Product
 from .serializers import PromotionSerializer
 
 
@@ -42,3 +43,23 @@ class PromotionProductListView(CurrencyMixin, LanguageMixin, generics.ListAPIVie
 
     def get_queryset(self):
         return self.get_promotion().products.filter(is_active=True)
+
+
+@extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM,
+                                                  settings.CURRENCY_QUERY_SCHEMA_PARAM]))
+class DiscountProductListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
+    permission_classes = ()
+    authentication_classes = ()
+    promotion_queryset = Promotion.objects.active_promotions()
+    serializer_class = ProductListSerializer
+    pagination_class = PagePagination
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['created_at', 'price']
+
+    def get_promotions_with_discount(self):
+        return self.promotion_queryset.filter(products__isnull=False, discount__isnull=False).distinct()
+
+    def get_queryset(self):
+        promotions = self.promotion_queryset.filter(products__isnull=False, discount__isnull=False).distinct()
+        product_ids = promotions.values_list('products', flat=True)
+        return Product.objects.filter(availability=True, is_active=True, id__in=product_ids)

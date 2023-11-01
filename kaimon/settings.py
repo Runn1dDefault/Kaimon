@@ -16,7 +16,8 @@ CSRF_TRUSTED_ORIGINS = [
     "http://176.126.166.140:9010",
     "http://176.126.166.140",
     "http://localhost:9010",
-    "http://kaimono.vip",
+    "https://kaimono.vip",
+    "https://kaimono.vip/"
 ]
 # Application definition
 
@@ -175,8 +176,10 @@ REST_FRAMEWORK = {
     'TEST_REQUEST_DEFAULT_FORMAT': 'json',
 }
 
-CORS_ALLOW_ALL_ORIGINS = True  # TODO: off after testing
-
+CORS_ALLOWED_ORIGINS = [
+    "https://kaimono.vip",
+    "http://localhost:3000"
+]
 # swagger
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Kaimono Project API',

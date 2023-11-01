@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/v1/order/', include('order.urls')),
     path('api/v1/promotions/', include('promotions.urls')),
     path('api/v1/external-admin/', include('external_admin.urls')),
+    path('api/v1/conversions/', include('currencies.urls')),
 ] + docs_urlpatterns
 
 if settings.DEBUG:

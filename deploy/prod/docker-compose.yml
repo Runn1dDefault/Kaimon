@@ -4,7 +4,8 @@ services:
   postgres:
     image: postgres
     restart: always
-    hostname: postgres_kaimono
+    networks:
+      - database
     ports:
       - "5436:5432"
     environment:
@@ -16,22 +17,23 @@ services:
   redis:
     image: redis
     restart: always
-    hostname: redis_kaimono
     command: redis-server --requirepass akmsdokm124j90
+    networks:
+      - redis_cache
     ports:
       - "6355:6379"
     volumes:
       - redis_data:/usr/local/etc/redis
 
   web:
-    container_name: web-kaimon-dev
     restart: always
     build:
       context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
-    entrypoint: [ "bash", "./deploy/entrypoint.sh" ]
+    networks:
+      - backend
+      - database
+      - redis_cache
+    entrypoint: [ "bash", "./deploy/sh/entrypoint.sh" ]
     env_file:
       - ../../.env
     expose:
@@ -41,10 +43,11 @@ services:
       - media:/app/media
 
   nginx:
-    container_name: nginx-kaimon
     build:
       context: ../../
       dockerfile: deploy/prod/nginx.Dockerfile
+    networks:
+      - backend
     command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
     volumes:
       - static:/app/static
@@ -57,10 +60,9 @@ services:
     depends_on:
       - web
     env_file:
-      - .env
+      - ../../.env
 
   certbot:
-    container_name: certbot-kaimon
     image: certbot/certbot
     restart: unless-stopped
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
@@ -69,14 +71,12 @@ services:
       - ../../certbot/www:/var/www/certbot
 
   celery-default:
-    container_name: celery-default
-    hostname: celery-default
     restart: always
     build:
       context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
+    networks:
+      - database
+      - redis_cache
     command: celery --app kaimon worker -Q default -c 4 --loglevel=info
     env_file:
       - ../../.env
@@ -84,13 +84,12 @@ services:
       - web
 
   celery-beat:
-    container_name: celery-beat
     restart: always
     build:
       context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
+    networks:
+      - database
+      - redis_cache
     command: celery --app kaimon beat --loglevel=info
     env_file:
       - ../../.env
@@ -98,14 +97,12 @@ services:
       - web
 
   celery-mailing:
-    container_name: celery-mailing
-    hostname: celery-mailing
     restart: always
     build:
       context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
+    networks:
+      - database
+      - redis_cache
     command: celery --app kaimon worker -Q mailing -c 1 --loglevel=info
     env_file:
       - ../../.env
@@ -113,14 +110,12 @@ services:
       - web
 
   celery-rakuten-requests:
-    container_name: celery-rakuten-requests
-    hostname: celery-rakuten-requests
     restart: always
     build:
       context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
+    networks:
+      - database
+      - redis_cache
     command: celery --app kaimon worker -Q rakuten_requests -c 3 --loglevel=info
     env_file:
       - ../../.env
@@ -128,34 +123,27 @@ services:
       - web
 
   celery-item-saving:
-    container_name: celery-item-saving
-    hostname: celery-item-saving
     restart: always
     build:
       context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
-    command: celery --app kaimon worker -Q item_saving -c 10 --loglevel=info
+    networks:
+      - database
+      - redis_cache
+    command: celery --app kaimon worker -Q item_saving -c 4 --loglevel=info
     env_file:
       - ../../.env
     depends_on:
       - web
 
-  celery-translating:
-    container_name: celery-translating
-    hostname: celery-translating
-    restart: always
-    build:
-      context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
-    command: celery --app kaimon worker -Q translating -c 1 --loglevel=info
-    env_file:
-      - ../../.env
-    depends_on:
-      - web
+networks:
+  backend:
+    driver: bridge
+
+  database:
+    driver: bridge
+
+  redis_cache:
+    driver: bridge
 
 volumes:
   redis_data:

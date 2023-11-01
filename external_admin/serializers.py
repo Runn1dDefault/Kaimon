@@ -7,6 +7,7 @@ from rest_framework import serializers
 
 from currencies.models import Conversion
 from currencies.serializers import ConversionField
+from currencies.utils import get_currency_price_per
 from product.models import Product, Genre, Tag, ProductImageUrl, TagGroup, ProductReview, ProductGenre, ProductTag
 from product.utils import get_genre_parents_tree
 from promotions.models import Banner, Promotion, Discount
@@ -27,6 +28,12 @@ class ConversionAdminSerializer(serializers.ModelSerializer):
         model = Conversion
         fields = ('id', 'currency_from', 'currency_to', 'price_per')
         extra_kwargs = {'currency_from': {'read_only': True}, 'currency_to': {'read_only': True}}
+
+
+    def save(self, **kwargs):
+        instance = super().save(**kwargs)
+        get_currency_price_per.clear()
+        return instance
 
 
 class TagGroupAdminSerializer(serializers.ModelSerializer):

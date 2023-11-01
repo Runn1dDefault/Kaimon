@@ -9,6 +9,7 @@ from rest_framework.generics import get_object_or_404
 
 from utils.views import LanguageMixin
 
+from .models import ProductGenre, ProductTag
 from .querysets import ProductQuerySet
 
 
@@ -75,14 +76,14 @@ class ProductReferenceFilter(BaseFilterBackend):
         product_id = request.query_params.get(self.product_id_param)
         if product_id:
             # recommendations by product instance genres and tags
-            product = get_object_or_404(queryset, id=product_id)
-            genre_ids = product.genres.exclude(genre__level__in=self.exclude_genre_levels).values_list('id', flat=True)
-            tag_ids = product.tags.values_list('tag_id', flat=True)
+            genre_ids = ProductGenre.objects.filter(product_id=product_id).exculde(
+                genre__level__in=self.exclude_genre_levels
+            ).values_list('genre_id', flat=True)
+            tag_ids = ProductTag.objects.filter(product_id=product_id).values_list('tag_id', flat=True)
             return (
                 queryset.exclude(id=product_id)
                         .filter(Q(genres__genre_id__in=genre_ids) | Q(tags__tag_id__in=tag_ids))
-                        .annotate(average_rank=Sum('reviews__rank'))
-                        .order_by(F('reference_rank').desc(nulls_last=True), F('average_rank').desc(nulls_last=True))
+                        .order_by(F('reference_rank').desc(nulls_last=True), '-avg_rank')
             )
         # recommendations by products purchases and reviews
         by_purchases_filtered = self.filter_by_purchases_count(queryset, min_count=self.min_filter_qty)
@@ -126,8 +127,7 @@ class PopularProductOrdering(BaseFilterBackend):
 
     def filter_queryset(self, request, queryset, view):
         if self.ordering_included(request, view):
-            assert isinstance(queryset, ProductQuerySet)
-            return queryset.order_by_popular()
+            return queryset.order_by("-receipts_qty", "-avg_rank")
         return queryset
 
     def get_schema_operation_parameters(self, view):

@@ -124,12 +124,12 @@ class BaseProductsListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
     filter_backends = [SearchFilterByLang, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
-    search_fields_ja = ['name', 'genres__genre__name', 'tags__tag__name']
-    search_fields_ru = ['name_ru', 'genres__genre__name_ru', 'tags__tag__name_ru']
-    search_fields_en = ['name_en', 'genres__genre__name_en', 'tags__tag__name_en']
-    search_fields_tr = ['name_tr', 'genres__genre__name_tr', 'tags__tag__name_tr']
-    search_fields_ky = ['name_ky', 'genres__genre__name_ky', 'tags__tag__name_ky']
-    search_fields_kz = ['name_kz', 'genres__genre__name_kz', 'tags__tag__name_kz']
+    search_fields_ja = ['name', 'description', 'genres__genre__name']
+    search_fields_ru = ['name_ru', 'description_ru', 'genres__genre__name_ru']
+    search_fields_en = ['name_en', 'description_en', 'genres__genre__name_en']
+    search_fields_tr = ['name_tr', 'description_tr', 'genres__genre__name_tr']
+    search_fields_ky = ['name_ky', 'description_ky', 'genres__genre__name_ky']
+    search_fields_kz = ['name_kz', 'description_kz', 'genres__genre__name_kz']
     ordering_fields = ['created_at', 'price']
 
 
@@ -145,6 +145,9 @@ class ProductsListView(BaseProductsListView):
     pagination_class = QuerysetPagination
     filter_backends = [SearchFilterWithTranslating, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
     search_fields = ('name',)
+
+    def get_queryset(self):
+        return super().get_queryset().prefetch_related('image_urls')
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
