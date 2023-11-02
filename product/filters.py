@@ -1,8 +1,9 @@
+from django.db.models import Subquery, Q, Case, When
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 from rest_framework.filters import BaseFilterBackend
 
-from .models import Product
+from .models import Product, Genre
 
 
 class FilterByTag(BaseFilterBackend):
@@ -47,45 +48,15 @@ class ProductReferenceFilter(BaseFilterBackend):
     product_id_description = _('Recommendations by product meta')
 
     def filter_queryset(self, request, queryset, view):
-        paginator = view.paginator
-        page_size = paginator.get_page_size(request)
-
         product_id = request.query_params.get(self.product_id_param)
+        orders = ('-receipts_qty', '-reviews_count', '-avg_rank')
         if product_id:
-            return Product.objects.raw(
-                '''
-                SELECT p.* FROM product_product as p
-                   LEFT OUTER JOIN product_product_genres as pg ON (p.id = pg.product_id) 
-                   LEFT OUTER JOIN product_product_tags as pt ON (p.id = pt.product_id) 
-                   WHERE (
-                    p.availability AND p.is_active AND NOT (p.id = %s) 
-                    AND (
-                        pg.genre_id IN (
-                            SELECT g.id FROM product_genre as g 
-                            INNER JOIN product_product_genres as gp ON (g.id = gp.genre_id) 
-                            WHERE (NOT (g.level IN (0, 1) AND g.level IS NOT NULL) AND gp.product_id = %s)
-                            ORDER BY g.level DESC LIMIT 1
-                        ) 
-                        OR pt.tag_id IN (
-                            SELECT t.id FROM product_tag as t 
-                            INNER JOIN product_product_tags as t_p ON (t.id = t_p.tag_id) 
-                            WHERE t_p.product_id = %s
-                            )
-                        )
-                    ) LIMIT %s
-                ''', (product_id, product_id, product_id, page_size)
+            genre = Subquery(
+                Genre.objects.filter(products__id=product_id)
+                             .order_by('-level').values('id')[:1]
             )
-
-        return Product.objects.raw(
-            """
-            SELECT p.*, CASE WHEN p.reviews_count > 1 THEN true 
-                             WHEN p.receipts_qty > 1 THEN true 
-                             ELSE false END AS in_reference FROM product_product as p
-                WHERE (p.availability AND p.is_active) 
-                ORDER BY in_reference ASC, p.avg_rank DESC
-                LIMIT %s
-            """, (page_size,)
-        )
+            return queryset.exclude(id=product_id).filter(genres__id=genre).order_by(*orders)
+        return queryset.order_by(*orders)
 
     def get_schema_operation_parameters(self, view):
         return [
