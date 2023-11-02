@@ -9,6 +9,3 @@ class ConversionListView(ListAPIView):
     permission_classes = (EmailConfirmedPermission,)
     queryset = Conversion.objects.all()
     serializer_class = ConversionAdminSerializer
-
-
-

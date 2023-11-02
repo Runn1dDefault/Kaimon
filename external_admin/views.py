@@ -8,8 +8,8 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
 from currencies.models import Conversion
-from product.filters import PopularProductOrdering
-from product.models import Product, ProductReview, Genre, Tag, ProductTag, TagGroup
+from product.filters import PopularProductOrdering, FilterByTag
+from product.models import Product, ProductReview, Genre, Tag, TagGroup
 from promotions.models import Promotion
 from users.models import User
 from order.models import Order
@@ -41,21 +41,21 @@ class UserAdminViewSet(DirectorViewMixin, viewsets.ReadOnlyModelViewSet):
     lookup_url_kwarg = 'user_id'
     lookup_field = 'id'
 
-    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
+    @extend_schema(responses={status.HTTP_200_OK: None})
     @action(methods=['GET'], detail=True, url_path='change-activity')
     def block_or_unblock_user(self, request, **kwargs):
         user = self.get_object()
         user.is_active = not user.is_active
         user.save()
-        return Response(status=status.HTTP_202_ACCEPTED)
+        return Response(status=status.HTTP_200_OK)
 
-    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
+    @extend_schema(responses={status.HTTP_200_OK: None})
     @action(methods=['GET'], detail=True, url_path='mark-register-payed')
     def mark_payed(self, request):
         user = self.get_object()
         user.registration_payed = True
         user.save()
-        return Response(status=status.HTTP_202_ACCEPTED)
+        return Response(status=status.HTTP_200_OK)
 
 
 # ------------------------------------------------ Genre ---------------------------------------------------------------
@@ -64,7 +64,7 @@ class GenreListAdminView(CachingMixin, StaffViewMixin, generics.ListAPIView):
     serializer_class = GenreAdminSerializer
     pagination_class = AdminPagePagination
     filter_backends = [filters.SearchFilter]
-    search_fields = ['name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz']
+    search_fields = ['name']
 
     @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
     @action(methods=['GET'], detail=True, url_path='change-activity')
@@ -81,7 +81,7 @@ class TagListAdminView(CachingMixin, StaffViewMixin, generics.ListAPIView):
     pagination_class = AdminPagePagination
     serializer_class = TagAdminSerializer
     filter_backends = [SearchFilter]
-    search_fields = ['name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz']
+    search_fields = ['name']
 
 
 class TagGroupListAdminViewSet(CachingMixin, StaffViewMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
@@ -111,15 +111,8 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     serializer_class = ProductDetailAdminSerializer
     pagination_class = AdminPagePagination
     parser_classes = (parsers.JSONParser,)
-    filter_backends = [filters.SearchFilter, PopularProductOrdering, filters.OrderingFilter]
-    search_fields = [
-        'name', 'genres__genre__name', 'tags__tag__name',
-        'name_ru', 'genres__genre__name_ru', 'tags__tag__name_ru',
-        'name_en', 'genres__genre__name_en', 'tags__tag__name_en',
-        'name_tr', 'genres__genre__name_tr', 'tags__tag__name_tr',
-        'name_ky', 'genres__genre__name_ky', 'tags__tag__name_ky',
-        'name_kz', 'genres__genre__name_kz', 'tags__tag__name_kz'
-    ]
+    filter_backends = [filters.SearchFilter, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
+    search_fields = ['name', 'genres__name']
     ordering_fields = ['created_at', 'price']
     lookup_url_kwarg = 'product_id'
     lookup_field = 'id'
@@ -157,7 +150,7 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         image_fk.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @extend_schema(responses={status.HTTP_202_ACCEPTED: None}, request=ProductImageAdminSerializer)
+    @extend_schema(responses={status.HTTP_200_OK: None}, request=ProductImageAdminSerializer)
     @action(methods=['POST'], detail=False)
     def add_new_image(self, request, **kwargs):
         serializer = ProductImageAdminSerializer(
@@ -167,7 +160,7 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(status=status.HTTP_202_ACCEPTED)
+        return Response(status=status.HTTP_200_OK)
 
     @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
     @action(
@@ -183,7 +176,7 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         tag_fk.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
+    @extend_schema(responses={status.HTTP_200_OK: None})
     @action(
         methods=['GET'],
         detail=True,
@@ -193,9 +186,8 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         tag_id = self.kwargs['tag_id']
         if not Tag.objects.filter(id=tag_id).exists():
             return Response({'detail': _('Tag does with id %s not exist!') % tag_id})
-        product = self.get_object()
-        ProductTag.objects.create(product=product, tag_id=tag_id)
-        return Response(status=status.HTTP_202_ACCEPTED)
+        self.get_object().tags.add(tag_id)
+        return Response(status=status.HTTP_200_OK)
 
 
 # ---------------------------------------------- Reviews ---------------------------------------------------------------
@@ -303,8 +295,7 @@ class PromotionAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     serializer_class = PromotionAdminSerializer
     parser_classes = (parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser)
     filter_backends = [filters.SearchFilter, FilterByFields, filters.OrderingFilter]
-    search_fields = ['banner__name', 'banner__name_ru', 'banner__name_en', 'banner__name_tr', 'banner__name_ky',
-                     'banner__name_kz']
+    search_fields = ['banner__name']
     filter_fields = {'deactivated': {'db_field': 'deactivated', 'type': 'boolean'}}
     ordering_fields = ['id', 'created_at', 'start_date', 'end_date']
     lookup_field = 'id'
