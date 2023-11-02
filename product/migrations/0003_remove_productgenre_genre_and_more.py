@@ -155,5 +155,16 @@ class Migration(migrations.Migration):
         migrations.AddIndex(
             model_name='productimageurl',
             index=models.Index(fields=['product', 'url'], name='product_pro_product_02611d_idx'),
+        ),
+        migrations.AddField(
+            model_name='product',
+            name='genres',
+            field=models.ManyToManyField(db_table='product_product_genres', related_name='products',
+                                         to='product.genre'),
+        ),
+        migrations.AddField(
+            model_name='product',
+            name='tags',
+            field=models.ManyToManyField(db_table='product_product_tags', related_name='products', to='product.tag'),
         )
     ]
