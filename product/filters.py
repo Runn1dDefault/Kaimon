@@ -1,6 +1,6 @@
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
-from rest_framework.filters import SearchFilter, BaseFilterBackend
+from rest_framework.filters import BaseFilterBackend
 
 from .models import Product
 
