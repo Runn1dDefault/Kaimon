@@ -6,15 +6,13 @@ from rest_framework.generics import get_object_or_404
 from currencies.mixins import CurrencyMixin
 from product.serializers import ProductListSerializer
 from utils.paginators import PagePagination
-from utils.views import LanguageMixin
 
 from .models import Promotion
 from product.models import Product
 from .serializers import PromotionSerializer
 
 
-@extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
-class PromotionListView(LanguageMixin, generics.ListAPIView):
+class PromotionListView(generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     queryset = Promotion.objects.active_promotions()
@@ -22,9 +20,8 @@ class PromotionListView(LanguageMixin, generics.ListAPIView):
     pagination_class = PagePagination
 
 
-@extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM,
-                                                  settings.CURRENCY_QUERY_SCHEMA_PARAM]))
-class PromotionProductListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
+@extend_schema_view(get=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
+class PromotionProductListView(CurrencyMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     lookup_field = 'id'
@@ -45,9 +42,8 @@ class PromotionProductListView(CurrencyMixin, LanguageMixin, generics.ListAPIVie
         return self.get_promotion().products.filter(is_active=True)
 
 
-@extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM,
-                                                  settings.CURRENCY_QUERY_SCHEMA_PARAM]))
-class DiscountProductListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
+@extend_schema_view(get=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
+class DiscountProductListView(CurrencyMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     promotion_queryset = Promotion.objects.active_promotions()
