@@ -3,6 +3,7 @@ version: "3.9"
 services:
   postgres:
     image: postgres
+    shm_size: 512m
     restart: always
     networks:
       - database
