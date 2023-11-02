@@ -232,15 +232,7 @@ EMAIL_CONFIRM_CODE_LIVE = 43200
 PARSING_SETTINGS = {'CACHE_NAME': "scraping"}
 INCREASE_PRICE_PERCENTAGE = 10
 
-SUPPORTED_LANG = ('ru', 'en', 'ja', 'tr', 'ky', 'kz')
-LANGUAGE_QUERY_PARAM = 'lang'
 CURRENCY_QUERY_PARAM = 'currency'
-LANGUAGE_QUERY_SCHEMA_PARAM = OpenApiParameter(
-    name=LANGUAGE_QUERY_PARAM,
-    type=OpenApiTypes.STR,
-    required=False,
-    default='ja'
-)
 CURRENCY_QUERY_SCHEMA_PARAM = OpenApiParameter(
     name=CURRENCY_QUERY_PARAM,
     type=OpenApiTypes.STR,
