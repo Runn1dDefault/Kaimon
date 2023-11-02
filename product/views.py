@@ -1,38 +1,31 @@
-from collections import OrderedDict
-
 from django.conf import settings
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter, extend_schema_view
 from rest_framework import generics, status, filters
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from currencies.mixins import CurrencyMixin
-from rakuten_scraping.tasks import check_product_availability
 from users.permissions import RegistrationPayedPermission, EmailConfirmedPermission
 from utils.filters import FilterByLookup
 from utils.paginators import PagePagination
-from utils.views import CachingMixin, LanguageMixin
+from utils.views import CachingMixin
 
-from .filters import SearchFilterByLang, GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter, FilterByTag, SearchFilterWithTranslating
+from .filters import GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter, FilterByTag
 from .models import Genre, Product, TagGroup, ProductReview
-from .paginators import GenrePagination, QuerysetPagination
+from .paginators import GenrePagination
 from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer, \
     ProductIdsSerializer
-from .utils import get_genre_parents_tree
-
-currency_and_lang_params = [settings.LANGUAGE_QUERY_SCHEMA_PARAM, settings.CURRENCY_QUERY_SCHEMA_PARAM]
+from .utils import get_genre_parents_tree, get_tags_for_product
 
 
 # -------------------------------------------------- Genres ------------------------------------------------------------
 @extend_schema_view(
     get=extend_schema(
-        parameters=[
-            OpenApiParameter(name='level', type=OpenApiTypes.INT, required=False, default=1),
-            settings.LANGUAGE_QUERY_SCHEMA_PARAM
-        ]
+        parameters=[OpenApiParameter(name='level', type=OpenApiTypes.INT, required=False, default=1)]
     )
 )
-class GenreListView(CachingMixin, LanguageMixin, generics.ListAPIView):
+class GenreListView(CachingMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     queryset = Genre.objects.filter(deactivated=False)
@@ -41,8 +34,7 @@ class GenreListView(CachingMixin, LanguageMixin, generics.ListAPIView):
     serializer_class = GenreSerializer
 
 
-@extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
-class GenreChildrenView(CachingMixin, LanguageMixin, generics.ListAPIView):
+class GenreChildrenView(CachingMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     lookup_field = 'id'
@@ -51,9 +43,7 @@ class GenreChildrenView(CachingMixin, LanguageMixin, generics.ListAPIView):
     pagination_class = None
 
     def get_children_list(self):
-        genre = self.get_object()
-        children = genre.children.filter(deactivated=False)
-        return children
+        return self.get_object().children.filter(deactivated=False)
 
     def list(self, request, *args, **kwargs):
         children = self.get_children_list()
@@ -66,8 +56,7 @@ class GenreChildrenView(CachingMixin, LanguageMixin, generics.ListAPIView):
         return Response(serializer.data)
 
 
-@extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
-class GenreParentsView(CachingMixin, LanguageMixin, generics.ListAPIView):
+class GenreParentsView(CachingMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     lookup_field = 'id'
@@ -87,8 +76,8 @@ class GenreParentsView(CachingMixin, LanguageMixin, generics.ListAPIView):
 
 
 # ------------------------------------------------ Products ------------------------------------------------------------
-@extend_schema_view(post=extend_schema(parameters=currency_and_lang_params))
-class ProductsByIdsView(CurrencyMixin, LanguageMixin, generics.GenericAPIView):
+@extend_schema_view(post=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
+class ProductsByIdsView(CurrencyMixin, generics.GenericAPIView):
     permission_classes = ()
     authentication_classes = ()
     queryset = Product.objects.filter(is_active=True)
@@ -117,60 +106,26 @@ class ProductsByIdsView(CurrencyMixin, LanguageMixin, generics.GenericAPIView):
         return self.list(request, *args, **kwargs)
 
 
-class BaseProductsListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
+@extend_schema_view(get=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
+class ProductsListView(CurrencyMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     queryset = Product.objects.filter(is_active=True, availability=True)
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
-    filter_backends = [SearchFilterByLang, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
-    search_fields_ja = ['name', 'description', 'genres__genre__name']
-    search_fields_ru = ['name_ru', 'description_ru', 'genres__genre__name_ru']
-    search_fields_en = ['name_en', 'description_en', 'genres__genre__name_en']
-    search_fields_tr = ['name_tr', 'description_tr', 'genres__genre__name_tr']
-    search_fields_ky = ['name_ky', 'description_ky', 'genres__genre__name_ky']
-    search_fields_kz = ['name_kz', 'description_kz', 'genres__genre__name_kz']
-    ordering_fields = ['created_at', 'price']
+    filter_backends = [filters.SearchFilter, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
+    search_fields = ['name', 'description', 'genres', 'genres__name']
+    ordering_fields = ['created_at']
 
 
-@extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
-class ProductsListByGenreView(BaseProductsListView):
+@extend_schema_view(get=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
+class ProductsListByGenreView(ProductsListView):
     lookup_url_kwarg = 'id'
-    lookup_field = 'genres__genre_id'
-    filter_backends = (FilterByLookup, *BaseProductsListView.filter_backends)
+    lookup_field = 'genres__id'
+    filter_backends = (FilterByLookup, *ProductsListView.filter_backends)
 
 
-@extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
-class ProductsListView(BaseProductsListView):
-    pagination_class = QuerysetPagination
-    filter_backends = [SearchFilterWithTranslating, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
-    search_fields = ('name',)
-
-    def get_queryset(self):
-        return super().get_queryset().prefetch_related('image_urls')
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        page_queryset = self.paginate_queryset(queryset)
-
-        sliced_queryset = page_queryset or queryset
-        serializer = self.get_serializer(sliced_queryset, many=True)
-
-        data = OrderedDict()
-        data['products'] = serializer.data
-        base_q = TagGroup.objects.filter(id__in=sliced_queryset.values_list('tags__tag__group_id', flat=True))
-        data['tags'] = base_q.tags_list(
-            name_field=self.build_translate_field('name'),
-            tag_ids=sliced_queryset.values_list('tags__tag_id', flat=True)
-        )
-
-        if page_queryset is not None:
-            return self.get_paginated_response(data)
-        return Response(data)
-
-
-@extend_schema_view(get=extend_schema(parameters=[settings.LANGUAGE_QUERY_SCHEMA_PARAM]))
-class TagByGenreListView(LanguageMixin, generics.ListAPIView):
+class TagByGenreListView(generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     queryset = TagGroup.objects.all()
@@ -179,22 +134,18 @@ class TagByGenreListView(LanguageMixin, generics.ListAPIView):
 
     def get_queryset(self):
         return super().get_queryset().filter(
-            tags__producttag__product__genres__genre_id=self.kwargs[self.lookup_url_kwarg]
+            tags__products__genres__id=self.kwargs[self.lookup_url_kwarg]
         ).distinct()
-
-    def get_name_field(self):
-        lang = self.get_lang()
-        return f'{self.name_field}_{lang}' if lang != 'ja' else self.name_field
 
     def list(self, request, *args, **kwargs):
         groups = self.get_queryset()
         if not groups.exists():
             return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(groups.tags_list(self.get_name_field()))
+        return Response(groups.tags_list())
 
 
-@extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
-class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView):
+@extend_schema_view(get=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
+class ProductRetrieveView(CurrencyMixin, generics.RetrieveAPIView):
     permission_classes = ()
     authentication_classes = ()
     lookup_field = 'id'
@@ -204,8 +155,13 @@ class ProductRetrieveView(CurrencyMixin, LanguageMixin, generics.RetrieveAPIView
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
-        check_product_availability.delay(product_id=instance.id)
+        # check_product_availability.delay(product_id=instance.id)
         return Response(serializer.data)
+
+
+@api_view(['GET'])
+def product_tags_info_view(request, product_id):
+    return Response(get_tags_for_product(product_id))
 
 
 # ------------------------------------------------- Reviews ------------------------------------------------------------
@@ -256,8 +212,8 @@ class ProductReviewListView(generics.ListAPIView):
 
 
 # -------------------------------------------- Recommendations ---------------------------------------------------------
-@extend_schema_view(get=extend_schema(parameters=currency_and_lang_params))
-class ReferenceListView(CurrencyMixin, LanguageMixin, generics.ListAPIView):
+@extend_schema_view(get=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
+class ReferenceListView(CurrencyMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     queryset = Product.objects.filter(is_active=True, availability=True)
