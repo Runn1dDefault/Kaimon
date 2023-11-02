@@ -67,7 +67,7 @@ class ProductRetrieveSerializer(serializers.ModelSerializer):
                   'genres', 'image_urls')
 
     def get_genres(self, instance):
-        genres_fk = instance.genres.filter(genre__deactivated=False)
+        genres_fk = instance.genres.filter(deactivated=False)
         if not genres_fk.exists():
             return []
 
