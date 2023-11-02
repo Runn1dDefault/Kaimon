@@ -10,6 +10,8 @@ from .querysets import OrderAnalyticsQuerySet
 
 
 class BaseModel(models.Model):
+    objects = models.Manager()
+
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
 
@@ -21,6 +23,8 @@ class Customer(BaseModel):
     """
     model for saving recipient data for history and analytics
     """
+    objects = models.Manager()
+
     name = models.CharField(max_length=100)
     email = models.EmailField()
     phone = models.CharField(max_length=20, validators=[only_digit_validator])
@@ -30,6 +34,8 @@ class Customer(BaseModel):
 
 
 class DeliveryAddress(BaseModel):
+    objects = models.Manager()
+
     user = models.ForeignKey(get_user_model(), on_delete=models.SET(get_sentinel_user),
                              related_name='delivery_addresses')
     recipient_name = models.CharField(max_length=100)
@@ -107,5 +113,7 @@ class Receipt(BaseModel):
 
 
 class ReceiptTag(models.Model):
+    objects = models.Manager()
+
     receipt = models.ForeignKey(Receipt, on_delete=models.CASCADE, related_name='tags')
     tag = models.ForeignKey('product.Tag', on_delete=models.RESTRICT)
