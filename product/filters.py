@@ -1,33 +1,8 @@
-import requests
-
-from django.contrib.admin import SimpleListFilter
-from django.db.models import Avg, Q, F, Sum, Count, Case, When, Value, IntegerField
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 from rest_framework.filters import SearchFilter, BaseFilterBackend
-from rest_framework.generics import get_object_or_404
 
-from utils.views import LanguageMixin
-
-from .models import ProductGenre, ProductTag
-from .querysets import ProductQuerySet
-
-
-class SearchFilterWithTranslating(SearchFilter):
-    def get_search_terms(self, request):
-        terms = super().get_search_terms(request)
-        query = request.query_params.get(self.search_param, '')
-        if query:
-            try:
-                response = requests.get('https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=auto&tl=ja&q=' + query)
-                x = str(response.json()[0][0][0]).split()
-                print(terms, ': ', x)
-                if x:
-                    terms = x
-            except Exception as err:
-                print(err)
-        return terms
-
+from .models import Product
 
 
 class FilterByTag(BaseFilterBackend):
@@ -36,9 +11,19 @@ class FilterByTag(BaseFilterBackend):
 
     def filter_queryset(self, request, queryset, view):
         tag_ids = request.query_params.get(self.param, '').split(',')
-        tag_ids = [tag_id for tag_id in tag_ids if tag_id.strip()]
+        tag_ids = tuple(tag_id for tag_id in tag_ids if tag_id.strip())
         if tag_ids:
-            return queryset.filter(tags__tag_id__in=tag_ids)
+            paginator = view.paginator
+            page_size = paginator.get_page_size(request)
+            return Product.objects.raw(
+                '''
+                SELECT p.* FROM product_product as p
+                   LEFT OUTER JOIN product_product_tags as pt ON (p.id = pt.product_id) 
+                   WHERE (
+                    p.availability AND p.is_active AND pt.tag_id IN %s
+                    ) LIMIT %s
+                ''', (tag_ids, page_size)
+            )
         return queryset
 
     def get_schema_operation_parameters(self, view):
@@ -58,45 +43,49 @@ class FilterByTag(BaseFilterBackend):
 class ProductReferenceFilter(BaseFilterBackend):
     min_filter_qty = 1
     reference_qty = 10
-    exclude_genre_levels = [0, 1]
     product_id_param = 'product_id'
     product_id_description = _('Recommendations by product meta')
 
-    @staticmethod
-    def filter_by_purchases_count(queryset, min_count: int = 0) -> ProductQuerySet:
-        return queryset.annotate(
-            purchases_count=Sum('receipts__quantity', output_field=IntegerField())
-        ).filter(purchases_count__gt=min_count)
-
-    @staticmethod
-    def filter_by_reviews_count(queryset, min_count: int = 0) -> ProductQuerySet:
-        return queryset.annotate(reviews_count=Count('reviews__id')).filter(reviews_count__gt=min_count)
-
     def filter_queryset(self, request, queryset, view):
+        paginator = view.paginator
+        page_size = paginator.get_page_size(request)
+
         product_id = request.query_params.get(self.product_id_param)
         if product_id:
-            # recommendations by product instance genres and tags
-            genre_ids = ProductGenre.objects.filter(product_id=product_id).exculde(
-                genre__level__in=self.exclude_genre_levels
-            ).values_list('genre_id', flat=True)
-            tag_ids = ProductTag.objects.filter(product_id=product_id).values_list('tag_id', flat=True)
-            return (
-                queryset.exclude(id=product_id)
-                        .filter(Q(genres__genre_id__in=genre_ids) | Q(tags__tag_id__in=tag_ids))
-                        .order_by(F('reference_rank').desc(nulls_last=True), '-avg_rank')
+            return Product.objects.raw(
+                '''
+                SELECT p.* FROM product_product as p
+                   LEFT OUTER JOIN product_product_genres as pg ON (p.id = pg.product_id) 
+                   LEFT OUTER JOIN product_product_tags as pt ON (p.id = pt.product_id) 
+                   WHERE (
+                    p.availability AND p.is_active AND NOT (p.id = %s) 
+                    AND (
+                        pg.genre_id IN (
+                            SELECT g.id FROM product_genre as g 
+                            INNER JOIN product_product_genres as gp ON (g.id = gp.genre_id) 
+                            WHERE (NOT (g.level IN (0, 1) AND g.level IS NOT NULL) AND gp.product_id = %s)
+                            ORDER BY g.level DESC LIMIT 1
+                        ) 
+                        OR pt.tag_id IN (
+                            SELECT t.id FROM product_tag as t 
+                            INNER JOIN product_product_tags as t_p ON (t.id = t_p.tag_id) 
+                            WHERE t_p.product_id = %s
+                            )
+                        )
+                    ) LIMIT %s
+                ''', (product_id, product_id, product_id, page_size)
             )
-        # recommendations by products purchases and reviews
-        by_purchases_filtered = self.filter_by_purchases_count(queryset, min_count=self.min_filter_qty)
-        by_reviews_filtered = self.filter_by_reviews_count(queryset, min_count=self.min_filter_qty)
-        purchases_product_ids = list(by_purchases_filtered.values_list('id', flat=True))
-        reviewed_product_ids = list(by_reviews_filtered.values_list('id', flat=True))
-        reference_product_ids = purchases_product_ids + reviewed_product_ids
-        return queryset.annotate(
-            in_reference=Case(
-                When(id__in=reference_product_ids, then=Value(True)),
-                When(~Q(id__in=reference_product_ids), then=Value(False))
-            )
-        ).order_by('in_reference', F('reference_rank').desc(nulls_last=True))
+
+        return Product.objects.raw(
+            """
+            SELECT p.*, CASE WHEN p.reviews_count > 1 THEN true 
+                             WHEN p.receipts_qty > 1 THEN true 
+                             ELSE false END AS in_reference FROM product_product as p
+                WHERE (p.availability AND p.is_active) 
+                ORDER BY in_reference ASC, p.avg_rank DESC
+                LIMIT %s
+            """, (page_size,)
+        )
 
     def get_schema_operation_parameters(self, view):
         return [
@@ -144,64 +133,8 @@ class PopularProductOrdering(BaseFilterBackend):
         ]
 
 
-class SearchFilterByLang(SearchFilter):
-    def get_search_fields(self, view, request):
-        assert isinstance(view, LanguageMixin)
-        lang = view.get_lang()
-        return getattr(view, f'search_fields_{lang}', None)
-
-
 class GenreLevelFilter(BaseFilterBackend):
     def filter_queryset(self, request, queryset, view):
         level = request.query_params.get('level', 1)
         filter_kwargs = dict(level=level)
         return queryset.filter(**filter_kwargs)
-
-
-class ProductRankAdminFilter(SimpleListFilter):
-    title = _('Rank')
-    parameter_name = 'rank'
-
-    def lookups(self, request, model_admin):
-        return [
-            ("Unranked", _("Unranked")),
-            ("0.5", _("★☆☆☆☆")),
-            ("1.0", _("⭐☆☆☆☆")),
-            ("1.5", _("⭐★☆☆☆")),
-            ("2.0", _("⭐⭐☆☆☆")),
-            ("2.5", _("⭐⭐★☆☆")),
-            ("3.0", _("⭐⭐⭐☆☆")),
-            ("3.5", _("⭐⭐⭐★☆")),
-            ("4.0", _("⭐⭐⭐⭐☆")),
-            ("4.5", _("⭐⭐⭐⭐★")),
-            ("5.0", _("⭐⭐⭐⭐⭐")),
-        ]
-
-    def queryset(self, request, queryset):
-        base_queryset = queryset.annotate(avg_rank=Avg('reviews__rank', filter=Q(reviews__is_active=True)))
-        value = self.value()
-        match value:
-            case "Unranked":
-                return base_queryset.filter(avg_rank=0.0)
-            case "0.5":
-                return base_queryset.filter(avg_rank__gt=0, avg_rank__lte=0.5)
-            case "1.0":
-                return base_queryset.filter(avg_rank__gt=0.5, avg_rank__lte=1.0)
-            case "1.5":
-                return base_queryset.filter(avg_rank__gt=1.0, avg_rank__lte=1.5)
-            case "2.0":
-                return base_queryset.filter(avg_rank__gt=1.5, avg_rank__lte=2.0)
-            case "2.5":
-                return base_queryset.filter(avg_rank__gt=2.0, avg_rank__lte=2.5)
-            case "3.0":
-                return base_queryset.filter(avg_rank__gt=2.5, avg_rank__lte=3.0)
-            case "3.5":
-                return base_queryset.filter(avg_rank__gt=3.0, avg_rank__lte=3.5)
-            case "4.0":
-                return base_queryset.filter(avg_rank__gt=3.5, avg_rank__lte=4.0)
-            case "4.5":
-                return base_queryset.filter(avg_rank__gt=4.0, avg_rank__lte=4.5)
-            case "5.0":
-                return base_queryset.filter(avg_rank__gt=4.5)
-            case _:
-                return queryset
