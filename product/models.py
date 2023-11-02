@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from utils.helpers import round_half_integer
 
-from .querysets import ProductQuerySet, TagGroupQuerySet, ReviewAnalyticsQuerySet
+from .querysets import TagGroupQuerySet, ReviewAnalyticsQuerySet
 from .utils import internal_product_id_generation, increase_price
 
 
@@ -58,7 +58,7 @@ class Tag(BaseTagModel):
 
 
 class Product(models.Model):
-    objects = ProductQuerySet.as_manager()
+    objects = models.Manager()
     id = models.CharField(max_length=255, primary_key=True, default=internal_product_id_generation)
     # Product Info
     name = models.CharField(max_length=255, verbose_name=_('Name') + '[ja]')
