@@ -6,7 +6,6 @@ from rest_framework import serializers
 
 from currencies.models import Conversion
 from product.models import Product, Tag
-from utils.serializers import LangSerializerMixin
 
 from .models import DeliveryAddress, Order, Receipt, Customer, ReceiptTag
 from .utils import duplicate_delivery_address
@@ -32,7 +31,7 @@ class DeliveryAddressSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class ReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer):
+class ReceiptSerializer(serializers.ModelSerializer):
     tags = serializers.SerializerMethodField(read_only=True)
     product_id = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.filter(is_active=True, availability=True),
@@ -78,16 +77,14 @@ class ReceiptSerializer(LangSerializerMixin, serializers.ModelSerializer):
         return instance.unit_price
 
     def get_product_name(self, instance):
-        name_field = self.get_translate_field('name')
-        return getattr(instance.product, name_field, instance.product.name)
+        return instance.product.name
 
     def get_product_image(self, instance):
         if instance.product.image_urls.exists():
             return instance.product.image_urls.first().url
 
     def get_tags(self, instance):
-        field = self.get_translate_field('tag__name')
-        return list(instance.tags.values_list(field, flat=True))
+        return list(instance.tags.values_list('name', flat=True))
 
     def create(self, validated_data):
         product = validated_data['product_id']
