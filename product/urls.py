@@ -4,7 +4,7 @@ from .views import (
     GenreListView, GenreChildrenView, GenreParentsView, TagByGenreListView,
     ProductsListView, ProductsByIdsView, ProductsListByGenreView, ProductRetrieveView, ProductReviewDestroyView,
     UserReviewListView, ProductReviewCreateView, ProductReviewListView,
-    ReferenceListView
+    ReferenceListView, product_tags_info_view
 )
 
 genres_urlpatterns = [
@@ -31,7 +31,9 @@ products_urlpatterns = [
     re_path('^genres/(?P<id>.+)/products/$', ProductsListByGenreView.as_view(), name='product-products-by-genre-list'),
     # Important: product_detail must always be the last, otherwise it will overlap other addresses.
     # also product_urlpatterns should also be at the end of urlpatterns
+    re_path('^(?P<product_id>.+)/tags/$', product_tags_info_view, name='product-tags-info'),
     re_path('^(?P<id>.+)/$', ProductRetrieveView.as_view(), name='product-detail'),
+
 ]
 
 urlpatterns = additions_urlpatterns + genres_urlpatterns + reviews_urlpatterns + products_urlpatterns
