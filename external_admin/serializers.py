@@ -8,7 +8,7 @@ from rest_framework import serializers
 from currencies.models import Conversion
 from currencies.serializers import ConversionField
 from currencies.utils import get_currency_price_per
-from product.models import Product, Genre, Tag, ProductImageUrl, TagGroup, ProductReview, ProductGenre, ProductTag
+from product.models import Product, Genre, Tag, ProductImageUrl, TagGroup, ProductReview
 from product.utils import get_genre_parents_tree
 from promotions.models import Banner, Promotion, Discount
 from order.models import Order, Customer, DeliveryAddress, Receipt
@@ -29,7 +29,6 @@ class ConversionAdminSerializer(serializers.ModelSerializer):
         fields = ('id', 'currency_from', 'currency_to', 'price_per')
         extra_kwargs = {'currency_from': {'read_only': True}, 'currency_to': {'read_only': True}}
 
-
     def save(self, **kwargs):
         instance = super().save(**kwargs)
         get_currency_price_per.clear()
@@ -39,13 +38,13 @@ class ConversionAdminSerializer(serializers.ModelSerializer):
 class TagGroupAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = TagGroup
-        fields = ('id', 'name', 'name_ru', 'name_en', 'name_tr', 'name_ky', 'name_kz')
+        fields = ('id', 'name')
 
 
 class TagAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
-        fields = ('id', 'name', 'name_ru', 'name_en', 'name_tr', 'name_ky', 'name_kz')
+        fields = ('id', 'name')
 
 
 class ProductImageAdminSerializer(serializers.ModelSerializer):
@@ -71,7 +70,7 @@ class ProductAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = ('id', 'name', 'price', 'sale_price', 'availability', 'is_active', 'avg_rank', 'reviews_count',
-                  'reference_rank', 'description', 'image_urls')
+                  'description', 'image_urls')
 
 
 class ProductDetailAdminSerializer(ProductAdminSerializer):
@@ -91,60 +90,18 @@ class ProductDetailAdminSerializer(ProductAdminSerializer):
     images = serializers.ListField(child=serializers.URLField(), write_only=True, required=False)
     genres = serializers.SerializerMethodField(read_only=True)
     image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
-    tags_info = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
         fields = (
-            *ProductAdminSerializer.Meta.fields, 'name_ru', 'name_en', 'name_tr', 'name_ky', 'name_kz',
-            'description_ru', 'description_en', 'description_tr', 'description_ky', 'description_kz',
-            'genres', 'tags_info', 'genre', 'tags', 'images', 'product_url'
+            *ProductAdminSerializer.Meta.fields,
+            'genres', 'genre', 'tags', 'images', 'product_url'
         )
         extra_kwargs = {'id': {'read_only': True}, 'price': {'required': True}}
 
     def get_genres(self, instance):
-        genres_fk = instance.genres.filter(genre__deactivated=False)
-        if not genres_fk.exists():
-            return []
-
-        genres = (
-            Genre.objects.exclude(level=0)
-            .filter(id__in=genres_fk.values_list('genre_id', flat=True))
-            .order_by('-level')
-        )
+        genres = instance.genres.exclude(level=0).filter(deactivated=False).order_by('-level')
         return GenreAdminSerializer(instance=genres, many=True, context=self.context).data
-
-    def get_tags_info(self, instance):
-        tags_fk = instance.tags.all()
-        if not tags_fk.exists():
-            return []
-
-        group_ids = (
-            tags_fk.order_by('tag__group_id')
-                   .distinct('tag__group_id')
-                   .values_list('tag__group_id', flat=True)
-        )
-        groups_queryset = TagGroup.objects.filter(id__in=group_ids)
-        return groups_queryset.tags_data(tag_ids=tags_fk.values_list('tag_id', flat=True))
-
-    @staticmethod
-    def update_genres(instance, genre) -> list[ProductGenre]:
-        genres_query = ProductGenre.objects.filter(product=instance)
-        if genres_query.exists():
-            genres_query.delete()
-        genres_tree = get_genre_parents_tree(genre)
-        return ProductGenre.objects.bulk_create(
-            [ProductGenre(product=instance, genre_id=genre_id) for genre_id in genres_tree]
-        )
-
-    @staticmethod
-    def update_tags(instance, tags) -> list[ProductTag]:
-        tags_query = ProductTag.objects.filter(product=instance)
-        if tags_query.exists():
-            tags_query.delete()
-        return ProductTag.objects.bulk_create(
-            [ProductTag(product=instance, tag=tag) for tag in tags]
-        )
 
     @staticmethod
     def update_images(instance, image_urls) -> list[ProductImageUrl]:
@@ -161,9 +118,12 @@ class ProductDetailAdminSerializer(ProductAdminSerializer):
         tags = self.validated_data.pop('tags', None)
         product = super().save()
         if genre:
-            self.update_genres(product, genre)
+            genres_tree = get_genre_parents_tree(genre)
+            product.genres.clear()
+            product.genres.add(*genres_tree)
         if tags:
-            self.update_tags(product, tags)
+            product.tags.clear()
+            product.tags.add(*tags)
         if images:
             self.update_images(product, images)
         return product
@@ -187,32 +147,19 @@ class BannerAdminSerializer(serializers.ModelSerializer):
 
 class PromotionAdminSerializer(serializers.ModelSerializer):
     name = serializers.CharField(write_only=True, required=True)
-    name_ru = serializers.CharField(write_only=True, required=False)
-    name_en = serializers.CharField(write_only=True, required=False)
-    name_tr = serializers.CharField(write_only=True, required=False)
-    name_kz = serializers.CharField(write_only=True, required=False)
-    name_ky = serializers.CharField(write_only=True, required=False)
     description = serializers.CharField(write_only=True, required=False)
-    description_ru = serializers.CharField(write_only=True, required=False)
-    description_en = serializers.CharField(write_only=True, required=False)
-    description_tr = serializers.CharField(write_only=True, required=False)
-    description_kz = serializers.CharField(write_only=True, required=False)
-    description_ky = serializers.CharField(write_only=True, required=False)
     image = serializers.ImageField(write_only=True, required=False)
 
     set_products = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), write_only=True, many=True,
                                                       required=False)
     set_discount = serializers.FloatField(validators=[MaxValueValidator(100)], write_only=True, required=False)
-
     discount = serializers.SlugRelatedField(slug_field='percentage', read_only=True)
     banner = BannerAdminSerializer(many=False, read_only=True)
     products = ProductAdminSerializer(many=True, read_only=True)
 
     class Meta:
         model = Promotion
-        banner_fields = ('name', 'name_ru', 'name_en', 'name_tr', 'name_ky', 'name_kz', 'description',
-                         'description_ru', 'description_en', 'description_tr', 'description_ky', 'description_kz',
-                         'image')
+        banner_fields = ('name', 'description', 'image')
         fields = ('id', 'discount', 'set_discount', 'banner', 'products', 'set_products', 'start_date', 'end_date',
                   'deactivated', 'created_at', *banner_fields)
 
@@ -305,8 +252,7 @@ class OrderAdminSerializer(serializers.ModelSerializer):
                   'delivery_address')
 
     def get_total_prices(self, instance):
-        prices = Order.analytics.filter(id=instance.id).total_prices().values('yen', 'som', 'dollar')
-        return list(prices)[0]
+        return list(Order.analytics.filter(id=instance.id).total_prices().values('yen', 'som', 'dollar'))[0]
 
 
 # ------------------------------------------------- Analytics ----------------------------------------------------------
