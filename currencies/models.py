@@ -20,6 +20,7 @@ class Conversion(models.Model):
                 case cls.som.value:
                     return cls.som
 
+    objects = models.Manager()
     currency_from = models.CharField(max_length=10, choices=Currencies.choices, default=Currencies.yen)
     currency_to = models.CharField(max_length=10, choices=Currencies.choices)
     price_per = models.DecimalField(max_digits=20, decimal_places=10, help_text=_('unit price currency_from'))
