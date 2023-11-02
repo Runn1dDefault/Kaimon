@@ -1,27 +1,21 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from utils.helpers import round_half_integer
 
-from .querysets import GenreQuerySet, ProductQuerySet, TagGroupQuerySet, ReviewAnalyticsQuerySet
+from .querysets import ProductQuerySet, TagGroupQuerySet, ReviewAnalyticsQuerySet
 from .utils import internal_product_id_generation, increase_price
 
 
 class Genre(models.Model):
-    objects = GenreQuerySet.as_manager()
+    objects = models.Manager()
 
     id = models.BigIntegerField(primary_key=True)
     level = models.PositiveIntegerField(null=True, blank=True)
-
-    name = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ja]')
-    name_ru = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ru]')
-    name_en = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[en]')
-    name_tr = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[tr]')
-    name_ky = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ky]')
-    name_kz = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[kz]')
+    name = models.CharField(max_length=100)
 
     deactivated = models.BooleanField(default=False, null=True)
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, related_name='children', null=True)
@@ -29,15 +23,17 @@ class Genre(models.Model):
     def __str__(self):
         return str(self.id)
 
+    class Meta:
+        indexes = (
+            models.Index(name='exclude_zero_idx', fields=('name',), condition=~Q(level=0), include=('level',)),
+            models.Index(name='activate_genres_idx', fields=('name',), condition=Q(deactivated=False),
+                         include=('deactivated',)),
+        )
+
 
 class BaseTagModel(models.Model):
     id = models.BigIntegerField(primary_key=True)
     name = models.CharField(max_length=100)
-    name_tr = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[tr]')
-    name_ru = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ru]')
-    name_en = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[en]')
-    name_ky = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[ky]')
-    name_kz = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Name') + '[kz]')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -48,16 +44,17 @@ class TagGroup(BaseTagModel):
     objects = TagGroupQuerySet.as_manager()
 
     def __str__(self):
-        return f'Tag-group-{self.id}-{self.name}'
+        return f'Group: {self.id}'
 
 
 class Tag(BaseTagModel):
-    group = models.ForeignKey(TagGroup, on_delete=models.CASCADE, related_name='tags', null=True, blank=True)
+    objects = models.Manager()
+    group = models.ForeignKey(TagGroup, on_delete=models.CASCADE, related_name='tags', null=True)
 
     def __str__(self):
         if self.group:
-            return f'#{self.group.name}-{self.id}-{self.name}'
-        return f'#{self.id}-{self.name}'
+            return f'{self.group} Tag: {self.id}'
+        return f'Tag: {self.id}'
 
 
 class Product(models.Model):
@@ -67,88 +64,45 @@ class Product(models.Model):
     name = models.CharField(max_length=255, verbose_name=_('Name') + '[ja]')
     description = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ja]')
     rakuten_price = models.DecimalField(max_digits=20, decimal_places=10, null=True)
-    price = models.DecimalField(max_digits=20, decimal_places=10, null=True)
     product_url = models.TextField(blank=True, null=True)
     availability = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
-    reference_rank = models.IntegerField(null=True, blank=True)
 
-    # translating fields
-    name_tr = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[tr]')
-    name_ru = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[ru]')
-    name_en = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[en]')
-    name_ky = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[ky]')
-    name_kz = models.CharField(max_length=255, blank=True, null=True, verbose_name=_('Name') + '[kz]')
-    description_tr = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[tr]')
-    description_ru = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ru]')
-    description_en = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[en]')
-    description_ky = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ky]')
-    description_kz = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[kz]')
     avg_rank = models.FloatField(default=0)
     receipts_qty = models.PositiveIntegerField(default=0)
     reviews_count = models.PositiveIntegerField(default=0)
     sale_price = models.DecimalField(max_digits=20, decimal_places=10, null=True, default=None)
 
-    def update_sale_price(self):
-        self.sale_price = None
-        if not self.availability or not self.price or self.price <= 0:
-            self.save()
-            return
+    genres = models.ManyToManyField(Genre, related_name='products', db_table='product_product_genres')
+    tags = models.ManyToManyField(Tag, related_name='products', db_table='product_product_tags')
 
-        promotions = getattr(self, 'promotions')
-        promotion = promotions.active_promotions().first()
-        if not promotion:
-            self.save()
-            return
+    @property
+    def price(self):
+        return increase_price(self.rakuten_price)
 
-        try:
-            discount = promotion.discount
-        except ObjectDoesNotExist:
-            # in the future here can be changed, when new promotion logic will be added
-            return None
-
-        self.sale_price = discount.calc_price(self.price)
-        self.save()
-
-    def update_reviews_count(self):
-        reviews = getattr(self, 'reviews')
-        self.reviews_count = reviews.filter(is_active=True).values('id').distinct().count() or 0
-        self.save()
-
-    def update_average_rank(self):
-        reviews = getattr(self, 'reviews')
-        self.avg_rank = reviews.filter(is_active=True).aggregate(models.Avg('rank'))['rank__avg']
-        self.save()
-
-    def update_receipts_qty(self):
-        receipts = getattr(self, 'receipts')
-        self.receipts_qty = receipts.values('order_id').distinct().count() or 0
-        self.save()
-
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-        if self.rakuten_price and not self.price:
-            self.price = increase_price(self.rakuten_price)
-        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
-
-
-class ProductGenre(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='genres')
-    genre = models.ForeignKey(Genre, on_delete=models.CASCADE)
-
-
-class ProductTag(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='tags')
-    tag = models.ForeignKey(Tag, on_delete=models.CASCADE)
+    class Meta:
+        indexes = (
+            models.Index(fields=('avg_rank',)),
+            models.Index(fields=('created_at',)),
+            models.Index(fields=('reviews_count',)),
+            models.Index(fields=('receipts_qty',)),
+            models.Index(name='available_idx', fields=('name',), condition=Q(availability=True),
+                         include=['availability'])
+        )
 
 
 class ProductImageUrl(models.Model):
+    objects = models.Manager()
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='image_urls')
     url = models.TextField()
 
     def __str__(self):
         return self.url
+
+    class Meta:
+        indexes = (models.Index(fields=('product', 'url')),)
 
 
 class ProductReview(models.Model):
