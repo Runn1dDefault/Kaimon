@@ -4,7 +4,7 @@ from functools import lru_cache
 from currencies.models import Conversion
 
 
-@lru_cache(maxsize=3)
+@lru_cache(maxsize=2)
 def get_currency_price_per(currency: str):
     conversion = Conversion.objects.filter(currency_to=currency).order_by('created_at').first()
     if not conversion:
