@@ -216,7 +216,7 @@ class ProductReviewListView(generics.ListAPIView):
 class ReferenceListView(CurrencyMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
-    queryset = Product.objects.filter(is_active=True, availability=True).prefetch_related('image_urls')
+    queryset = Product.objects.filter(is_active=True, availability=True)
     filter_backends = [ProductReferenceFilter]
     serializer_class = ProductListSerializer
     pagination_class = PagePagination
