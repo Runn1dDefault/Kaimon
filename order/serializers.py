@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from currencies.models import Conversion
+from currencies.utils import get_currency_price_per
 from product.models import Product, Tag
 
 from .models import DeliveryAddress, Order, Receipt, Customer, ReceiptTag
@@ -84,7 +85,7 @@ class ReceiptSerializer(serializers.ModelSerializer):
             return instance.product.image_urls.first().url
 
     def get_tags(self, instance):
-        return list(instance.tags.values_list('name', flat=True))
+        return list(instance.tags.values_list('tag__name', flat=True))
 
     def create(self, validated_data):
         product = validated_data['product_id']
@@ -114,7 +115,8 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ('id', 'status', 'delivery_address', 'receipts', 'products', 'address_id', 'phone', 'comment', 'created_at', 'total_price')
+        fields = ('id', 'status', 'delivery_address', 'receipts', 'products', 'address_id', 'phone', 'comment',
+                  'created_at', 'total_price')
         extra_kwargs = {'status': {'read_only': True}}
 
     def validate(self, attrs):
@@ -124,19 +126,13 @@ class OrderSerializer(serializers.ModelSerializer):
                 {'address_id': _("Invalid pk \"%s\" - object does not exist.") % address.id}
             )
 
-        dollar_conversion = Conversion.objects.filter(
-            currency_from=Conversion.Currencies.yen,
-            currency_to=Conversion.Currencies.dollar
-        ).first()
-        som_conversion = Conversion.objects.filter(
-            currency_from=Conversion.Currencies.yen,
-            currency_to=Conversion.Currencies.som
-        ).first()
-        if not dollar_conversion or not som_conversion:
+        dollar = get_currency_price_per(Conversion.Currencies.dollar)
+        som = get_currency_price_per(Conversion.Currencies.som)
+        if not dollar or not som:
             logging.warning('no entries were found for conversion')
 
-        attrs['yen_to_usd'] = dollar_conversion.price_per if dollar_conversion else 0.0
-        attrs['yen_to_som'] = som_conversion.price_per if som_conversion else 0.0
+        attrs['yen_to_usd'] = dollar
+        attrs['yen_to_som'] = som
         return attrs
 
     def create(self, validated_data):
