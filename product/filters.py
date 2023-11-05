@@ -1,4 +1,4 @@
-from django.db.models import Subquery, Q, Case, When
+from django.db.models import Subquery
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 from rest_framework.filters import BaseFilterBackend
@@ -79,17 +79,17 @@ class PopularProductOrdering(BaseFilterBackend):
     popular_param = 'popular'
     popular_description = _("Ordering by popular (enabled when equal to 1)")
 
-    def get_popular_param(self, request, view):
+    def get_popular_param(self, request):
         return request.query_params.get(self.popular_param, '0')
 
-    def ordering_included(self, request, view) -> bool:
-        popular_param = self.get_popular_param(request, view)
+    def ordering_included(self, request) -> bool:
+        popular_param = self.get_popular_param(request)
         if popular_param == '1':
             return True
         return False
 
     def filter_queryset(self, request, queryset, view):
-        if self.ordering_included(request, view):
+        if self.ordering_included(request):
             return queryset.order_by("-receipts_qty", "-avg_rank")
         return queryset
 
