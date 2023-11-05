@@ -11,19 +11,22 @@ class FilterByTag(BaseFilterBackend):
     description = _('Filter by tag ids')
 
     def filter_queryset(self, request, queryset, view):
-        tag_ids = request.query_params.get(self.param, '').split(',')
-        tag_ids = tuple(tag_id for tag_id in tag_ids if tag_id.strip())
+        tag_ids = tuple(tag_id for tag_id in request.query_params.get(self.param, '').split(',') if tag_id.strip())
         if tag_ids:
+            lookup_kwarg_field = view.lookup_url_kwarg or view.lookup_field
             paginator = view.paginator
             page_size = paginator.get_page_size(request)
+            check_field = f"p.{view.lookup_field}" if view.lookup_field else 1
+            check_value = view.kwargs[lookup_kwarg_field] if view.lookup_field else 1
             return Product.objects.raw(
                 '''
                 SELECT p.* FROM product_product as p
                    LEFT OUTER JOIN product_product_tags as pt ON (p.id = pt.product_id) 
                    WHERE (
                     p.availability AND p.is_active AND pt.tag_id IN %s
+                    AND %s = %s
                     ) LIMIT %s
-                ''', (tag_ids, page_size)
+                ''', (tag_ids, page_size, check_field, check_value)
             )
         return queryset
 
