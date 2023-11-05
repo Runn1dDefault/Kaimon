@@ -3,7 +3,7 @@ from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 from rest_framework.filters import BaseFilterBackend
 
-from .models import Product, Genre
+from .models import Genre
 
 
 class FilterByTag(BaseFilterBackend):
@@ -13,21 +13,7 @@ class FilterByTag(BaseFilterBackend):
     def filter_queryset(self, request, queryset, view):
         tag_ids = tuple(tag_id for tag_id in request.query_params.get(self.param, '').split(',') if tag_id.strip())
         if tag_ids:
-            lookup_kwarg_field = view.lookup_url_kwarg or view.lookup_field
-            paginator = view.paginator
-            page_size = paginator.get_page_size(request)
-            check_field = f"p.{view.lookup_field}" if view.lookup_field else 1
-            check_value = view.kwargs[lookup_kwarg_field] if view.lookup_field else 1
-            return Product.objects.raw(
-                '''
-                SELECT p.* FROM product_product as p
-                   LEFT OUTER JOIN product_product_tags as pt ON (p.id = pt.product_id) 
-                   WHERE (
-                    p.availability AND p.is_active AND pt.tag_id IN %s
-                    AND %s = %s
-                    ) LIMIT %s
-                ''', (tag_ids, page_size, check_field, check_value)
-            )
+            return queryset.filter(tags__id__in=tag_ids)
         return queryset
 
     def get_schema_operation_parameters(self, view):
