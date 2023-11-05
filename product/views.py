@@ -114,7 +114,7 @@ class ProductsListView(CurrencyMixin, generics.ListAPIView):
     pagination_class = PagePagination
     serializer_class = ProductListSerializer
     filter_backends = [filters.SearchFilter, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
-    search_fields = ['name', 'description', 'genres', 'genres__name']
+    search_fields = ['name', 'description', 'genres__id', 'genres__name']
     ordering_fields = ['created_at']
 
 
