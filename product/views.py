@@ -7,7 +7,6 @@ from rest_framework.response import Response
 
 from currencies.mixins import CurrencyMixin
 from users.permissions import RegistrationPayedPermission, EmailConfirmedPermission
-from utils.filters import FilterByLookup
 from utils.paginators import PagePagination
 from utils.views import CachingMixin
 
@@ -122,7 +121,9 @@ class ProductsListView(CurrencyMixin, generics.ListAPIView):
 class ProductsListByGenreView(ProductsListView):
     lookup_url_kwarg = 'id'
     lookup_field = 'genres__id'
-    filter_backends = (FilterByLookup, *ProductsListView.filter_backends)
+
+    def get_queryset(self):
+        return super().get_queryset().filter(**{self.lookup_field: self.kwargs[self.lookup_url_kwarg]})
 
 
 class TagByGenreListView(generics.ListAPIView):
