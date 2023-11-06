@@ -30,6 +30,8 @@ ITEM_SAVING_QUEUE_ROUTE = {'queue': 'item_saving', 'routing_key': 'item_saving'}
 # bind routing with queues
 app.conf.task_routes = {
     'users.tasks.*': MAILING_QUEUE_ROUTE,
+    'product.tasks.deactivate_products': BASE_DEFAULT_QUEUE_ROUTE,
+    'product.tasks.deactivate_empty_genres': BASE_DEFAULT_QUEUE_ROUTE,
     'rakuten_scraping.tasks.parse_genres': RAKUTEN_REQUESTS_QUEUE_ROUTE,
     'rakuten_scraping.tasks.parse_items': RAKUTEN_REQUESTS_QUEUE_ROUTE,
     'rakuten_scraping.tasks.parse_and_update_tag': RAKUTEN_REQUESTS_QUEUE_ROUTE,
