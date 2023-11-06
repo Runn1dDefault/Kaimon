@@ -4,8 +4,8 @@ from typing import Any
 from django.utils import timezone
 
 from kaimon.celery import app
-from product.utils import get_last_children, get_genre_parents_tree
-from utils.helpers import import_model
+from product.utils import filter_only_active_genres, check_all_genres_active
+from utils.helpers import import_model, recursive_many_tree, recursive_single_tree
 
 from .settings import app_settings
 from .utils import get_rakuten_client, build_by_fields_map
@@ -167,14 +167,19 @@ def update_items(items: list[dict[str, Any]]):
 @app.task()
 def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict[str, Any]] = None):
     conf = app_settings.PRODUCT_PARSE_SETTINGS
+    genre_model = import_model(app_settings.GENRE_PARSE_SETTINGS.MODEL)
+    genre = genre_model.objects.get(id=genre_id)
+    genre_ids = recursive_single_tree(genre, 'parent')
+    if not check_all_genres_active(genre_ids):
+        print('Genre %s have deactivated parents!' % genre_id)
+        return
+
     product_model = import_model(conf.MODEL)
     increase_price = import_model('product.utils.increase_price')
     product_genre_model = import_model(conf.GENRE_RELATION_MODEL)
     product_tag_model = import_model(conf.TAG_RELATION_MODEL)
     img_model = import_model(conf.IMAGE_MODEL)
-    genre_model = import_model(app_settings.GENRE_PARSE_SETTINGS.MODEL)
-    genre = genre_model.objects.get(id=genre_id)
-    genre_ids = get_genre_parents_tree(genre)
+
     fields_map = conf.PARSE_KEYS._asdict()
 
     if tag_groups:
@@ -285,8 +290,8 @@ def check_product_availability(product_id: str):
 @app.task()
 def parse_all_genre_products():
     genre_model = import_model(app_settings.GENRE_PARSE_SETTINGS.MODEL)
-    for genre in genre_model.objects.filter(level=1):
-        children = get_last_children(genre)
+    for genre in genre_model.objects.filter(level=1, deactivated=False):
+        children = recursive_many_tree(genre, 'children')
 
-        for child_id in children:
+        for child_id in filter_only_active_genres(children):
             parse_items.delay(child_id, parse_all=True)
