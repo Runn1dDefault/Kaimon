@@ -7,6 +7,7 @@ from rest_framework.response import Response
 
 from currencies.mixins import CurrencyMixin
 from users.permissions import RegistrationPayedPermission, EmailConfirmedPermission
+from utils.helpers import recursive_single_tree
 from utils.paginators import PagePagination
 from utils.views import CachingMixin
 
@@ -15,7 +16,7 @@ from .models import Genre, Product, TagGroup, ProductReview
 from .paginators import GenrePagination
 from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer, \
     ProductIdsSerializer
-from .utils import get_genre_parents_tree, get_tags_for_product
+from .utils import get_tags_for_product
 
 
 # -------------------------------------------------- Genres ------------------------------------------------------------
@@ -59,11 +60,12 @@ class GenreParentsView(CachingMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     lookup_field = 'id'
-    queryset = Genre.objects.filter(deactivated=False)
+    queryset = Genre.objects.filter(level__gt=0, deactivated=False)
     serializer_class = GenreSerializer
 
     def list(self, request, *args, **kwargs):
-        parents_queryset = self.get_queryset().exclude(level=0).filter(id__in=get_genre_parents_tree(self.get_object()))
+        parents = recursive_single_tree(self.get_object(), 'parent')
+        parents_queryset = self.get_queryset().filter(id__in=parents)
         parents = self.filter_queryset(parents_queryset)
         page = self.paginate_queryset(parents)
         if page is not None:
