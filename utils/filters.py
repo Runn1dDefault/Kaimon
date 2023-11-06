@@ -11,9 +11,10 @@ from rest_framework.compat import coreapi, coreschema
 
 class ListFilterFields(BaseFilterBackend):
     description = _('Filtering by field %s ex: query1,query2')
+    filter_fields_arr = 'list_filter_fields'
 
     def get_field_names(self, view):
-        return getattr(view, 'list_filter_fields', {})
+        return getattr(view, self.filter_fields_arr, {})
 
     def get_queries_kwargs(self, request, view) -> dict[str, list[str]]:
         queries = {}
@@ -113,26 +114,12 @@ class DateRangeFilter(BaseFilterBackend):
         ]
 
 
-class FilterByLookup(BaseFilterBackend):
-    def filter_queryset(self, request, queryset, view):
-        lookup_url_kwarg = view.lookup_url_kwarg or view.lookup_field
-
-        assert lookup_url_kwarg in view.kwargs, (
-            'Expected view %s to be called with a URL keyword argument '
-            'named "%s". Fix your URL conf, or set the `.lookup_field` '
-            'attribute on the view correctly.' %
-            (view.__class__.__name__, lookup_url_kwarg)
-        )
-
-        filter_kwargs = {view.lookup_field: view.kwargs[lookup_url_kwarg]}
-        return queryset.filter(**filter_kwargs)
-
-
 class FilterByFields(BaseFilterBackend):
     description_form = _('Filter by field: {field}')
+    filter_fields_arg = 'filter_fields'
 
     def get_filter_fields(self, view):
-        return getattr(view, 'filter_fields', None)
+        return getattr(view, self.filter_fields_arg, None)
 
     def filter_queryset(self, request, queryset, view):
         filter_fields = self.get_filter_fields(view)

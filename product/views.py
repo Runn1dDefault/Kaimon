@@ -7,7 +7,6 @@ from rest_framework.response import Response
 
 from currencies.mixins import CurrencyMixin
 from users.permissions import RegistrationPayedPermission, EmailConfirmedPermission
-from utils.filters import FilterByLookup
 from utils.paginators import PagePagination
 from utils.views import CachingMixin
 
@@ -112,9 +111,9 @@ class ProductsListView(CurrencyMixin, generics.ListAPIView):
     authentication_classes = ()
     queryset = Product.objects.filter(is_active=True, availability=True)
     pagination_class = PagePagination
-    serializer_class = ProductListSerializer
+    serializer_class = ProductRetrieveSerializer
     filter_backends = [filters.SearchFilter, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
-    search_fields = ['name', 'description', 'genres', 'genres__name']
+    search_fields = ['name', 'description']
     ordering_fields = ['created_at']
 
 
@@ -122,7 +121,12 @@ class ProductsListView(CurrencyMixin, generics.ListAPIView):
 class ProductsListByGenreView(ProductsListView):
     lookup_url_kwarg = 'id'
     lookup_field = 'genres__id'
-    filter_backends = (FilterByLookup, *ProductsListView.filter_backends)
+
+    def get_lookup_kwargs(self):
+        return {self.lookup_field: self.kwargs[self.lookup_url_kwarg]}
+
+    def get_queryset(self):
+        return super().get_queryset().filter(**self.get_lookup_kwargs())
 
 
 class TagByGenreListView(generics.ListAPIView):
