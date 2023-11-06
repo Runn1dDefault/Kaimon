@@ -8,12 +8,11 @@ from product.models import Genre, Tag, TagGroup, Product, ProductImageUrl, Produ
 class GenreAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'level', 'deactivated')
     list_display_links = ('id', 'name')
-    search_fields = ('id', 'name', 'name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz')
+    search_fields = ('id', 'name')
     search_help_text = _('Search by fields: ID, NAME')
     list_filter = ('level', 'deactivated')
     fieldsets = (
-        (_('General Info'), {'fields': ('id', 'name', 'level', 'deactivated')}),
-        (_('Another language names'), {'fields': ('name_tr', 'name_ru', 'name_en', 'name_ky', 'name_kz')}),
+        (_('General Info'), {'fields': ('id', 'name', 'level', 'deactivated', 'parent')}),
     )
     list_per_page = 30
     list_max_show_all = 50
