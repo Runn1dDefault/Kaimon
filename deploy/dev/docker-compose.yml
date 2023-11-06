@@ -56,8 +56,8 @@ services:
     depends_on:
       - web-dev
     volumes:
-      - ../../static:/app/static
-      - ../../media:/app/media
+      - static:/app/static
+      - media:/app/media
 
   celery-default:
     restart: always
