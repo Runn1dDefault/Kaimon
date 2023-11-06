@@ -9,10 +9,10 @@ from currencies.models import Conversion
 from currencies.serializers import ConversionField
 from currencies.utils import get_currency_price_per
 from product.models import Product, Genre, Tag, ProductImageUrl, TagGroup, ProductReview
-from product.utils import get_genre_parents_tree
 from promotions.models import Banner, Promotion, Discount
 from order.models import Order, Customer, DeliveryAddress, Receipt
 from users.models import User
+from utils.helpers import recursive_single_tree
 from utils.serializers import AnalyticsSerializer
 
 
@@ -118,7 +118,7 @@ class ProductDetailAdminSerializer(ProductAdminSerializer):
         tags = self.validated_data.pop('tags', None)
         product = super().save()
         if genre:
-            genres_tree = get_genre_parents_tree(genre)
+            genres_tree = recursive_single_tree(genre, "parent")
             product.genres.clear()
             product.genres.add(*genres_tree)
         if tags:
