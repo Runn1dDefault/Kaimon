@@ -3,10 +3,12 @@ version: "3.9"
 services:
   postgres:
     image: postgres
+    shm_size: 512m
     restart: always
-    hostname: postgres_kaimono
+    networks:
+      - database
     ports:
-      - "5436:5432"
+      - "5438:5432"
     environment:
       POSTGRES_DB: kaimono
       POSTGRES_PASSWORD: lksdflkma12ke0291
@@ -16,35 +18,36 @@ services:
   redis:
     image: redis
     restart: always
-    hostname: redis_kaimono
     command: redis-server --requirepass akmsdokm124j90
-    expose:
-      - "6379"
+    networks:
+      - redis_cache
+    ports:
+      - "6355:6379"
     volumes:
       - redis_data:/usr/local/etc/redis
 
-  web-dev:
-    container_name: web-dev
+  web:
     restart: always
     build:
       context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
+    networks:
+      - backend
+      - database
+      - redis_cache
     entrypoint: [ "bash", "./deploy/sh/entrypoint.sh" ]
     env_file:
       - ../../.env
     expose:
       - "8334"
     volumes:
-      - ../../:/app
-    depends_on:
-      - postgres
-      - redis
+      - static:/app/static
+      - media:/app/media
 
   nginx-dev:
     container_name: nginx-dev
     restart: always
+    networks:
+      - backend
     build:
       context: ../../
       dockerfile: deploy/dev/nginx.Dockerfile
@@ -56,108 +59,83 @@ services:
       - ../../static:/app/static
       - ../../media:/app/media
 
-  celery-default-dev:
-    container_name: celery-default-dev
-    hostname: celery-default-dev
+  celery-default:
     restart: always
     build:
       context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
+    networks:
+      - database
+      - redis_cache
     command: celery --app kaimon worker -Q default -c 4 --loglevel=info
-    volumes:
-      - ../../:/app
     env_file:
       - ../../.env
     depends_on:
-      - web-dev
+      - web
 
-  celery-beat-dev:
-    container_name: celery-beat-dev
+  celery-beat:
     restart: always
     build:
       context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
-    command: celery --app kaimon beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
-    volumes:
-      - ../../:/app
+    networks:
+      - database
+      - redis_cache
+    command: celery --app kaimon beat --loglevel=info
     env_file:
       - ../../.env
     depends_on:
-      - web-dev
+      - web
 
-  celery-mailing-dev:
-    container_name: celery-mailing-dev
-    hostname: celery-mailing-dev
+  celery-mailing:
     restart: always
     build:
       context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
+    networks:
+      - database
+      - redis_cache
     command: celery --app kaimon worker -Q mailing -c 1 --loglevel=info
-    volumes:
-      - ../../:/app
     env_file:
       - ../../.env
     depends_on:
-      - web-dev
+      - web
 
-  celery-rakuten-requests-dev:
-    container_name: celery-rakuten-requests-dev
-    hostname: celery-rakuten-requests-dev
+  celery-rakuten-requests:
     restart: always
     build:
       context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
-    command: celery --app kaimon worker -Q rakuten_requests -c 4 --loglevel=info
-    volumes:
-      - ../../:/app
+    networks:
+      - database
+      - redis_cache
+    command: celery --app kaimon worker -Q rakuten_requests -c 3 --loglevel=info
     env_file:
       - ../../.env
     depends_on:
-      - web-dev
+      - web
 
-  celery-item-saving-dev:
-    container_name: celery-item-saving-dev
-    hostname: celery-item-saving-dev
+  celery-item-saving:
     restart: always
     build:
       context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
+    networks:
+      - database
+      - redis_cache
     command: celery --app kaimon worker -Q item_saving -c 4 --loglevel=info
-    volumes:
-      - ../../:/app
     env_file:
       - ../../.env
     depends_on:
-      - web-dev
+      - web
 
-  celery-translating-dev:
-    container_name: celery-translating-dev
-    hostname: celery-translating-dev
-    restart: always
-    build:
-      context: ../../
-    links:
-      - "postgres:postgres_kaimono"
-      - "redis:redis_kaimono"
-    command: celery --app kaimon worker -Q translating -c 1 --loglevel=info
-    volumes:
-      - ../../:/app
-    env_file:
-      - ../../.env
-    depends_on:
-      - web-dev
+networks:
+  backend:
+    driver: bridge
 
+  database:
+    driver: bridge
+
+  redis_cache:
+    driver: bridge
 
 volumes:
   redis_data:
   postgres_data:
+  static:
+  media:
