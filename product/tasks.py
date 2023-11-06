@@ -64,3 +64,14 @@ def deactivate_empty_genres():
 
     if to_full_deactivate:
         Genre.objects.bulk_update(to_full_deactivate, ('deactivated',))
+
+
+@app.task()
+def deactivate_products():
+    deactivated_genres = Genre.objects.filter(deactivated=True)
+    if not deactivated_genres:
+        return
+
+    for genre in deactivated_genres:
+        genre.products.update(is_active=False)
+
