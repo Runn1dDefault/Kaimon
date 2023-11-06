@@ -54,7 +54,7 @@ services:
     ports:
       - "9010:80"
     depends_on:
-      - web-dev
+      - web
     volumes:
       - static:/app/static
       - media:/app/media
