@@ -22,10 +22,12 @@ def get_genre_parents_tree(current_genre) -> list[int]:
     It is important to remember that with this approach we work from the bottom up.
      And we get a list from the category itself to the topmost parent
     """
-    collected_parents = [current_genre.id]
-    if not current_genre.parent:
+    collected_parents = []
+    if current_genre.parent is None:
         return collected_parents
-    collected_parents.extend(get_genre_parents_tree(current_genre.parent))
+    else:
+        collected_parents.append(current_genre.parent.id)
+        collected_parents.extend(get_genre_parents_tree(parent))
     return collected_parents
 
 
