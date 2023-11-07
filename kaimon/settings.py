@@ -13,11 +13,9 @@ DEBUG = True
 ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",  # JS for testing
-    "http://176.126.166.140:9010",
-    "http://176.126.166.140",
-    "http://localhost:9010",
     "https://kaimono.vip",
-    "https://kaimono.vip/"
+    "https://kaimono.vip/",
+    "http://109.123.237.209:9010"
 ]
 # Application definition
 
@@ -178,7 +176,8 @@ REST_FRAMEWORK = {
 
 CORS_ALLOWED_ORIGINS = [
     "https://kaimono.vip",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "http://109.123.237.209:9010"
 ]
 # swagger
 SPECTACULAR_SETTINGS = {
