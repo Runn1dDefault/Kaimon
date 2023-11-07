@@ -185,7 +185,7 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
     db_product_ids = list(product_model.objects.values_list('id', flat=True))
 
     new_products, products_to_update = [], []
-    new_product_images, new_product_tags, new_product_genres = [], [], []
+    new_product_tags, new_product_images = {}, []
 
     for item in items:
         item_code = item[conf.PARSE_KEYS.id]
@@ -197,12 +197,7 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
         product_data = build_by_fields_map(item, fields_map=fields_map)
         product = product_model(**product_data)
         new_products.append(product)
-
-        for genre_id in genre_ids:
-            product.genres.add(genre_id)
-
-        for tag_id in set(item[conf.TAG_IDS_KEY] or []):
-            product.tags.add(tag_id)
+        new_product_tags[item_code] = item[conf.TAG_IDS_KEY]
 
         for img_key in conf.IMG_PARSE_FIELDS or []:
             image_urls = item.get(img_key)
@@ -218,7 +213,10 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
                 break
 
     if new_products:
-        product_model.objects.bulk_create(new_products)
+        products = product_model.objects.bulk_create(new_products)
+        for product in products:
+            product.genres.add(*genre_ids)
+            product.tags.add(*new_product_tags[product.id])
 
     if new_product_images:
         img_model.objects.bulk_create(new_product_images)
