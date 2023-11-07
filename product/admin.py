@@ -4,6 +4,11 @@ from django.utils.translation import gettext_lazy as _
 from product.models import Genre, Tag, TagGroup, Product, ProductImageUrl, ProductReview
 
 
+@admin.action(description="Mark selected genres as activated")
+def make_active(modeladmin, request, queryset):
+    queryset.update(deactivated=False)
+
+
 @admin.register(Genre)
 class GenreAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'level', 'deactivated')
@@ -16,6 +21,7 @@ class GenreAdmin(admin.ModelAdmin):
     )
     list_per_page = 30
     list_max_show_all = 50
+    actions = [make_active]
 
 
 class ProductImageInline(admin.TabularInline):
