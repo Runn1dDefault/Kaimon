@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from kaimon.celery import app
 from product.utils import filter_only_active_genres, check_all_genres_active
-from utils.helpers import import_model, recursive_many_tree, recursive_single_tree
+from utils.helpers import import_model, recursive_many_tree, recursive_single_tree, increase_price
 
 from .settings import app_settings
 from .utils import get_rakuten_client, build_by_fields_map
@@ -175,7 +175,6 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
         return
 
     product_model = import_model(conf.MODEL)
-    increase_price = import_model('product.utils.increase_price')
     product_genre_model = import_model(conf.GENRE_RELATION_MODEL)
     product_tag_model = import_model(conf.TAG_RELATION_MODEL)
     img_model = import_model(conf.IMAGE_MODEL)
