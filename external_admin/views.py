@@ -151,6 +151,14 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         image_fk.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
+    @action(methods=['GET'], detail=True, url_path='change-activity')
+    def activate_or_deactivate_product(self, request, **kwargs):
+        genre = self.get_object()
+        genre.is_active = not genre.is_active
+        genre.save()
+        return Response(status=status.HTTP_202_ACCEPTED)
+
     @extend_schema(responses={status.HTTP_200_OK: None}, request=ProductImageAdminSerializer)
     @action(methods=['POST'], detail=False)
     def add_new_image(self, request, **kwargs):
