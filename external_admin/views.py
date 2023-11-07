@@ -70,7 +70,8 @@ class GenreListAdminView(CachingMixin, StaffViewMixin, generics.ListAPIView):
     @action(methods=['GET'], detail=True, url_path='change-activity')
     def activate_or_deactivate_genre(self, request, **kwargs):
         genre = self.get_object()
-        genre.is_active = not genre.is_active
+        genre.deactivated = not genre.deactivated
+        genre.products.update(is_active=not genre.deactivated)
         genre.save()
         return Response(status=status.HTTP_202_ACCEPTED)
 
