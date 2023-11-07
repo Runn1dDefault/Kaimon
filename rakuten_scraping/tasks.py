@@ -78,7 +78,7 @@ def save_tags_from_groups(tag_groups: list[dict[str, Any]]):
         for tag in group[conf.TAG_KEY] or []:
             tag_id = tag[conf.PARSE_KEYS.id]
 
-            if tag_id in new_tags or db_tags in db_tags:
+            if tag_id in new_tags or tag_id in db_tags:
                 continue
 
             new_tags[tag_id] = tag_model(id=tag_id, name=tag[conf.PARSE_KEYS.name], group_id=group_id)
