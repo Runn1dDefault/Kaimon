@@ -122,7 +122,6 @@ def update_or_create_tag(tag_data: dict[str, Any]):
 def update_items(items: list[dict[str, Any]]):
     conf = app_settings.PRODUCT_PARSE_SETTINGS
     product_model = import_model(conf.MODEL)
-    product_tag_model = import_model(conf.TAG_RELATION_MODEL)
     fields_map = conf.PARSE_KEYS._asdict()
     updated_products, update_fields = [], set()
 
@@ -152,13 +151,9 @@ def update_items(items: list[dict[str, Any]]):
         if tags_to_delete.exists():
             tags_to_delete.delete()
 
-        new_tags = [
-            product_tag_model(product_id=item_code, tag_id=tag_id)
-            for tag_id in tag_ids if tag_id not in saved_tag_ids
-        ]
-
+        new_tags = [tag_id for tag_id in tag_ids if tag_id not in saved_tag_ids]
         if new_tags:
-            product_tag_model.objects.bulk_create(new_tags)
+            db_product.tags.add(*new_tags)
 
     if updated_products:
         product_model.objects.bulk_update(updated_products, update_fields)
