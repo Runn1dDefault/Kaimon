@@ -215,7 +215,7 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
     if new_products:
         products = product_model.objects.bulk_create(new_products)
         for product in products:
-            product.genres.add(*genre_ids)
+            product.genres.add(genre_id, *genre_ids)
             product.tags.add(*new_product_tags[product.id])
 
     if new_product_images:
