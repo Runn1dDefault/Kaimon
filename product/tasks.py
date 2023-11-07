@@ -45,12 +45,29 @@ def update_product_sale_price(product_id: int):
     product.save()
 
 
+# @app.task()
+# def deactivate_products():
+#     deactivated_genres = Genre.objects.filter(deactivated=True)
+#     if not deactivated_genres:
+#         return
+#
+#     for genre in deactivated_genres:
+#         genre.products.update(is_active=False)
+
 @app.task()
 def deactivate_products():
-    deactivated_genres = Genre.objects.filter(deactivated=True)
-    if not deactivated_genres:
-        return
+    genres = Genre.objects.prefetch_related('products').filter(level=1, deactivated=True)
+    update_products = []
+    collected_ids = set()
 
-    for genre in deactivated_genres:
-        genre.products.update(is_active=False)
+    for genre in genres:
+        for product in genre.products.all():
+            if product.id in collected_ids:
+                continue
 
+            product.is_active = False
+            update_products.append(product)
+            collected_ids.add(product.id)
+
+    if update_products:
+        Product.objects.bulk_update(update_products, fields=['is_active'])
