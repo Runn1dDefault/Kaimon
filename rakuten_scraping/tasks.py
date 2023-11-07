@@ -293,5 +293,5 @@ def parse_all_genre_products():
     for genre in genre_model.objects.filter(level=1, deactivated=False):
         children = recursive_many_tree(genre, 'children')
 
-        for child_id in filter_only_active_genres(children):
-            parse_items.delay(child_id, parse_all=True)
+        for child in filter_only_active_genres(children):
+            parse_items.delay(child.id, parse_all=True)
