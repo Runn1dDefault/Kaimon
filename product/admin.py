@@ -4,9 +4,19 @@ from django.utils.translation import gettext_lazy as _
 from product.models import Genre, Tag, TagGroup, Product, ProductImageUrl, ProductReview
 
 
+admin.site.site_header = "Dev Admin"
+admin.site.index_title = "Welcome to Dev Admin"
+admin.site.site_title = "Dev Admin"
+
+
 @admin.action(description="Mark selected genres as activated")
 def make_active(modeladmin, request, queryset):
     queryset.update(deactivated=False)
+
+
+@admin.action(description="Mark selected genres as deactivated")
+def make_deactivated(modeladmin, request, queryset):
+    queryset.update(deactivated=True)
 
 
 @admin.register(Genre)
