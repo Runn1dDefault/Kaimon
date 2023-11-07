@@ -175,8 +175,6 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
         return
 
     product_model = import_model(conf.MODEL)
-    product_genre_model = import_model(conf.GENRE_RELATION_MODEL)
-    product_tag_model = import_model(conf.TAG_RELATION_MODEL)
     img_model = import_model(conf.IMAGE_MODEL)
 
     fields_map = conf.PARSE_KEYS._asdict()
@@ -200,13 +198,15 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
         price = product_data['rakuten_price']
         if price and price > 0:
             product_data['price'] = increase_price(price)
-        new_products.append(product_model(**product_data))
+
+        product = product_model(**product_data)
+        new_products.append(product)
 
         for genre_id in genre_ids:
-            new_product_genres.append(product_genre_model(product_id=item_code, genre_id=genre_id))
+            product.genres.add(genre_id)
 
         for tag_id in set(item[conf.TAG_IDS_KEY] or []):
-            new_product_tags.append(product_tag_model(product_id=item_code, tag_id=tag_id))
+            product.tags.add(tag_id)
 
         for img_key in conf.IMG_PARSE_FIELDS or []:
             image_urls = item.get(img_key)
@@ -223,12 +223,6 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
 
     if new_products:
         product_model.objects.bulk_create(new_products)
-
-    if new_product_tags:
-        product_tag_model.objects.bulk_create(new_product_tags)
-
-    if new_product_genres:
-        product_genre_model.objects.bulk_create(new_product_genres)
 
     if new_product_images:
         img_model.objects.bulk_create(new_product_images)
