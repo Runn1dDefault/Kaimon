@@ -146,14 +146,9 @@ def update_items(items: list[dict[str, Any]]):
             updated_products.append(db_product)
 
         tag_ids = item[conf.TAG_IDS_KEY]
-        saved_tag_ids = db_product.tags.filter(id__in=tag_ids).values_list('id', flat=True)
-        tags_to_delete = db_product.tags.exclude(id__in=tag_ids)
-        if tags_to_delete.exists():
-            tags_to_delete.delete()
-
-        new_tags = [tag_id for tag_id in tag_ids if tag_id not in saved_tag_ids]
-        if new_tags:
-            db_product.tags.add(*new_tags)
+        if tag_ids:
+            db_product.tags.clear()
+            db_product.tags.add(*tag_ids)
 
     if updated_products:
         product_model.objects.bulk_update(updated_products, update_fields)
