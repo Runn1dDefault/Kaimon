@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from kaimon.celery import app
 from product.utils import filter_only_active_genres, check_all_genres_active
-from utils.helpers import import_model, recursive_many_tree, recursive_single_tree, increase_price
+from utils.helpers import import_model, recursive_many_tree, recursive_single_tree
 
 from .settings import app_settings
 from .utils import get_rakuten_client, build_by_fields_map
@@ -195,10 +195,6 @@ def save_items(items: list[dict[str, Any]], genre_id: int, tag_groups: list[dict
             continue
 
         product_data = build_by_fields_map(item, fields_map=fields_map)
-        price = product_data['rakuten_price']
-        if price and price > 0:
-            product_data['price'] = increase_price(price)
-
         product = product_model(**product_data)
         new_products.append(product)
 
