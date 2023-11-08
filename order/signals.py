@@ -9,10 +9,8 @@ from product.tasks import update_product_receipts_qty
 def update_product_receipts_qty_on_create(sender, instance, created, **kwargs):
     if created:
         update_product_receipts_qty.delay(instance.product.id)
-        instance.product.update_receipts_qty()
 
 
 @receiver(post_delete, sender=Receipt)
 def update_product_receipts_qty_on_delete(sender, instance, **kwargs):
     update_product_receipts_qty.delay(instance.product.id)
-    instance.product.update_receipts_qty()
