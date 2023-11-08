@@ -46,13 +46,7 @@ class GenreChildrenView(CachingMixin, generics.ListAPIView):
         return self.get_object().children.filter(deactivated=False)
 
     def list(self, request, *args, **kwargs):
-        children = self.get_children_list()
-        page = self.paginate_queryset(children)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(children, many=True)
+        serializer = self.get_serializer(self.get_children_list(), many=True)
         return Response(serializer.data)
 
 
