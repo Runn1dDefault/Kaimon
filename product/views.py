@@ -64,15 +64,12 @@ class GenreParentsView(CachingMixin, generics.ListAPIView):
     serializer_class = GenreSerializer
 
     def list(self, request, *args, **kwargs):
-        parents = recursive_single_tree(self.get_object(), 'parent')
-        parents_queryset = self.get_queryset().filter(id__in=parents)
-        parents = self.filter_queryset(parents_queryset)
-        page = self.paginate_queryset(parents)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(parents, many=True)
+        current_genre = self.get_object()
+        genres = [current_genre]
+        parent_ids = recursive_single_tree(current_genre, 'parent')
+        parents = list(self.filter_queryset(self.get_queryset().filter(id__in=parent_ids)))
+        genres.extend(parents)
+        serializer = self.get_serializer(instance=genres, many=True)
         return Response(serializer.data)
 
 
