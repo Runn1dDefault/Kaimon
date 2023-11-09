@@ -249,7 +249,7 @@ class ReceiptAdminSerializer(serializers.ModelSerializer):
         product_images = instance.product.image_urls
         if not product_images.exists():
             return []
-        return list(product_images.values('url', flat=True))
+        return list(product_images.values_list('url', flat=True))
 
 
 class OrderAdminSerializer(serializers.ModelSerializer):
