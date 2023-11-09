@@ -31,7 +31,7 @@ class ConversionAdminSerializer(serializers.ModelSerializer):
 
     def save(self, **kwargs):
         instance = super().save(**kwargs)
-        get_currency_price_per.clear()
+        get_currency_price_per.cache_clear()
         return instance
 
 
