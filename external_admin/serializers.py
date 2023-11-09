@@ -237,10 +237,11 @@ class DeliveryAddressAdminSerializer(serializers.ModelSerializer):
 class ReceiptAdminSerializer(serializers.ModelSerializer):
     product_name = serializers.SerializerMethodField(read_only=True)
     images = serializers.SerializerMethodField(read_only=True)
+    total_prices = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Receipt
-        fields = ['id', 'product', 'product_name', 'images', 'discount', 'quantity', 'unit_price']
+        fields = ['id', 'product', 'product_name', 'images', 'discount', 'quantity', 'unit_price', 'total_prices']
 
     def get_product_name(self, instance):
         return instance.product.name
@@ -250,6 +251,20 @@ class ReceiptAdminSerializer(serializers.ModelSerializer):
         if not product_images.exists():
             return []
         return list(product_images.values_list('url', flat=True))
+
+    def get_total_prices(self, instance):
+        unit_price = instance.unit_price
+        if instance.discount > 0:
+            per = (instance.discount * 100) / instance.discount
+            unit_price = unit_price - per
+
+        price = unit_price * instance.quantity
+
+        return {
+            'yen': price,
+            'som': price * instance.order.yen_to_som,
+            'dollar': price * instance.order.yen_to_usd
+        }
 
 
 class OrderAdminSerializer(serializers.ModelSerializer):
