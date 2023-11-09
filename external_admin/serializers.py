@@ -235,9 +235,21 @@ class DeliveryAddressAdminSerializer(serializers.ModelSerializer):
 
 
 class ReceiptAdminSerializer(serializers.ModelSerializer):
+    product_name = serializers.SerializerMethodField(read_only=True)
+    images = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Receipt
-        fields = '__all__'
+        fields = ['id', 'product', 'product_name', 'images', 'discount', 'quantity', 'unit_price']
+
+    def get_product_name(self, instance):
+        return instance.product.name
+
+    def get_images(self, instance):
+        product_images = instance.product.image_urls
+        if not product_images.exists():
+            return []
+        return list(product_images.values('url', flat=True))
 
 
 class OrderAdminSerializer(serializers.ModelSerializer):
