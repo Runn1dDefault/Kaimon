@@ -2,9 +2,8 @@
 
 import django.core.validators
 from django.db import migrations, models
-import django.db.models.deletion
 import django.db.models.manager
-import product.utils
+from utils.helpers import internal_uid_generation
 
 
 class Migration(migrations.Migration):
@@ -32,7 +31,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Product',
             fields=[
-                ('id', models.CharField(default=product.utils.internal_product_id_generation, max_length=255, primary_key=True, serialize=False)),
+                ('id', models.CharField(default=internal_uid_generation, max_length=255, primary_key=True, serialize=False)),
                 ('name', models.CharField(max_length=255, verbose_name='Name[ja]')),
                 ('description', models.TextField(blank=True, null=True, verbose_name='Description[ja]')),
                 ('rakuten_price', models.DecimalField(decimal_places=10, max_digits=20, null=True)),
