@@ -24,4 +24,5 @@ class PromotionAdmin(admin.ModelAdmin):
     list_display_links = ('id', 'banner')
     list_filter = ('deactivated', 'start_date', 'end_date', 'created_at')
     search_fields = ('id',)
+    readonly_fields = ('products',)
     search_help_text = _('Search By ID')
