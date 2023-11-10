@@ -188,7 +188,7 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
         return promotion
 
     def update(self, instance, validated_data):
-        product_ids = validated_data.pop('product_ids', None)
+        product_ids = validated_data.pop('set_products', None)
         if product_ids:
             instance.products.clear()
             instance.products.add(*product_ids)
