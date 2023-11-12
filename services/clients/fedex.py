@@ -159,7 +159,7 @@ class FedexAPIClient(BaseClient):
                     "returnShipmentDetail": {"returnType": "PRINT_RETURN_LABEL"}
                 },
                 "rateRequestType": ["ACCOUNT", "LIST"],
-                "customsClearanceDetail": {
+                "customsClearanceDetail": {fe
                     "dutiesPayment": {"paymentType": "SENDER", "payor": {"responsibleParty": None}},
                     "commodities": [commodity.payload() for commodity in commodities]
                 },
