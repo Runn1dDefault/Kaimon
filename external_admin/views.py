@@ -47,7 +47,7 @@ class UserAdminViewSet(DirectorViewMixin, viewsets.ReadOnlyModelViewSet):
         user = self.get_object()
         user.is_active = not user.is_active
         user.save()
-        return Response(status=status.HTTP_200_OK)
+        return Response({'status': user.is_active}, status=status.HTTP_200_OK)
 
     @extend_schema(responses={status.HTTP_200_OK: None})
     @action(methods=['GET'], detail=True, url_path='mark-register-payed')
