@@ -29,7 +29,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         email = validated_data.get('email')
-        if email and email != instance.email:
+        if email and (email != instance.email or instance.email_confirmed is False):
             new_code = generate_confirm_code(
                 user_id=instance.id,
                 raise_on_exist=True,
