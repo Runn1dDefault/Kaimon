@@ -26,9 +26,6 @@ class GenreAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name')
     search_help_text = _('Search by fields: ID, NAME')
     list_filter = ('level', 'deactivated')
-    fieldsets = (
-        (_('General Info'), {'fields': ('id', 'name', 'level', 'deactivated', 'parent')}),
-    )
     list_per_page = 30
     list_max_show_all = 50
     actions = [make_active]
@@ -56,7 +53,7 @@ class TagAdmin(admin.ModelAdmin):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductImageInline]
-    list_display = ('id', 'name', 'price', 'is_active', 'availability', 'created_at')
+    list_display = ('id', 'name', 'rakuten_price', 'price', 'is_active', 'availability', 'created_at')
     list_display_links = ('id', 'name')
     search_fields = ('id', 'name')
     search_help_text = _('Search by fields: ID, Rakuten ID, NAME, GENRE NAME')
@@ -65,7 +62,7 @@ class ProductAdmin(admin.ModelAdmin):
     fieldsets = (
         (
             _('General Info'),
-            {'fields': ('id', 'name', 'description', 'rakuten_price', 'genres', 'tags')}
+            {'fields': ('id', 'name', 'description', 'rakuten_price', 'increase_percentage', 'genres', 'tags')}
         ),
         (_('Dates'), {'classes': ['collapse'], 'fields': ('created_at', 'modified_at')}),
         (_('Control'), {'fields': ('availability', 'is_active')}),
