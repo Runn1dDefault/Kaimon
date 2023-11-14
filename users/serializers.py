@@ -27,6 +27,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
         self.hide_fields = hide_fields or []
         super().__init__(instance=instance, data=data, **kwargs)
 
+    def validate(self, attrs):
+        email = attrs.get('email')
+        if email and User.objects.filter(email=email).exists():
+            raise serializers.ValidationError({'email': _('Already exists!')})
+        return attrs
+    
     def update(self, instance, validated_data):
         email = validated_data.get('email')
         if email and (email != instance.email or instance.email_confirmed is False):
