@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 
 def import_model(model_import_path: str):
@@ -13,7 +14,7 @@ def import_model(model_import_path: str):
 
 def increase_price(price, percentage):
     if percentage > 0:
-        return price + (percentage * price / 100)
+        return price + (Decimal(percentage) * price / 100)
     return price
 
 
