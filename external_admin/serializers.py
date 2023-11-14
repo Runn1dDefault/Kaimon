@@ -95,7 +95,7 @@ class ProductDetailAdminSerializer(ProductAdminSerializer):
         model = Product
         fields = (
             *ProductAdminSerializer.Meta.fields,
-            'genres', 'genre', 'tags', 'images', 'product_url'
+            'genres', 'genre', 'tags', 'images', 'product_url', 'increase_percentage'
         )
         extra_kwargs = {'id': {'read_only': True}, 'price': {'required': True}}
 
