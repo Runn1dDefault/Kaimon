@@ -1,8 +1,6 @@
 import uuid
 from datetime import datetime
 
-from django.conf import settings
-
 
 def import_model(model_import_path: str):
     assert '.' in model_import_path
@@ -13,8 +11,10 @@ def import_model(model_import_path: str):
     return getattr(mod, model_name)
 
 
-def increase_price(price):
-    return price + (settings.INCREASE_PRICE_PERCENTAGE * price / 100)
+def increase_price(price, percentage):
+    if percentage > 0:
+        return price + (percentage * price / 100)
+    return price
 
 
 def round_half_integer(number):
