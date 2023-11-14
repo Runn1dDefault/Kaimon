@@ -17,11 +17,27 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('email', 'full_name', 'role', 'image', 'email_confirmed', 'registration_payed')
-        extra_kwargs = {'role': {'read_only': True}}
+        extra_kwargs = {
+            'role': {'read_only': True},
+            'email_confirmed': {'read_only': True},
+            'registration_payed': {'read_only': True},
+        }
 
     def __init__(self, instance=None, data=empty, hide_fields: Iterable[str] = None, **kwargs):
         self.hide_fields = hide_fields or []
         super().__init__(instance=instance, data=data, **kwargs)
+
+    def update(self, instance, validated_data):
+        email = validated_data.get('email')
+        if email and email != instance.email:
+            new_code = generate_confirm_code(
+                user_id=instance.id,
+                raise_on_exist=True,
+                live_seconds=settings.EMAIL_CONFIRM_CODE_LIVE
+            )
+            send_code_template.delay(email=email, code=str(new_code))
+            validated_data['email_confirmed'] = False
+        return super().update(instance, validated_data)
 
     @property
     def _readable_fields(self):
