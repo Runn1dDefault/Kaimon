@@ -14,7 +14,8 @@ def import_model(model_import_path: str):
 
 def increase_price(price, percentage):
     if percentage > 0:
-        return price + (Decimal(percentage) * Decimal(price) / 100)
+        price = Decimal(price)
+        return price + (Decimal(percentage) * price / 100)
     return price
 
 
