@@ -3,7 +3,7 @@ from rest_framework import serializers
 from currencies.serializers import ConversionField
 from users.serializers import UserProfileSerializer
 
-from .models import Genre, Product, ProductReview, TagGroup
+from .models import Genre, Product, ProductReview
 
 
 class GenreSerializer(serializers.ModelSerializer):
