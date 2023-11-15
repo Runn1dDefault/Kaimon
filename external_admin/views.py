@@ -60,7 +60,7 @@ class UserAdminViewSet(DirectorViewMixin, viewsets.ReadOnlyModelViewSet):
 
 # ------------------------------------------------ Genre ---------------------------------------------------------------
 class GenreListAdminView(CachingMixin, StaffViewMixin, generics.ListAPIView):
-    queryset = Genre.objects.all()
+    queryset = Genre.objects.filter(deactivated=False)
     serializer_class = GenreAdminSerializer
     pagination_class = AdminPagePagination
     filter_backends = [filters.SearchFilter]
