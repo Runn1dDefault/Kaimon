@@ -113,7 +113,7 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     pagination_class = AdminPagePagination
     parser_classes = (parsers.JSONParser,)
     filter_backends = [filters.SearchFilter, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
-    search_fields = ['name', 'genres__name']
+    search_fields = ['id', 'name', 'genres__name']
     ordering_fields = ['created_at', 'price']
     lookup_url_kwarg = 'product_id'
     lookup_field = 'id'
