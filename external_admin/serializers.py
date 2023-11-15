@@ -123,16 +123,21 @@ class ProductDetailAdminSerializer(ProductAdminSerializer):
         genre = self.validated_data.pop('genre', None)
         images = self.validated_data.pop('images', None)
         tags = self.validated_data.pop('tags', None)
-        product = super().save()
+        product = super().save(**kwargs)
+        save = False
         if genre:
             genres_tree = recursive_single_tree(genre, "parent")
             product.genres.clear()
             product.genres.add(*genres_tree)
+            save = True
         if tags:
             product.tags.clear()
             product.tags.add(*tags)
+            save = True
         if images:
             self.update_images(product, images)
+        if save:
+            product.save()
         return product
 
 
