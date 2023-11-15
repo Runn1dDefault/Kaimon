@@ -99,6 +99,13 @@ class ProductDetailAdminSerializer(ProductAdminSerializer):
         )
         extra_kwargs = {'id': {'read_only': True}, 'price': {'required': True}}
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        price = attrs.pop('price', None)
+        if price:
+            attrs['rakuten_price'] = price
+        return attrs
+
     def get_genres(self, instance):
         genres = instance.genres.exclude(level=0).filter(deactivated=False).order_by('-level')
         return GenreAdminSerializer(instance=genres, many=True, context=self.context).data
