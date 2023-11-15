@@ -19,8 +19,8 @@ class Genre(models.Model):
 
     deactivated = models.BooleanField(default=False, null=True)
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, related_name='children', null=True, blank=True)
-    avg_weight = models.FloatField(null=True)
-    fedex_description = models.CharField(null=True)
+    avg_weight = models.FloatField(null=True, blank=True)
+    fedex_description = models.CharField(null=True, blank=True)
 
     def __str__(self):
         return str(self.id)
@@ -65,9 +65,10 @@ class Product(models.Model):
     # Product Info
     name = models.CharField(max_length=255, verbose_name=_('Name') + '[ja]')
     description = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ja]')
-    rakuten_price = models.DecimalField(max_digits=20, decimal_places=10, null=True)
+    site_price = models.DecimalField(max_digits=20, decimal_places=10, validators=[MinValueValidator(limit_value=1)])
     increase_percentage = models.FloatField(default=settings.DEFAULT_INCREASE_PRICE_PER,
-                                            validators=[MaxValueValidator(limit_value=100), MinValueValidator(limit_value=0)])
+                                            validators=[MaxValueValidator(limit_value=100),
+                                                        MinValueValidator(limit_value=0)])
     product_url = models.TextField(blank=True, null=True)
     availability = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -84,7 +85,7 @@ class Product(models.Model):
 
     @property
     def price(self):
-        return increase_price(self.rakuten_price, self.increase_percentage)
+        return increase_price(self.site_price, self.increase_percentage)
 
     class Meta:
         indexes = (

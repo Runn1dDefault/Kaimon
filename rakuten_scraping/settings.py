@@ -17,7 +17,7 @@ class ProductParseCase(NamedTuple):
     description: str = 'itemCaption'
     # here it is not stored in the price field,
     # since price should be calculated with a premium based on the rakuten_price field
-    rakuten_price: str = 'itemPrice'
+    site_price: str = 'itemPrice'
     product_url: str = 'itemUrl'
     availability: str = 'availability'
 

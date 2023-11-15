@@ -53,7 +53,7 @@ class TagAdmin(admin.ModelAdmin):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductImageInline]
-    list_display = ('id', 'name', 'rakuten_price', 'price', 'is_active', 'availability', 'created_at')
+    list_display = ('id', 'name', 'site_price', 'price', 'is_active', 'availability', 'created_at')
     list_display_links = ('id', 'name')
     search_fields = ('id', 'name')
     search_help_text = _('Search by fields: ID, Rakuten ID, NAME, GENRE NAME')
