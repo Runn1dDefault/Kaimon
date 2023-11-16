@@ -2,11 +2,11 @@ from typing import Any
 
 from requests import Request
 
-from services.clients.base import BaseClient
+from services.clients.base import BaseAPIClient
 from services.clients.types import ProductSort, ItemSort
 
 
-class RakutenClient(BaseClient):
+class RakutenClient(BaseAPIClient):
     RETRIES = 3
     DELAY = 0.1
     ERROR_STATUSES = [400, 404, 429, 500, 503]

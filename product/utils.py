@@ -5,7 +5,7 @@ from django.db import connection
 from product.models import Genre
 
 
-def get_tags_for_product(product_id) -> list[dict[str, int | str]]:
+def get_tags_for_product(site, product_id) -> list[dict[str, int | str]]:
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -13,8 +13,8 @@ def get_tags_for_product(product_id) -> list[dict[str, int | str]]:
               FROM product_tag as t
             JOIN product_taggroup as tg ON (t.group_id = tg.id)
             INNER JOIN product_product_tags as pt ON (t.id = pt.tag_id)
-            WHERE pt.product_id = %s
-            """, (product_id,)
+            WHERE pt.site = %s AND pt.product_id = %s
+            """, (site, product_id,)
         )
         columns = [col[0] for col in cursor.description]
         rows = [dict(zip(columns, row)) for row in cursor.fetchall()]

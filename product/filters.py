@@ -3,7 +3,32 @@ from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 from rest_framework.filters import BaseFilterBackend
 
-from .models import Genre
+from .models import Genre, Site
+
+
+class FilterBySite(BaseFilterBackend):
+    param = 'site'
+    description = _('Filter by site: (%s)' % ", ".join((value for atrr, value in Site.choices)))
+
+    def filter_queryset(self, request, queryset, view):
+        site_param = request.query_params.get(self.param)
+        site = Site.from_string(site_param) if site_param else Site.rakuten
+        if site is not None:
+            return queryset.filter(site=site)
+        return queryset
+
+    def get_schema_operation_parameters(self, view):
+        return [
+            {
+                'name': self.param,
+                'required': False,
+                'in': 'query',
+                'description': force_str(self.description),
+                'schema': {
+                    'type': 'string'
+                }
+            }
+        ]
 
 
 class FilterByTag(BaseFilterBackend):
@@ -42,7 +67,7 @@ class ProductReferenceFilter(BaseFilterBackend):
         if product_id:
             genre = Subquery(
                 Genre.objects.filter(products__id=product_id)
-                             .order_by('-level').values('id')[:1]
+                .order_by('-level').values('id')[:1]
             )
             return queryset.exclude(id=product_id).filter(genres__id=genre).order_by(*orders)
         return queryset.order_by(*orders)

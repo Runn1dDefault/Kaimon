@@ -1,5 +1,6 @@
 from django.db import transaction
-from rest_framework import viewsets, mixins, parsers
+from rest_framework import viewsets, generics, mixins, parsers, permissions
+from rest_framework.response import Response
 
 from currencies.mixins import CurrencyMixin
 from product.serializers import ProductListSerializer
@@ -10,7 +11,7 @@ from utils.paginators import PagePagination
 
 from .models import DeliveryAddress, Order
 from .permissions import OrderPermission
-from .serializers import DeliveryAddressSerializer, OrderSerializer
+from .serializers import DeliveryAddressSerializer, OrderSerializer, FedexQuoteRateSerializer
 
 
 class DeliveryAddressViewSet(viewsets.ModelViewSet):
@@ -52,3 +53,15 @@ class OrderViewSet(
 
     def get_queryset(self):
         return super().get_queryset().filter(delivery_address__user=self.request.user)
+
+
+class FedexQuoteRateView(generics.GenericAPIView):
+    authentication_classes = ()
+    permission_classes = (permissions.AllowAny,)
+    parser_classes = (parsers.JSONParser,)
+    serializer_class = FedexQuoteRateSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(data=serializer.data)

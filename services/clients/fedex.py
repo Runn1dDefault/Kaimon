@@ -7,25 +7,26 @@ from urllib.parse import urljoin
 
 from requests import Request
 
-from services.clients.base import BaseClient
+from services.clients.base import BaseAPIClient
 
 
 @dataclass
 class FedexAddress:
     # https://developer.fedex.com/api/en-kg/guides/api-reference.html#countrycodes
-    country_code: str   
+    country_code: str
     # https://developer.fedex.com/api/en-kg/catalog/rate/v1/docs.html#:~:text=here%20to%20see-,Postal,-aware%20countries
     postal_code: int | str = None
     city: str = None
     residential: bool = None
     # https://developer.fedex.com/api/en-kg/catalog/rate/v1/docs.html#:~:text=see%20State%20Or-,Province,-Code
-    state_or_province_code: str = None 
-    
+    state_or_province_code: str = None
+
     def payload(self):
         payload = {
-            "postalCode": self.postal_code,
             "countryCode": self.country_code,
         }
+        if self.postal_code:
+            payload["postalCode"] = self.postal_code
         if self.city:
             payload['city'] = self.city
         if self.residential is not None:
@@ -42,6 +43,7 @@ class FedexPickupType(Enum):
     USE_SCHEDULED_PICKUP = 'USE_SCHEDULED_PICKUP'
 
 
+# https://developer.fedex.com/api/en-us/guides/api-reference.html#packagetypes
 class FedexPackagingType(Enum):
     YOUR_PACKAGING = 'YOUR_PACKAGING'
     FEDEX_ENVELOPE = 'FEDEX_ENVELOPE'
@@ -54,7 +56,7 @@ class FedexPackagingType(Enum):
     FEDEX_25KG_BOX = 'FEDEX_25KG_BOX'
     FEDEX_PAK = 'FEDEX_PAK'
     FEDEX_TUBE = 'FEDEX_TUBE'
-    
+
 
 @dataclass
 class FedexWeight:
@@ -63,14 +65,14 @@ class FedexWeight:
 
     def payload(self):
         return asdict(self)
-    
-    
+
+
 @dataclass
 class FedexCurrencyAmount:
     # https://developer.fedex.com/api/en-us/guides/api-reference.html#currencycodes
-    currency: Literal['USD', 'JYE'] = 'JYE'
+    currency: Literal['USD', 'JYE']
     amount: float | int = None
-    
+
     def payload(self):
         return asdict(self)
 
@@ -80,19 +82,25 @@ class FedexCommodity:
     weight: FedexWeight
     currency_amount: FedexCurrencyAmount
     quantity: int = 1
+    # https://developer.fedex.com/api/en-kg/guides/api-reference.html#harmonizedsystemcodeunitofmeasure-table1
+    quantity_units: str = None
+    # https://developer.fedex.com/api/en-kg/guides/api-reference.html#vaguecommoditydescriptions
+    desciption: str = None
     
     def payload(self):
-        return {
-            "name": "NON_DOCUMENTS",
+        payload = {
             "quantity": self.quantity,
-            "quantityUnits": "PCS",
-            "numberOfPieces": 1,
             "weight": self.weight.payload(),
             "customsValue": self.currency_amount.payload()
         }
-        
-    
-class FedexAPIClient(BaseClient):
+        if self.quantity_units:
+            payload['quantityUnits'] = self.quantity_units
+        if self.desciption:
+            payload['description'] = self.desciption
+        return payload
+
+
+class FedexAPIClient(BaseAPIClient):
     BASE_URL = ''
     TEST_URL = 'https://apis-sandbox.fedex.com'
     ERROR_STATUSES = [400, 401, 500, 503]
@@ -105,14 +113,14 @@ class FedexAPIClient(BaseClient):
         self._client_secret = client_secret
         self._token = None
         self._token_exp = None
-    
+
     def token_expired(self) -> bool:
         return not self._token_exp or datetime.utcnow() < self._token_exp
 
     def process_request(self, request) -> None:
         if not self._token or self.token_expired():
             self.auth()
-            
+
         request.headers['Authorization'] = self._token
         request.headers['x-locale'] = 'en_US'
         request.headers['Content-Type'] = 'application/json'
@@ -139,60 +147,37 @@ class FedexAPIClient(BaseClient):
         recipient: FedexAddress,
         pickup_type: FedexPickupType,
         commodities: Iterable[FedexCommodity],
-        ship_date: datetime.date,
-        packaging_type: FedexPackagingType = None
+        ship_date: datetime.date
     ) -> dict[str, Any]:
         """
         docs: https://developer.fedex.com/api/en-us/catalog/rate/v1/docs.html#operation/Rate%20and%20Transit%20times
         """
         assert self.account_number, 'account_number is required for this action'
         payload = {
-            "accountNumber": {"value": self.account_number},
+            "accountNumber": {
+                "value": self.account_number
+            },
             "requestedShipment": {
                 "shipper": {"address": shipper.payload()},
                 "recipient": {"address": recipient.payload()},
                 "shipDateStamp": str(ship_date),
                 "pickupType": pickup_type.value,
+                # "preferredCurrency": "JYE",
                 "serviceType": "INTERNATIONAL_PRIORITY",
-                "shipmentSpecialServices": {
-                    "specialServiceTypes": ["RETURN_SHIPMENT"],
-                    "returnShipmentDetail": {"returnType": "PRINT_RETURN_LABEL"}
+                "rateRequestType": ["LIST", "ACCOUNT"],
+                "customsClearanceDetail": {
+                    "dutiesPayment": {
+                        "paymentType": "SENDER",
+                        "payor": {"responsibleParty": None}
+                    },
+                    "commodities": [c.payload() for c in commodities]
                 },
-                "rateRequestType": ["ACCOUNT", "LIST"],
-                "customsClearanceDetail": {fe
-                    "dutiesPayment": {"paymentType": "SENDER", "payor": {"responsibleParty": None}},
-                    "commodities": [commodity.payload() for commodity in commodities]
-                },
-                "requestedPackageLineItems": [{"weight": commodity.weight.payload()} for commodity in commodities]
+                "requestedPackageLineItems": [{"weight": c.weight.payload()} for c in commodities]
             }
         }
-        # payload = {
-        #     "accountNumber": {"value": self.account_number},
-        #     # "rateRequestControlParameters": {
-        #     #     "rateSortOrder": "COMMITASCENDING",
-        #     #     "returnTransitTimes": True,
-        #     #     "variableOptions": None,
-        #     #     "servicesNeededOnRateFailure": False
-        #     # },
-        #     "requestedShipment": {
-        #         "shipper": {"address": shipper.payload()},
-        #         "recipient": {"address": recipient.payload()},
-        #         "shipDateStamp": str(ship_date),
-        #         "packagingType": packaging_type.value if packaging_type is not None else "",
-        #         "pickupType": pickup_type.value,
-        #         "rateRequestType": ["ACCOUNT", "LIST"],
-        #         "customsClearanceDetail": {
-        #             "commodities": [commodity.payload() for commodity in commodities]
-        #         },
-        #         "serviceType": "INTERNATIONAL_PRIORITY",
-        #         "requestedPackageLineItems": [{"weight": commodity.weight.payload()} for commodity in commodities],
-        #         "preferredCurrency": 'JYE'
-        #     },
-        #     # "carrierCodes": ["FDXG", "FDXE"]
-        # }
         return self.post('/rate/v1/rates/quotes', json=payload)
-    
-    
+
+
 if __name__ == '__main__':
     client = FedexAPIClient(
         client_id='l74d183751b6f54e14808394421c87c8d0',
@@ -200,28 +185,37 @@ if __name__ == '__main__':
         account_number='740561073',
         use_test=True
     )
-    
+
     resp_data = client.international_rate_quotes(
-        shipper=FedexAddress(postal_code="168-0063", country_code="JP", city="Tokio", residential=False),
-        recipient=FedexAddress(country_code="KG", city="Bishkek", residential=False),
+        shipper=FedexAddress(postal_code="658-0032", country_code="JP"),
+        recipient=FedexAddress(postal_code=720000, country_code="KG"),
         pickup_type=FedexPickupType.CONTACT_FEDEX_TO_SCHEDULE,
-        commodities=(FedexCommodity(weight=FedexWeight(units="KG", value=10), currency_amount=FedexCurrencyAmount()),),
-        ship_date=datetime(year=2023, month=11, day=13).date(),
-        packaging_type=FedexPackagingType.FEDEX_10KG_BOX
+        commodities=(
+            FedexCommodity(
+                weight=FedexWeight(units="KG", value=10.0),
+                currency_amount=FedexCurrencyAmount(currency='JYE', amount=100),
+                desciption="Camera",
+                quantity=1,
+                quantity_units="PCS"
+            ),
+        ),
+        ship_date=datetime(year=2023, month=11, day=15).date()
     )
+
+    # with open('response.json', 'w') as json_file:
+    #     json.dump(resp_data, json_file)
+
+    ouput = resp_data['output']
+    data = ouput['rateReplyDetails'][0]['ratedShipmentDetails'][0]
     
-    data = resp_data['output']['rateReplyDetails'][0]['ratedShipmentDetails'][0]
-    
+    print('quoteDate: ', ouput['quoteDate'])
     print('Base Rate: ', data['totalBaseCharge'])
-    
+
     for i in data['shipmentRateDetail']['surCharges']:
         print(i['description'], ': ', i['amount'])
-    
-    print('totalSurcharges: ', data['shipmentRateDetail']['totalSurcharges'])
-    
+
     for i in data['ancillaryFeesAndTaxes']:
         print(i['description'], ': ', i['amount'])
-        
-    print('totalAncillaryFeesAndTaxes: ', data['totalAncillaryFeesAndTaxes'])
+
+    print('Total Ancillary Fees And Taxes: ', data['totalAncillaryFeesAndTaxes'])
     print('Estimated Total: ', data['totalNetChargeWithDutiesAndTaxes'])
-    

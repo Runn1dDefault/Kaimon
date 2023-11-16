@@ -36,18 +36,21 @@ class Customer(BaseModel):
 class DeliveryAddress(BaseModel):
     objects = models.Manager()
 
+    class CountryCode(models.TextChoices):
+        JP = 'JP', _('Japanese')
+        KG = 'KG', _('Kyrgyzstan')
+        KZ = 'KZ', _('Kazahstan')
+        TR = 'TR', _('Türkiye')
+        RU = 'RU', _('Russia')
+
     user = models.ForeignKey(get_user_model(), on_delete=models.SET(get_sentinel_user),
                              related_name='delivery_addresses')
     recipient_name = models.CharField(max_length=100)
-    country = models.CharField(max_length=100)
+    country_code = models.CharField(choices=CountryCode.choices, default=CountryCode.KG)
     city = models.CharField(max_length=100)
-    postal_code = models.CharField(max_length=20)  # TODO: maybe this is not required field
-    state = models.CharField(max_length=100, blank=True, null=True)
+    postal_code = models.CharField(max_length=20, null=True, blank=True)
     address_line = models.TextField(blank=True, null=True)
     as_deleted = models.BooleanField(default=False)
-
-    def __str__(self):
-        return f"{self.recipient_name}'s Address"
 
     class Meta:
         verbose_name = _('Delivery Address')
@@ -73,6 +76,8 @@ class Order(BaseModel):
     # important!: when updating an address, create a new address and mark the old one as deleted
     shipping_carrier = models.CharField(max_length=50, default='FedEx')
     shipping_weight = models.IntegerField(verbose_name=_('Shipping weight'), blank=True, null=True)
+    barcode = models.ImageField(upload_to='order/barcodes/')
+
     # for correct analytics, the value of conversions for two currencies with yen will be saved here
     yen_to_usd = models.DecimalField(max_digits=20, decimal_places=10)
     yen_to_som = models.DecimalField(max_digits=20, decimal_places=10)
@@ -80,16 +85,6 @@ class Order(BaseModel):
     @property
     def phone(self):
         return getattr(self.customer, 'phone', None)
-
-    @property
-    def total_price(self):
-        receipts = getattr(self, 'receipts')
-        if not receipts.exists():
-            return 0.0
-
-        order_id = getattr(self, 'id')
-        receipts_prices = self.__class__.analytics.filter(id=order_id).total_prices().values('yen')
-        return receipts_prices[0]['yen']
 
     @property
     def total_prices(self):

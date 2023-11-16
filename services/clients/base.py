@@ -7,7 +7,7 @@ from requests import Session, Request, Response, HTTPError
 from requests.adapters import HTTPAdapter
 
 
-class BaseClient:
+class BaseAPIClient:
     RETRIES: int = None
     LOG_FORMAT: str = "'%(asctime)s %(name)s %(levelname)s: %(message)s'"
     BASE_URL: str = None

@@ -11,7 +11,7 @@ from utils.helpers import recursive_single_tree
 from utils.paginators import PagePagination
 from utils.views import CachingMixin
 
-from .filters import GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter, FilterByTag
+from .filters import FilterBySite, GenreLevelFilter, PopularProductOrdering, ProductReferenceFilter, FilterByTag
 from .models import Genre, Product, TagGroup, ProductReview
 from .paginators import GenrePagination
 from .serializers import ProductListSerializer, GenreSerializer, ProductReviewSerializer, ProductRetrieveSerializer, \
@@ -29,7 +29,7 @@ class GenreListView(CachingMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
     queryset = Genre.objects.filter(deactivated=False)
-    filter_backends = [GenreLevelFilter]
+    filter_backends = (GenreLevelFilter, FilterBySite)
     pagination_class = GenrePagination
     serializer_class = GenreSerializer
 
@@ -37,6 +37,7 @@ class GenreListView(CachingMixin, generics.ListAPIView):
 class GenreChildrenView(CachingMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
+    filter_backends = (FilterBySite,)
     lookup_field = 'id'
     queryset = Genre.objects.filter(deactivated=False)
     serializer_class = GenreSerializer
@@ -53,6 +54,7 @@ class GenreChildrenView(CachingMixin, generics.ListAPIView):
 class GenreParentsView(CachingMixin, generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
+    filter_backends = (FilterBySite,)
     lookup_field = 'id'
     queryset = Genre.objects.filter(level__gt=0, deactivated=False)
     serializer_class = GenreSerializer
@@ -73,6 +75,7 @@ class ProductsByIdsView(CurrencyMixin, generics.GenericAPIView):
     permission_classes = ()
     authentication_classes = ()
     queryset = Product.objects.filter(is_active=True)
+    filter_backends = (FilterBySite,)
     pagination_class = PagePagination
     serializer_class = ProductIdsSerializer
     list_serializer_class = ProductRetrieveSerializer
@@ -105,7 +108,7 @@ class ProductsListView(CurrencyMixin, generics.ListAPIView):
     queryset = Product.objects.filter(is_active=True, availability=True)
     pagination_class = PagePagination
     serializer_class = ProductRetrieveSerializer
-    filter_backends = [filters.SearchFilter, PopularProductOrdering, FilterByTag, filters.OrderingFilter]
+    filter_backends = (FilterBySite, filters.SearchFilter, PopularProductOrdering, FilterByTag, filters.OrderingFilter)
     search_fields = ['name', 'genres__name']
     ordering_fields = ['created_at']
 
@@ -114,6 +117,7 @@ class ProductsListView(CurrencyMixin, generics.ListAPIView):
 class ProductsListByGenreView(ProductsListView):
     lookup_url_kwarg = 'id'
     lookup_field = 'genres__id'
+    filter_backends = (FilterBySite,)
 
     def get_lookup_kwargs(self):
         return {self.lookup_field: self.kwargs[self.lookup_url_kwarg]}
@@ -125,6 +129,7 @@ class ProductsListByGenreView(ProductsListView):
 class TagByGenreListView(generics.ListAPIView):
     permission_classes = ()
     authentication_classes = ()
+    filter_backends = (FilterBySite,)
     queryset = TagGroup.objects.all()
     lookup_url_kwarg = 'id'
     name_field = 'name'
@@ -135,7 +140,7 @@ class TagByGenreListView(generics.ListAPIView):
         ).distinct()
 
     def list(self, request, *args, **kwargs):
-        groups = self.get_queryset()
+        groups = self.filter_queryset(self.get_queryset())
         if not groups.exists():
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(groups.tags_list())
@@ -145,6 +150,7 @@ class TagByGenreListView(generics.ListAPIView):
 class ProductRetrieveView(CurrencyMixin, generics.RetrieveAPIView):
     permission_classes = ()
     authentication_classes = ()
+    filter_backends = (FilterBySite,)
     lookup_field = 'id'
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductRetrieveSerializer
@@ -157,8 +163,8 @@ class ProductRetrieveView(CurrencyMixin, generics.RetrieveAPIView):
 
 
 @api_view(['GET'])
-def product_tags_info_view(request, product_id):
-    return Response(get_tags_for_product(product_id))
+def product_tags_info_view(request, site, product_id):
+    return Response(get_tags_for_product(site, product_id))
 
 
 # ------------------------------------------------- Reviews ------------------------------------------------------------

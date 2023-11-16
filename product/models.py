@@ -1,3 +1,5 @@
+from typing import Self
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -10,10 +12,27 @@ from utils.helpers import round_half_integer, internal_uid_generation, increase_
 from .querysets import TagGroupQuerySet, ReviewAnalyticsQuerySet
 
 
-class Genre(models.Model):
-    objects = models.Manager()
+class Site(models.TextChoices):
+    rakuten = 'rakuten', _('Rakuten')
+    uniqlo = 'uniqlo', _('Uniqlo')
 
-    id = models.BigIntegerField(primary_key=True)
+    @classmethod
+    def from_string(cls, site: str) -> Self | None:
+        for attr, choice in cls.choices:
+            if choice == site:
+                return getattr(cls, attr)
+
+
+class BaseSiteModel(models.Model):
+    objects = models.Manager()
+    site = models.CharField(choices=Site.choices, default=Site.rakuten)
+    site_id = models.BigIntegerField()
+
+    class Meta:
+        abstract = True
+
+
+class Genre(BaseSiteModel):
     level = models.PositiveIntegerField(null=True, blank=True)
     name = models.CharField(max_length=100)
 
@@ -26,6 +45,7 @@ class Genre(models.Model):
         return str(self.id)
 
     class Meta:
+        unique_together = ('site', 'site_id')
         indexes = (
             models.Index(name='exclude_zero_idx', fields=('name',), condition=~Q(level=0), include=('level',)),
             models.Index(name='activate_genres_idx', fields=('name',), condition=Q(deactivated=False),
@@ -33,8 +53,7 @@ class Genre(models.Model):
         )
 
 
-class BaseTagModel(models.Model):
-    id = models.BigIntegerField(primary_key=True)
+class BaseTagModel(BaseSiteModel):
     name = models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -48,9 +67,11 @@ class TagGroup(BaseTagModel):
     def __str__(self):
         return f'Group: {self.id}'
 
+    class Meta:
+        unique_together = ('site', 'site_id')
+
 
 class Tag(BaseTagModel):
-    objects = models.Manager()
     group = models.ForeignKey(TagGroup, on_delete=models.CASCADE, related_name='tags', null=True)
 
     def __str__(self):
@@ -58,10 +79,12 @@ class Tag(BaseTagModel):
             return f'{self.group} Tag: {self.id}'
         return f'Tag: {self.id}'
 
+    class Meta:
+        unique_together = ('site', 'site_id')
 
-class Product(models.Model):
-    objects = models.Manager()
-    id = models.CharField(max_length=255, primary_key=True, default=internal_uid_generation)
+
+class Product(BaseSiteModel):
+    site_id = models.CharField(max_length=255, unique=True, default=internal_uid_generation)
     # Product Info
     name = models.CharField(max_length=255, verbose_name=_('Name') + '[ja]')
     description = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ja]')
@@ -88,6 +111,7 @@ class Product(models.Model):
         return increase_price(self.site_price, self.increase_percentage)
 
     class Meta:
+        unique_together = ('site', 'site_id')
         indexes = (
             models.Index(fields=('avg_rank',)),
             models.Index(fields=('created_at',)),

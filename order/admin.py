@@ -11,9 +11,9 @@ class CustomerAdmin(admin.ModelAdmin):
 
 @admin.register(DeliveryAddress)
 class DeliveryAddressAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'country', 'city', 'state', 'as_deleted', 'created_at')
-    search_fields = ('id', 'user__email', 'country',  'city',)
-    list_filter = ('as_deleted', 'created_at', 'country', 'state')
+    list_display = ('id', 'user', 'country_code', 'postal_code', 'as_deleted')
+    search_fields = ('id', 'user__email', 'postal_code',)
+    list_filter = ('as_deleted', 'created_at', 'country_code')
     readonly_fields = ('created_at',)
 
 

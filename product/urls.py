@@ -31,7 +31,7 @@ products_urlpatterns = [
     re_path('^genres/(?P<id>.+)/products/$', ProductsListByGenreView.as_view(), name='product-products-by-genre-list'),
     # Important: product_detail must always be the last, otherwise it will overlap other addresses.
     # also product_urlpatterns should also be at the end of urlpatterns
-    re_path('^(?P<product_id>.+)/tags/$', product_tags_info_view, name='product-tags-info'),
+    re_path('^(?P<site>.+)/(?P<product_id>.+)/tags/$', product_tags_info_view, name='product-tags-info'),
     re_path('^(?P<id>.+)/$', ProductRetrieveView.as_view(), name='product-detail'),
 
 ]

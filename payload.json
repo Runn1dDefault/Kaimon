@@ -1,0 +1,131 @@
+{
+    "rateRequestControlParameters": {
+        "rateSortOrder": "COMMITASCENDING",
+        "returnTransitTimes": true,
+        "variableOptions": null,
+        "servicesNeededOnRateFailure": false
+    },
+    "requestedShipment": {
+        "shipper": {
+            "accountNumber": {
+                "value": ""
+            },
+            "address": {
+                "city": "Suginami City",
+                "postalCode": "168-0063",
+                "countryCode": "JP",
+                "streetLines": [
+                    ""
+                ],
+                "residential": false,
+                "stateOrProvinceCode": ""
+            }
+        },
+        "recipients": [
+            {
+                "address": {
+                    "city": "Бишкек",
+                    "countryCode": "KG",
+                    "streetLines": [
+                        ""
+                    ],
+                    "residential": false,
+                    "stateOrProvinceCode": ""
+                }
+            }
+        ],
+        "shipTimestamp": "2023-11-13",
+        "pickupType": "CONTACT_FEDEX_TO_SCHEDULE",
+        "packagingType": "FEDEX_10KG_BOX",
+        "shippingChargesPayment": {
+            "payor": {
+                "responsibleParty": {
+                    "accountNumber": {
+                        "value": ""
+                    },
+                    "address": {
+                        "countryCode": "JP"
+                    }
+                }
+            }
+        },
+        "blockInsightVisibility": false,
+        "edtRequestType": "NONE",
+        "rateRequestType": [
+            "ACCOUNT",
+            "LIST"
+        ],
+        "requestedPackageLineItems": [
+            {
+                "groupPackageCount": 1,
+                "physicalPackaging": "FEDEX_10KG_BOX",
+                "insuredValue": {
+                    "currency": "JYE",
+                    "currencySymbol": null,
+                    "amount": 0
+                },
+                "weight": {
+                    "units": "KG",
+                    "value": 30
+                }
+            }
+        ],
+        "preferredCurrency": "JYE",
+        "customsClearanceDetail": {
+            "commodities": [
+                {
+                    "name": "NON_DOCUMENTS",
+                    "numberOfPieces": 1,
+                    "description": "",
+                    "countryOfManufacture": "",
+                    "harmonizedCode": "",
+                    "harmonizedCodeDescription": "",
+                    "itemDescriptionForClearance": "",
+                    "weight": {
+                        "units": "KG",
+                        "value": 30
+                    },
+                    "quantity": 1,
+                    "quantityUnits": "",
+                    "unitPrice": {
+                        "currency": "JYE",
+                        "amount": null,
+                        "currencySymbol": ""
+                    },
+                    "unitsOfMeasures": [
+                        {
+                            "category": "",
+                            "code": "",
+                            "name": "",
+                            "value": "",
+                            "originalCode": ""
+                        }
+                    ],
+                    "excises": [
+                        {
+                            "values": [
+                                ""
+                            ],
+                            "code": ""
+                        }
+                    ],
+                    "customsValue": {
+                        "currency": "JYE",
+                        "amount": 1,
+                        "currencySymbol": ""
+                    },
+                    "exportLicenseNumber": "",
+                    "partNumber": "",
+                    "exportLicenseExpirationDate": "",
+                    "getcIMarksAndNumbers": ""
+                }
+            ]
+        }
+    },
+    "carrierCodes": [
+        "FDXG",
+        "FDXE"
+    ],
+    "returnLocalizedDateTime": true,
+    "webSiteCountryCode": "JP"
+}
