@@ -9,7 +9,7 @@ from rest_framework.filters import BaseFilterBackend
 from rest_framework.compat import coreapi, coreschema
 
 
-class ListFilterFields(BaseFilterBackend):
+class ListFilter(BaseFilterBackend):
     description = _('Filtering by field %s ex: query1,query2')
     filter_fields_arr = 'list_filter_fields'
 

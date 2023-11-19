@@ -1,5 +1,3 @@
-from typing import Any
-
 from requests import Request
 
 from services.clients.base import BaseAPIClient
@@ -44,7 +42,7 @@ class RakutenClient(BaseAPIClient):
         min_price: int = None,
         max_price: int = None,
         page: int = None
-    ) -> dict[str, Any]:
+    ):
         assert keyword or genre_id or product_id
         assert genre_info_flag in [0, 1]
         assert or_flag in [0, 1]
@@ -150,6 +148,8 @@ if __name__ == '__main__':
     # pprint(rakuten.product_search(keyword='フロントップ楽天市場店'))
     # pprint(rakuten.tag_search(1000319))
 
+    data = rakuten.genres_search(genre_id="568753")
+
     # data = rakuten.product_search(genre_id=568674)
-    data = rakuten.item_search(item_code="thematerialworld:10016878")
+    # data = rakuten.item_search(genre_id="568674")
     pprint(data)

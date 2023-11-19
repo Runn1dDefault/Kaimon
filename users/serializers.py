@@ -23,8 +23,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'registration_payed': {'read_only': True},
         }
 
-    def __init__(self, instance=None, data=empty, hide_fields: Iterable[str] = None, **kwargs):
-        self.hide_fields = hide_fields or []
+    def __init__(self, instance=None, data=empty, show_fields: Iterable[str] = None, **kwargs):
+        self.show_fields = show_fields or []
         super().__init__(instance=instance, data=data, **kwargs)
 
     def validate(self, attrs):
@@ -49,7 +49,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def _readable_fields(self):
         for field_name, field_ins in self.fields.items():
             # this will prevent a representation field from appearing
-            if field_name in self.hide_fields:
+            if field_name not in self.show_fields:
                 continue
 
             if not field_ins.write_only:

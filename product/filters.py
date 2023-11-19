@@ -8,7 +8,7 @@ from .models import Genre, Site
 
 class FilterBySite(BaseFilterBackend):
     param = 'site'
-    description = _('Filter by site: (%s)' % ", ".join((value for atrr, value in Site.choices)))
+    description = _('Filter by site')
 
     def filter_queryset(self, request, queryset, view):
         site_param = request.query_params.get(self.param)

@@ -36,6 +36,7 @@ INSTALLED_APPS = [
 
     'users',  # ready
     'product',  # ready
+    'products',
     'rakuten_scraping',  # ready
     'currencies',
     'promotions',

@@ -13,7 +13,7 @@ class GenreSerializer(serializers.ModelSerializer):
 
 
 class ProductReviewSerializer(serializers.ModelSerializer):
-    user = UserProfileSerializer(hide_fields=('role', 'email', 'email_confirmed', 'registration_payed'), read_only=True)
+    user = UserProfileSerializer(show_fields=('full_name',), read_only=True)
 
     class Meta:
         model = ProductReview

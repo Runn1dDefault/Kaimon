@@ -6,7 +6,7 @@ from currencies.mixins import CurrencyMixin
 from product.serializers import ProductListSerializer
 from users.filters import FilterByUser
 from users.permissions import RegistrationPayedPermission, EmailConfirmedPermission
-from utils.filters import ListFilterFields
+from utils.filters import ListFilter
 from utils.paginators import PagePagination
 
 from .models import DeliveryAddress, Order
@@ -44,7 +44,7 @@ class OrderViewSet(
     serializer_class = OrderSerializer
     product_serializer_class = ProductListSerializer
     pagination_class = PagePagination
-    filter_backends = [ListFilterFields]
+    filter_backends = [ListFilter]
     list_filter_fields = {'status': 'status'}
 
     def perform_create(self, serializer):

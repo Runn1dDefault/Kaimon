@@ -13,7 +13,7 @@ from product.models import Product, ProductReview, Genre, Tag, TagGroup
 from promotions.models import Promotion
 from users.models import User
 from order.models import Order
-from utils.filters import FilterByFields, DateRangeFilter, ListFilterFields
+from utils.filters import FilterByFields, DateRangeFilter, ListFilter
 from utils.views import CachingMixin
 
 from .mixins import DirectorViewMixin, StaffViewMixin
@@ -248,7 +248,7 @@ class OrderAdminViewSet(StaffViewMixin, viewsets.ReadOnlyModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderAdminSerializer
     pagination_class = AdminPagePagination
-    filter_backends = [filters.SearchFilter, ListFilterFields, filters.OrderingFilter, DateRangeFilter]
+    filter_backends = [filters.SearchFilter, ListFilter, filters.OrderingFilter, DateRangeFilter]
     list_filter_fields = {'status': 'status'}
     start_param = 'start_date'
     end_param = 'end_date'
