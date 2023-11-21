@@ -1,7 +1,29 @@
+from enum import Enum
+
 from requests import Request
 
-from services.clients.base import BaseAPIClient
-from services.clients.types import ProductSort, ItemSort
+from service.clients.base import BaseAPIClient
+
+
+class ProductSort(Enum):
+    standard = 'standard'
+    release_date = 'releaseDate'
+    seller = 'seller'
+    satisfied = 'satisfied'
+
+
+class ItemSort(Enum):
+    standard = 'standard'
+    affiliate_rate_asc = '-affiliateRate'
+    affiliate_rate_desc = '+affiliateRate'
+    review_count_asc = '-reviewCount'
+    review_count_desc = '+reviewCount'
+    review_avg_asc = '-reviewAverage'
+    review_avg_desc = '+reviewAverage'
+    item_price_asc = '-itemPrice'
+    item_price_desc = '+itemPrice'
+    update_ts_asc = '-updateTimestamp'
+    update_ts_desc = '+updateTimestamp'
 
 
 class RakutenClient(BaseAPIClient):
@@ -148,8 +170,8 @@ if __name__ == '__main__':
     # pprint(rakuten.product_search(keyword='フロントップ楽天市場店'))
     # pprint(rakuten.tag_search(1000319))
 
-    data = rakuten.genres_search(genre_id="568753")
+    # data = rakuten.genres_search(genre_id="568753")
 
     # data = rakuten.product_search(genre_id=568674)
-    # data = rakuten.item_search(genre_id="568674")
+    data = rakuten.item_search(item_code="sweetrag:13058716")
     pprint(data)

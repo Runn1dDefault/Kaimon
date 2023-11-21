@@ -1,5 +1,3 @@
-from enum import Enum
-
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.aggregates import ArrayAgg
@@ -9,32 +7,21 @@ from django.db.models.functions import JSONObject
 from django.template.defaultfilters import truncatechars
 from django.utils.translation import gettext_lazy as _
 
-from utils.helpers import increase_price
-
-
-class Site(Enum):
-    rakuten = 'rakuten'
-    uniqlo = 'uniqlo'
-
-    @classmethod
-    def from_string(cls, site: str):
-        by_value = {item.value: item for item in Site}
-        return by_value[site]
-
-
-class SiteCurrency(Enum):
-    rakuten = "yen"
-    uniqlo = "usd"
+from service.enums import Site
+from service.utils import increase_price
 
 
 class QuerySet(models.QuerySet):
-    def query_by_site(self, site: str):
+    def filter_by_site(self, site: str):
         return self.filter(id__startswith=site)
 
 
 class SiteManager(models.Manager):
     def get_queryset(self):
         return QuerySet(self.model, using=self._db)
+
+    def queryset_by_site(self, site: str):
+        return self.get_queryset().filter_by_site(site)
 
     @staticmethod
     def _concat_id(site: Site, site_id: int | str):
@@ -74,15 +61,15 @@ class Category(BaseModel):
 
 
 class TagQuerySet(models.QuerySet):
-    def collected_children(self, tag_ids: list[str] = None):
+    def grouped_tags(self, tag_ids: list[str] = None):
         return self.values(
-            tag_group_id=models.F('id'),
-            tag_group_name=models.F('name')
+            tag_group_id=models.F('group_id'),
+            tag_group_name=models.F('group__name')
         ).annotate(
             tags=ArrayAgg(
                 JSONObject(
-                    id=models.F('children__id'),
-                    name=models.F('children__name')
+                    id=models.F('id'),
+                    name=models.F('name')
                 ),
                 filter=models.Q(tags__id__in=tag_ids) if tag_ids else None,
                 distinct=True  # required
@@ -107,8 +94,10 @@ class Product(BaseModel):
     description = models.TextField(blank=True, null=True)
     site_price = models.DecimalField(max_digits=20, decimal_places=10)
     site_avg_rating = models.FloatField(default=0)
-    site_rating_count = models.PositiveIntegerField(default=0)
+    site_reviews_count = models.FloatField(default=0)
 
+    avg_rating = models.FloatField(default=0)
+    reviews_count = models.PositiveIntegerField(default=0)
     increase_per = models.FloatField(
         default=settings.DEFAULT_INCREASE_PRICE_PER,
         validators=[
@@ -127,17 +116,6 @@ class Product(BaseModel):
     @property
     def price(self):
         return increase_price(self.site_price, self.increase_per)
-
-    @property
-    def short_name(self):
-        return truncatechars(self.name, 15)
-
-    @property
-    def view_site_price(self):
-        return float(self.site_price)
-
-    def __str__(self):
-        return f'{self.short_name} ({self.id})'
 
 
 class ProductImage(models.Model):
@@ -167,9 +145,6 @@ class ProductInventory(models.Model):
     color_image_url = models.TextField(blank=True, null=True)
     size = models.CharField(blank=True, null=True)
     status_code = models.CharField(blank=True, null=True)
-
-    class Meta:
-        db_table = "products_productquantity"
 
     @property
     def price(self):

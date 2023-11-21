@@ -7,34 +7,6 @@ from rest_framework.filters import BaseFilterBackend
 from .models import Site, Category
 
 
-class SiteFilter(BaseFilterBackend):
-    param = 'site'
-    description = _('Filter by site')
-
-    def filter_queryset(self, request, queryset, view):
-        site_param = request.query_params.get(self.param)
-        if site_param is None:
-            return queryset
-        try:
-            Site.from_string(site_param)
-        except KeyError:
-            raise ValidationError({self.param: _("Wrong param!")})
-        return queryset.query_by_site(site=site_param)
-
-    def get_schema_operation_parameters(self, view):
-        return [
-            {
-                'name': self.param,
-                'required': False,
-                'in': 'query',
-                'description': force_str(self.description),
-                'schema': {
-                    'type': 'string'
-                }
-            }
-        ]
-
-
 class CategoryLevelFilter(BaseFilterBackend):
     query_param = "level"
     description = _("Filter by categories level")

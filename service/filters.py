@@ -4,9 +4,38 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
-from rest_framework import serializers
 from rest_framework.filters import BaseFilterBackend
 from rest_framework.compat import coreapi, coreschema
+
+from service.enums import Site
+
+
+class SiteFilter(BaseFilterBackend):
+    param = 'site'
+    description = _('Filter by site')
+
+    def filter_queryset(self, request, queryset, view):
+        site_param = request.query_params.get(self.param)
+        if site_param is None:
+            return queryset
+        try:
+            Site.from_string(site_param)
+        except KeyError:
+            raise ValidationError({self.param: _("Unsupported site!")})
+        return queryset.filter_by_site(site=site_param)
+
+    def get_schema_operation_parameters(self, view):
+        return [
+            {
+                'name': self.param,
+                'required': False,
+                'in': 'query',
+                'description': force_str(self.description),
+                'schema': {
+                    'type': 'string'
+                }
+            }
+        ]
 
 
 class ListFilter(BaseFilterBackend):
@@ -16,16 +45,19 @@ class ListFilter(BaseFilterBackend):
     def get_field_names(self, view):
         return getattr(view, self.filter_fields_arr, {})
 
-    def get_queries_kwargs(self, request, view) -> dict[str, list[str]]:
+    def get_queries_kwargs(self, request, queryset, view) -> dict[str, list[str]]:
         queries = {}
         for field_name, source in self.get_field_names(view).items():
+            if not hasattr(queryset.model, source):
+                continue
+
             params = [i for i in request.query_params.get(field_name, '').split(',') if i.strip()]
             if params:
                 queries[source + '__in'] = params
         return queries
 
     def filter_queryset(self, request, queryset, view):
-        queries = self.get_queries_kwargs(request, view)
+        queries = self.get_queries_kwargs(request, queryset, view)
         if queries:
             return queryset.filter(**queries)
         return queryset
@@ -36,12 +68,12 @@ class ListFilter(BaseFilterBackend):
                 'name': field_name,
                 'required': False,
                 'in': 'query',
-                'description': force_str(self.description % source),
+                'description': force_str(self.description % field_name),
                 'schema': {
                     'type': 'string',
                 },
             }
-            for field_name, source in self.get_field_names(view).items()
+            for field_name in self.get_field_names(view).keys()
         ]
 
 
@@ -81,14 +113,17 @@ class DateRangeFilter(BaseFilterBackend):
             return queryset
 
         range_queries = {}
-        if start:
-            range_queries[self.get_start_field(view) + '__gte'] = start
-        if end:
+        start_field = self.get_start_field(view)
+        end_field = self.get_end_field(view)
+
+        if start and hasattr(queryset.model, start_field):
+            range_queries[start_field + '__gte'] = start
+        if end and hasattr(queryset.model, end_field):
             range_queries[self.get_end_field(view) + '__lte'] = end
-        try:
+
+        if range_queries:
             return queryset.filter(**range_queries)
-        except ValidationError as e:
-            raise serializers.ValidationError(str(e))
+        return queryset
 
     def get_schema_operation_parameters(self, view):
         description = force_str(self.description)
@@ -132,6 +167,9 @@ class FilterByFields(BaseFilterBackend):
         filtered_queryset = queryset
 
         for query_field, db_field in filter_fields.items():
+            if not hasattr(queryset.model, db_field):
+                continue
+
             value = request.query_params.get(query_field, None)
             if not value:
                 continue

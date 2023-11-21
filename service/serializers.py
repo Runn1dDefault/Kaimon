@@ -3,20 +3,74 @@ from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from rest_framework import serializers
 
-import pandas as pd
 from django.utils.timezone import localtime, now
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 from rest_framework.fields import DateField, ChoiceField
-from rest_framework.serializers import ModelSerializer
 from rest_framework.utils.serializer_helpers import ReturnDict
+from pandas import concat, DataFrame
 
-from utils.querysets import AnalyticsQuerySet
-from utils.types import AnalyticsFilter
+from .models import Conversion
+from .utils import get_currencies_price_per, convert_price, get_currency_by_id
+from .querysets import BaseAnalyticsQuerySet, AnalyticsFilterBy
 
 
-class AnalyticsSerializer(ModelSerializer):
+class ConversionField(serializers.FloatField):
+    def __init__(self, instance_currency: str = None,  check_site_field: str = None, **kwargs):
+        super().__init__(**kwargs)
+        self.instance_currency = Conversion.Currencies.from_string(instance_currency) if instance_currency else None
+        self.check_site_field = check_site_field
+
+    def get_attribute(self, instance):
+        if not self.instance_currency:
+            instance_id = getattr(instance, self.check_site_field) if self.check_site_field else getattr(instance, 'id')
+            self.instance_currency = get_currency_by_id(instance_id)
+        return super().get_attribute(instance)
+
+    def get_currency(self) -> Conversion.Currencies:
+        return Conversion.Currencies.from_string(self.context.get('currency', 'yen'))
+
+    def all_conversions(self) -> bool:
+        return self.context.get('all_conversions') is True
+
+    def to_representation(self, value):
+        value = super().to_representation(value)
+
+        if self.all_conversions:
+            data = {}
+            for currency in Conversion.Currencies:
+                if currency == self.instance_currency:
+                    data[currency] = value
+                    continue
+
+                currency_name = getattr(currency, 'value')
+                price_per = get_currencies_price_per(currency_from=self.instance_currency, currency_to=currency)
+                data[currency_name] = convert_price(value, price_per) if price_per else None
+            return data
+
+        currency = self.get_currency()
+        if not value or currency == self.instance_currency:
+            return value
+
+        price_per = get_currencies_price_per(currency_from=self.instance_currency, currency_to=currency)
+        return convert_price(value, price_per) if price_per else None
+
+
+class ConversionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Conversion
+        fields = ('id', 'currency_from', 'currency_to', 'price_per')
+        extra_kwargs = {'currency_from': {'read_only': True}, 'currency_to': {'read_only': True}}
+
+    def save(self, **kwargs):
+        instance = super().save(**kwargs)
+        get_currencies_price_per.cache_clear()
+        return instance
+
+
+class AnalyticsSerializer(serializers.ModelSerializer):
     FILTER_BY = (
         ('day', 'day'),
         ('month', 'month'),
@@ -53,7 +107,7 @@ class AnalyticsSerializer(ModelSerializer):
     @staticmethod
     def validate_filter_by(filter_by: str):
         try:
-            return AnalyticsFilter.get_by_string(filter_by)
+            return AnalyticsFilterBy.from_string(filter_by)
         except ValueError as e:
             raise ValidationError({'filter_by': _(str(e))})
 
@@ -92,14 +146,14 @@ class AnalyticsSerializer(ModelSerializer):
         model = getattr(self.Meta, 'model')
         return model.analytics.filter(**self.build_queries())
 
-    def filtered_analytics(self) -> AnalyticsQuerySet:
+    def filtered_analytics(self) -> BaseAnalyticsQuerySet:
         filter_by = self.validated_data['filter_by']
         return self._base_queryset().by_dates(filter_by)
 
     @property
     def data(self):
         analytics_queryset = self.filtered_analytics()
-        df = analytics_queryset.to_df() if analytics_queryset.exists() else pd.DataFrame()
+        df = analytics_queryset.to_df() if analytics_queryset.exists() else DataFrame()
         return ReturnDict(self.to_representation(df), serializer=self)
 
     @property
@@ -108,11 +162,11 @@ class AnalyticsSerializer(ModelSerializer):
 
     def add_empty_rows(self, found_dates, start, end, filter_by):
         match filter_by:
-            case AnalyticsFilter.MONTH:
+            case AnalyticsFilterBy.MONTH:
                 iters = (end.month - start.month) + 1
                 iter_date = datetime(day=1, month=start.month, year=start.year, hour=0, minute=0, second=0,
                                      tzinfo=timezone.utc)
-            case AnalyticsFilter.YEAR:
+            case AnalyticsFilterBy.YEAR:
                 iters = (end.year - start.year) + 1
                 iter_date = datetime(day=1, month=1, year=start.year, hour=0, minute=0, second=0, tzinfo=timezone.utc)
             case _:
@@ -127,10 +181,10 @@ class AnalyticsSerializer(ModelSerializer):
                 not_found_dates.append(template)
 
             match filter_by:
-                case AnalyticsFilter.MONTH:
+                case AnalyticsFilterBy.MONTH:
                     _, days = calendar.monthrange(iter_date.year, iter_date.month)
                     iter_date += timedelta(days=days)
-                case AnalyticsFilter.YEAR:
+                case AnalyticsFilterBy.YEAR:
                     first = datetime(year=iter_date.year, day=1, month=1)
                     second = datetime(year=iter_date.year + 1, day=1, month=1)
                     iter_date += timedelta(days=(second - first).days)
@@ -142,14 +196,14 @@ class AnalyticsSerializer(ModelSerializer):
     def hide_fields(self):
         return getattr(self.Meta, 'hide_fields', None)
 
-    def to_representation(self, df):
+    def to_representation(self, df: DataFrame):
         dates = df['date'].tolist() if df.empty is False else []
         start, end = self.validated_data['start'], self.validated_data['end']
         filter_by = self.validated_data['filter_by']
         empty_rows = self.add_empty_rows(dates, start, end, filter_by)
 
         if empty_rows:
-            df = pd.concat([df, pd.DataFrame.from_records(empty_rows)], ignore_index=True)
+            df = concat([df, DataFrame.from_records(empty_rows)], ignore_index=True)
             df = df.sort_values(by='date')
 
         if df.empty is False:

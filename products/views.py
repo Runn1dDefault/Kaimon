@@ -4,25 +4,23 @@ from rest_framework import mixins
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.generics import ListAPIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet, GenericViewSet
 
-from currencies.mixins import CurrencyMixin
 from users.permissions import EmailConfirmedPermission, RegistrationPayedPermission, IsAuthor
-from utils.filters import ListFilter
-from utils.helpers import recursive_single_tree
-from utils.views import CachingMixin
+from service.mixins import CurrencyMixin, CachingMixin
+from service.filters import ListFilter, SiteFilter
+from service.utils import recursive_single_tree
 
-from .filters import CategoryLevelFilter, SiteFilter, ProductReferenceFilter
+from .filters import CategoryLevelFilter, ProductReferenceFilter
 from .models import Category, Product, Tag, ProductReview
 from .paginations import CategoryPagination, ProductReviewPagination, ProductPagination
 from .serializers import CategorySerializer, ShortProductSerializer, ProductDetailSerializer, ProductReviewSerializer
 
 
 class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
-    permission_classes = ()
-    authentication_classes = ()
+    permission_classes = (AllowAny,)
     queryset = Category.objects.filter(deactivated=False)
     serializer_class = CategorySerializer
     pagination_class = CategoryPagination
@@ -49,14 +47,14 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
 
     @action(methods=['GET'], detail=True, url_path='tags')
     def tags(self, request, category_id):
+        self.get_object()
         tag_groups = Tag.collections.filter(group__isnull=True, products__categories__id=category_id)
         return Response(tag_groups.collected_children())
 
 
 @extend_schema_view(post=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
-class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
-    permission_classes = ()
-    authentication_classes = ()
+class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
+    permission_classes = (AllowAny,)
     queryset = Product.objects.filter(is_active=True)
     pagination_class = ProductPagination
     serializer_class = ShortProductSerializer
@@ -64,7 +62,7 @@ class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
     lookup_url_kwarg = "product_id"
     lookup_field = "id"
     filter_backends = (SiteFilter, ListFilter, SearchFilter, OrderingFilter)
-    list_filter_fields = {"product_ids": "id", "categories_ids": "categories__id"}
+    list_filter_fields = {"product_ids": "id", "category_ids": "categories__id", "tag_ids": "tags__id"}
     search_fields = ("name", "categories__name")
     ordering_fields = ("created_at",)
 
@@ -74,11 +72,14 @@ class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
         return self.serializer_class
 
     @action(methods=['GET'], detail=True, url_path='tags')
-    def tags(self, request):
+    def tags(self, request, **kwargs):
         product = self.get_object()
         tag_groups = Tag.collections.filter(group__isnull=True, products__id=product.id)
-        tag_ids = product.tags.values('id', flat=True)
-        return Response(tag_groups.collected_children(tag_ids))
+        return Response(tag_groups.collected_children(product.tags.values('id', flat=True)))
+
+    @action(methods=['GET'], detail=True, url_path='reviews')
+    def reviews(self, request, **kwargs):
+        product = self.get_object()
 
 
 class ProductReviewsAPIView(ListAPIView):
@@ -105,13 +106,12 @@ class ProductReviewsAPIView(ListAPIView):
 
 class UserReviewViewSet(
     mixins.CreateModelMixin,
-    mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
     GenericViewSet
 ):
     permission_classes = (IsAuthenticated, EmailConfirmedPermission, RegistrationPayedPermission, IsAuthor)
-    queryset = ProductReview.objects.all()
+    queryset = ProductReview.objects.filter(moderated=True)
     serializer_class = ProductReviewSerializer
     pagination_class = ProductReviewPagination
 

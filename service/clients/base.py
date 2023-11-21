@@ -68,3 +68,4 @@ class BaseAPIClient:
 
     def delete(self, path: str) -> Any:
         return self._request('DELETE', path)
+    

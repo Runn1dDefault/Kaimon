@@ -7,14 +7,14 @@ from rest_framework.filters import SearchFilter
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
-from currencies.models import Conversion
+from service.models import Conversion
 from product.filters import PopularProductOrdering, FilterByTag
 from product.models import Product, ProductReview, Genre, Tag, TagGroup
 from promotions.models import Promotion
 from users.models import User
 from order.models import Order
-from utils.filters import FilterByFields, DateRangeFilter, ListFilter
-from utils.views import CachingMixin
+from service.mixins import CachingMixin
+from service.filters import FilterByFields, DateRangeFilter, ListFilter
 
 from .mixins import DirectorViewMixin, StaffViewMixin
 from .paginators import UserListPagination, AdminPagePagination
@@ -28,7 +28,7 @@ from .serializers import (
 
 
 # ---------------------------------------------- Users -----------------------------------------------------------------
-class UserAdminViewSet(DirectorViewMixin, viewsets.ReadOnlyModelViewSet):
+class UserAdminViewSet(DirectorViewMixin, viewsets.ModelViewSet):
     queryset = User.objects.filter(role=User.Role.CLIENT)
     pagination_class = UserListPagination
     serializer_class = UserAdminSerializer
@@ -40,22 +40,6 @@ class UserAdminViewSet(DirectorViewMixin, viewsets.ReadOnlyModelViewSet):
     end_param = 'end_date'
     lookup_url_kwarg = 'user_id'
     lookup_field = 'id'
-
-    @extend_schema(responses={status.HTTP_200_OK: None})
-    @action(methods=['GET'], detail=True, url_path='change-activity')
-    def block_or_unblock_user(self, request, **kwargs):
-        user = self.get_object()
-        user.is_active = not user.is_active
-        user.save()
-        return Response({'status': user.is_active}, status=status.HTTP_200_OK)
-
-    @extend_schema(responses={status.HTTP_200_OK: None})
-    @action(methods=['GET'], detail=True, url_path='mark-register-payed')
-    def mark_payed(self, request):
-        user = self.get_object()
-        user.registration_payed = True
-        user.save()
-        return Response(status=status.HTTP_200_OK)
 
 
 # ------------------------------------------------ Genre ---------------------------------------------------------------
@@ -244,7 +228,7 @@ class ProductReviewAdminViewSet(
 
 
 # ---------------------------------------------- Order -----------------------------------------------------------------
-class OrderAdminViewSet(StaffViewMixin, viewsets.ReadOnlyModelViewSet):
+class OrderAdminViewSet(StaffViewMixin, mixins.UpdateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderAdminSerializer
     pagination_class = AdminPagePagination
@@ -258,36 +242,6 @@ class OrderAdminViewSet(StaffViewMixin, viewsets.ReadOnlyModelViewSet):
     search_fields = ['customer__email', 'customer__name', 'customer__phone']
     lookup_field = 'id'
     lookup_url_kwarg = 'order_id'
-
-    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
-    @action(methods=['GET'], detail=True, url_path="mark-in-delivering")
-    def mark_in_delivering_order(self, request, **kwargs):
-        order = self.get_object()
-        if order.status != Order.Status.in_process:
-            return Response({'detail': _('To update you need to set the %s' % Order.Status.in_process.value)})
-        order.status = Order.Status.in_delivering
-        order.save()
-        return Response(status=status.HTTP_202_ACCEPTED)
-
-    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
-    @action(methods=['GET'], detail=True, url_path="mark-in-process")
-    def mark_in_process_order(self, request, **kwargs):
-        order = self.get_object()
-        if order.status != Order.Status.pending:
-            return Response({'detail': _('To update you need to set the %s' % Order.Status.pending.value)})
-        order.status = Order.Status.in_process
-        order.save()
-        return Response(status=status.HTTP_202_ACCEPTED)
-
-    @extend_schema(responses={status.HTTP_202_ACCEPTED: None})
-    @action(methods=['GET'], detail=True, url_path="mark-reject")
-    def mark_reject_order(self, request, **kwargs):
-        order = self.get_object()
-        if order.status in (Order.Status.pending, Order.Status.in_process):
-            return Response({'detail': _('Cannot update order status')})
-        order.status = Order.Status.rejected
-        order.save()
-        return Response(status=status.HTTP_202_ACCEPTED)
 
     @action(methods=['GET'], detail=False, url_path='new-count')
     def new_count(self, request, **kwargs):

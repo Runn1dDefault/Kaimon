@@ -1,4 +1,3 @@
-import json
 from dataclasses import dataclass, asdict
 from datetime import timedelta, datetime
 from enum import Enum
@@ -7,7 +6,7 @@ from urllib.parse import urljoin
 
 from requests import Request
 
-from services.clients.base import BaseAPIClient
+from service.clients.base import BaseAPIClient
 
 
 @dataclass
@@ -86,7 +85,7 @@ class FedexCommodity:
     quantity_units: str = None
     # https://developer.fedex.com/api/en-kg/guides/api-reference.html#vaguecommoditydescriptions
     desciption: str = None
-    
+
     def payload(self):
         payload = {
             "quantity": self.quantity,
@@ -142,12 +141,12 @@ class FedexAPIClient(BaseAPIClient):
         self._token_exp = datetime.utcnow() + timedelta(seconds=response_data['expires_in'] - self.SECONDS_TO_SUBSTRACT)
 
     def international_rate_quotes(
-        self,
-        shipper: FedexAddress,
-        recipient: FedexAddress,
-        pickup_type: FedexPickupType,
-        commodities: Iterable[FedexCommodity],
-        ship_date: datetime.date
+            self,
+            shipper: FedexAddress,
+            recipient: FedexAddress,
+            pickup_type: FedexPickupType,
+            commodities: Iterable[FedexCommodity],
+            ship_date: datetime.date
     ) -> dict[str, Any]:
         """
         docs: https://developer.fedex.com/api/en-us/catalog/rate/v1/docs.html#operation/Rate%20and%20Transit%20times
@@ -207,7 +206,7 @@ if __name__ == '__main__':
 
     ouput = resp_data['output']
     data = ouput['rateReplyDetails'][0]['ratedShipmentDetails'][0]
-    
+
     print('quoteDate: ', ouput['quoteDate'])
     print('Base Rate: ', data['totalBaseCharge'])
 

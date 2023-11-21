@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from currencies.serializers import ConversionField
+from service.serializers import ConversionField
 
 from .models import Category, Product, ProductInventory, ProductReview
 
@@ -18,7 +18,7 @@ class ShortProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'sale_price', 'site_avg_rating', 'site_rating_count', 'images')
+        fields = ('id', 'name', 'price', 'sale_price', 'avg_rating', 'rating_count', 'images')
 
     def update(self, instance, validated_data):
         raise NotImplementedError('`update()` not implemented.')

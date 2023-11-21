@@ -1,6 +1,12 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from functools import lru_cache
+
+import qrcode
+
+from .enums import Site, SiteCurrency
+from .models import Conversion
 
 
 def import_model(model_import_path: str):
@@ -37,12 +43,8 @@ def convert_date(date_string: str):
     return datetime.strptime(date_string, "%Y-%m-%d").date()
 
 
-def internal_uid_generation():
-    """
-    a function that returns a new uuid4 with the prefix internal: at the beginning.
-    The prefix can be useful for separating manually created products from other ones
-    """
-    return 'internal:' + str(uuid.uuid4())
+def uid_generate(prefix: str = 'kaimono'):
+    return prefix + '_' + str(uuid.uuid4())
 
 
 def recursive_single_tree(current, related_field: str) -> list[int]:
@@ -74,3 +76,38 @@ def recursive_many_tree(current, related_field: str) -> list[int]:
 
         last_children.extend(recursive_many_tree(child, related_field))
     return last_children
+
+
+def get_site_from_id(obj_id: str) -> str:
+    return obj_id.split('_')[0]
+
+
+@lru_cache(maxsize=4)
+def get_currencies_price_per(currency_from, currency_to) -> Decimal | None:
+    if currency_from == currency_to:
+        return None
+
+    conversion = Conversion.objects.filter(currency_from=currency_from, currency_to=currency_to).first()
+    if conversion:
+        return conversion.price_per
+
+
+def convert_price(current_price: float | Decimal | int, price_per: Decimal):
+    if not isinstance(current_price, Decimal):
+        current_price = Decimal(current_price)
+    return current_price * price_per
+
+
+def get_currency_by_id(instance_id):
+    site = Site.from_instance_id(instance_id)
+    currency_name = SiteCurrency.from_string(site).value
+    return Conversion.Currencies.from_string(currency_name)
+
+
+def generate_qrcode(filepath: str, url: str):
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10,
+                       border=4)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    img.save(filepath)
