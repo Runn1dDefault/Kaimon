@@ -55,7 +55,7 @@ class CategoryViewSet(ReadOnlyModelViewSet):
 
 
 @extend_schema_view(post=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
-class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
+class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
     permission_classes = (AllowAny,)
     queryset = Product.objects.filter(is_active=True)
     pagination_class = ProductPagination
