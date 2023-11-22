@@ -66,7 +66,7 @@ services:
     networks:
       - database
       - redis_cache
-    command: celery --app kaimon worker -Q default -c 4 --loglevel=info
+    command: celery --app kaimon worker -Q default --loglevel=info
     env_file:
       - ../../.env
     depends_on:
