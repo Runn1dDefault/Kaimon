@@ -98,31 +98,6 @@ services:
     depends_on:
       - web
 
-  celery-rakuten-requests:
-    restart: always
-    build:
-      context: ../../
-    networks:
-      - database
-      - redis_cache
-    command: celery --app kaimon worker -Q rakuten_requests -c 3 --loglevel=info
-    env_file:
-      - ../../.env
-    depends_on:
-      - web
-
-  celery-item-saving:
-    restart: always
-    build:
-      context: ../../
-    networks:
-      - database
-      - redis_cache
-    command: celery --app kaimon worker -Q item_saving -c 4 --loglevel=info
-    env_file:
-      - ../../.env
-    depends_on:
-      - web
 
 networks:
   backend:
