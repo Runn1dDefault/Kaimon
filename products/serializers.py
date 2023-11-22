@@ -43,17 +43,12 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     price = ConversionField()
     sale_price = ConversionField()
     images = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
-    categories = serializers.SerializerMethodField(read_only=True)
     inventories = ProductInventorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
         fields = ('id', 'name',  'description', 'price', 'sale_price', 'avg_rating', 'reviews_count',
-                  'site_avg_rating', 'site_reviews_count', 'categories', 'images', 'inventories')
-
-    def get_categories(self, instance):
-        categories = instance.categories.filter(level__gt=0, deactivated=False).order_by('-level')
-        return CategorySerializer(instance=categories, many=True, context=self.context).data
+                  'site_avg_rating', 'site_reviews_count', 'images', 'inventories')
 
 
 class ProductReviewSerializer(serializers.ModelSerializer):
