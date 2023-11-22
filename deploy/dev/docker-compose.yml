@@ -22,7 +22,7 @@ services:
     networks:
       - redis_cache
     ports:
-      - "6355:6379"
+      - "6356:6379"
     volumes:
       - redis_data:/usr/local/etc/redis
 
