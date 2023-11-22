@@ -19,7 +19,7 @@ from .paginations import CategoryPagination, ProductReviewPagination, ProductPag
 from .serializers import CategorySerializer, ShortProductSerializer, ProductDetailSerializer, ProductReviewSerializer
 
 
-class CategoryViewSet(ReadOnlyModelViewSet):
+class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
     permission_classes = (AllowAny,)
     queryset = Category.objects.filter(deactivated=False)
     serializer_class = CategorySerializer
@@ -54,7 +54,6 @@ class CategoryViewSet(ReadOnlyModelViewSet):
         )
 
 
-@extend_schema_view(post=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
 class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
     permission_classes = (AllowAny,)
     queryset = Product.objects.filter(is_active=True)
@@ -67,6 +66,14 @@ class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
     list_filter_fields = {"product_ids": "id", "category_ids": "categories__id", "tag_ids": "tags__id"}
     search_fields = ("name", "categories__name")
     ordering_fields = ("created_at",)
+
+    @extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM])
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM])
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
 
     def get_serializer_class(self):
         if self.detail:
