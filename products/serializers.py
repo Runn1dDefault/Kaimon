@@ -8,17 +8,23 @@ from .models import Category, Product, ProductInventory, ProductReview
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ('id', 'name', 'level', 'parent')
+        fields = ('id', 'name', 'level', 'parent_id')
 
 
 class ShortProductSerializer(serializers.ModelSerializer):
     price = ConversionField()
     sale_price = ConversionField()
-    images = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
+    image = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'sale_price', 'avg_rating', 'rating_count', 'images')
+        fields = ('id', 'name', 'price', 'sale_price', 'image', 'avg_rating',
+                  'reviews_count', 'site_avg_rating', 'site_reviews_count')
+
+    def get_image(self, instance):
+        image = instance.images.first()
+        if image:
+            return image.url
 
     def update(self, instance, validated_data):
         raise NotImplementedError('`update()` not implemented.')
@@ -42,8 +48,8 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ('id', 'name',  'description', 'price', 'sale_price', 'site_avg_rating', 'site_rating_count',
-                  'categories', 'images', 'inventories')
+        fields = ('id', 'name',  'description', 'price', 'sale_price', 'avg_rating', 'reviews_count',
+                  'site_avg_rating', 'site_reviews_count', 'categories', 'images', 'inventories')
 
     def get_categories(self, instance):
         categories = instance.categories.filter(level__gt=0, deactivated=False).order_by('-level')
@@ -51,11 +57,11 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
 
 class ProductReviewSerializer(serializers.ModelSerializer):
-    user = serializers.SlugRelatedField(slug_field="full_name", read_only=True)
+    author_name = serializers.SlugRelatedField(slug_field="full_name", read_only=True, source='user')
 
     class Meta:
         model = ProductReview
-        fields = ('id', 'user', 'product', 'rating', 'comment', 'created_at')
+        fields = ('id', 'author_name', 'product', 'rating', 'comment', 'created_at')
         extra_kwargs = {'product': {'write_only': True, 'required': True}}
 
     def validate(self, attrs):

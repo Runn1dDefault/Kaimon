@@ -3,9 +3,8 @@ from typing import Any
 from django.conf import settings
 from django.utils import timezone
 
-from product.models import Product
-from services.clients.fedex import FedexAPIClient, FedexAddress, FedexPickupType, FedexCommodity, FedexWeight, \
-    FedexCurrencyAmount
+from products.models import Product
+from service.clients import fedex
 from .models import DeliveryAddress
 
 
@@ -41,32 +40,32 @@ def fedex_international_quotes(
             continue
 
         commodities.append(
-            FedexCommodity(
-                weight=FedexWeight(units='KG', value=genre.avg_weight),
-                currency_amount=FedexCurrencyAmount(currency="JYE", amount=100),
+            fedex.FedexCommodity(
+                weight=fedex.FedexWeight(units='KG', value=genre.avg_weight),
+                currency_amount=fedex.FedexCurrencyAmount(currency="JYE", amount=100),
                 desciption=genre.fedex_description,
                 quantity=data['quantity'],
                 quantity_units="PCS"
             )
         )
 
-    client = FedexAPIClient(
+    client = fedex.FedexAPIClient(
         client_id=settings.FEDEX_CLIENT_ID,
         client_secret=settings.FEDEX_SECRET,
         account_number=settings.FEDEX_ACCOUNT_NUMBER,
         use_test=True  # TODO: change settings and delete this param on prod
     )
     return client.international_rate_quotes(
-        shipper=FedexAddress(
+        shipper=fedex.FedexAddress(
             postal_code=settings.SHIPPER_POSTAL_CODE,
             country_code=settings.SHIPPER_COUNTRY_CODE
         ),
-        recipient=FedexAddress(
+        recipient=fedex.FedexAddress(
             country_code=country_code,
             city=city,
             postal_code=postal_code
         ),
-        pickup_type=FedexPickupType.CONTACT_FEDEX_TO_SCHEDULE,
+        pickup_type=fedex.FedexPickupType.CONTACT_FEDEX_TO_SCHEDULE,
         commodities=commodities,
         ship_date=(timezone.localtime(timezone.now()) + timezone.timedelta(days=3)).date()
     )

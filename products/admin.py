@@ -1,7 +1,8 @@
 from django.contrib import admin
+from django.template.defaultfilters import truncatechars
 from django.utils.translation import gettext_lazy as _
 
-from .models import Site, Category, Tag, Product, ProductImage, ProductInventory
+from .models import Site, Category, Tag, Product, ProductImage, ProductInventory, ProductReview
 
 
 class SiteFilter(admin.SimpleListFilter):
@@ -123,7 +124,7 @@ class HasReviewFilter(admin.SimpleListFilter):
 class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductImageInline, ProductInventoryInline]
     autocomplete_fields = ("categories", "tags")
-    list_display = ("id", "short_name", "view_site_price", "is_active", "created_at")
+    list_display = ("id", 'product_name', "product_price", "is_active", "created_at")
     search_fields = ("id", "name")
     list_filter = (SiteFilter, "is_active", "modified_at", HasReviewFilter, "site_avg_rating",)
     list_per_page = 15
@@ -144,10 +145,35 @@ class ProductAdmin(admin.ModelAdmin):
         )
     )
 
-    def formfield_for_manytomany(self, db_field, request, **kwargs):
-        site = request.path.split('/')[-3].split('_')[0]
-        if db_field == 'categories':
-            kwargs["queryset"] = Category.objects.query_by_site(site=site).filter(deactivated=False)
-        elif db_field == 'tags':
-            kwargs["queryset"] = Tag.objects.query_by_site(site=site).filter(group_id__isnull=False)
-        return super().formfield_for_manytomany(db_field, request, **kwargs)
+    def product_name(self, obj):
+        return truncatechars(obj.name, 35)
+
+    product_name.admin_order_field = 'name'
+    product_name.short_description = _('Product Name')
+
+    def product_price(self, obj):
+        return float(obj.price)
+
+    product_price.admin_order_field = 'site_price'
+    product_price.short_description = _('Price')
+
+
+@admin.register(ProductReview)
+class ProductReviewAdmin(admin.ModelAdmin):
+    autocomplete_fields = ('user', 'product')
+    list_display = ('id', 'user', 'product_id', 'short_comment', 'moderated', 'is_read')
+    list_display_links = ('id', 'user', 'product_id')
+    search_fields = ('id', 'user__email', 'user__full_name')
+    list_filter = ('rating', 'created_at', 'is_read', 'moderated')
+
+    def product_id(self, obj):
+        return obj.product.id
+
+    product_id.admin_order_field = 'product'
+    product_id.short_description = _('Product ID')
+
+    def short_comment(self, obj):
+        return truncatechars(obj.comment, 35)
+
+    short_comment.admin_order_field = 'comment'
+    short_comment.short_description = _('Comment')

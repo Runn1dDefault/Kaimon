@@ -2,7 +2,7 @@ from django.core.validators import MaxValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from product.models import Product
+from products.models import Product
 from promotions.querysets import PromotionQueryset
 
 
@@ -30,14 +30,12 @@ class Promotion(models.Model):
         related_query_name="promotion"
     )
     deactivated = models.BooleanField(default=False)
-    is_deleted = models.BooleanField(default=False)
-
-    start_date = models.DateField(null=True, blank=True)
-    end_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
 class Discount(models.Model):
+    objects = models.Manager()
+
     # pulled out into a separate model,
     # since in the future they may add a different kind of promotion that does not use discount
     promotion = models.OneToOneField(Promotion, on_delete=models.CASCADE, primary_key=True)

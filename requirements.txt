@@ -17,3 +17,4 @@ requests==2.31.0
 numpy==1.25.2
 django-filter==23.2
 pandas==2.1.0
+qrcode~=7.4.2

@@ -9,15 +9,8 @@ from .models import Product
 @app.task()
 def update_product_reviews_data(product_id):
     product = Product.objects.prefetch_related('reviews').get(id=product_id)
-    product.reviews_count = product.reviews.filter(is_active=True).values('id').distinct().count()
-    product.avg_rating = product.reviews.filter(is_active=True).aggregate(Avg('rank'))['rank__avg']
-    product.save()
-
-
-@app.task()
-def update_product_receipts_qty(product_id):
-    product = Product.objects.prefetch_related('receipts').get(id=product_id)
-    product.receipts_qty = product.receipts.values('order_id').distinct().count()
+    product.reviews_count = product.reviews.filter(moderated=True).count()
+    product.avg_rating = product.reviews.filter(moderated=True).aggregate(Avg('rating'))['rating__avg']
     product.save()
 
 

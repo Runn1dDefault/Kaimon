@@ -19,14 +19,15 @@ from .paginations import CategoryPagination, ProductReviewPagination, ProductPag
 from .serializers import CategorySerializer, ShortProductSerializer, ProductDetailSerializer, ProductReviewSerializer
 
 
-class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
+class CategoryViewSet(ReadOnlyModelViewSet):
     permission_classes = (AllowAny,)
     queryset = Category.objects.filter(deactivated=False)
     serializer_class = CategorySerializer
     pagination_class = CategoryPagination
     lookup_url_kwarg = "category_id"
     lookup_field = "id"
-    filter_backends = (SiteFilter, CategoryLevelFilter)
+    filter_backends = (SearchFilter, SiteFilter, CategoryLevelFilter)
+    search_fields = ('id', 'name')
 
     @action(methods=['GET'], detail=True, url_path='children')
     def children(self, request, **kwargs):
@@ -35,8 +36,8 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-    @action(methods=['GET'], detail=True, url_path='parents')
-    def parents(self, request, **kwargs):
+    @action(methods=['GET'], detail=True, url_path='tree')
+    def categories_tree(self, request, **kwargs):
         category = self.get_object()
         category_tree = [category]
         parent_ids = recursive_single_tree(category, 'parent')
@@ -46,10 +47,11 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
         return Response(serializer.data)
 
     @action(methods=['GET'], detail=True, url_path='tags')
-    def tags(self, request, category_id):
-        self.get_object()
-        tag_groups = Tag.collections.filter(group__isnull=True, products__categories__id=category_id)
-        return Response(tag_groups.collected_children())
+    def tags(self, request, **kwargs):
+        category = self.get_object()
+        return Response(
+            Tag.collections.filter(products__in=category.products.all()).grouped_tags()
+        )
 
 
 @extend_schema_view(post=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
@@ -61,7 +63,7 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
     retrieve_serializer_class = ProductDetailSerializer
     lookup_url_kwarg = "product_id"
     lookup_field = "id"
-    filter_backends = (SiteFilter, ListFilter, SearchFilter, OrderingFilter)
+    filter_backends = (SiteFilter, ListFilter, SearchFilter, OrderingFilter, ProductReferenceFilter)
     list_filter_fields = {"product_ids": "id", "category_ids": "categories__id", "tag_ids": "tags__id"}
     search_fields = ("name", "categories__name")
     ordering_fields = ("created_at",)
@@ -74,18 +76,15 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
     @action(methods=['GET'], detail=True, url_path='tags')
     def tags(self, request, **kwargs):
         product = self.get_object()
-        tag_groups = Tag.collections.filter(group__isnull=True, products__id=product.id)
-        return Response(tag_groups.collected_children(product.tags.values('id', flat=True)))
-
-    @action(methods=['GET'], detail=True, url_path='reviews')
-    def reviews(self, request, **kwargs):
-        product = self.get_object()
+        return Response(
+            Tag.collections.filter(products__id=product.id)
+                           .grouped_tags(product.tags.values_list('id', flat=True))
+        )
 
 
 class ProductReviewsAPIView(ListAPIView):
-    permission_classes = ()
-    authentication_classes = ()
-    lookup_url_kwarg = "review_id"
+    permission_classes = (AllowAny,)
+    lookup_url_kwarg = "product_id"
     lookup_field = 'id'
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductReviewSerializer
@@ -117,13 +116,3 @@ class UserReviewViewSet(
 
     def get_queryset(self):
         return super().get_queryset().filter(user=self.request.user)
-
-
-@extend_schema_view(get=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
-class ReferenceListAPIView(CachingMixin, CurrencyMixin, ListAPIView):
-    permission_classes = ()
-    authentication_classes = ()
-    queryset = Product.objects.filter(is_active=True)
-    filter_backends = [ProductReferenceFilter]
-    serializer_class = ShortProductSerializer
-    pagination_class = ProductPagination

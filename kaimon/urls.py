@@ -14,11 +14,11 @@ docs_urlpatterns = [
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v1/', include('products.urls')),
+    path('api/v1/', include('service.urls')),
     path('api/v1/auth/', include('users.urls')),
     path('api/v1/order/', include('order.urls')),
     path('api/v1/promotions/', include('promotions.urls')),
     path('api/v1/external-admin/', include('external_admin.urls')),
-    path('api/v1/conversions/', include('currencies.urls')),
 ] + docs_urlpatterns
 
 if settings.DEBUG:

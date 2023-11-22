@@ -34,11 +34,9 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'drf_spectacular',
 
-    'users',  # ready
-    'product',  # ready
+    'service',
+    'users',
     'products',
-    'rakuten_scraping',  # ready
-    'currencies',
     'promotions',
     'order',
     'external_admin'
@@ -130,7 +128,7 @@ REDIS_CONNECTION_URL = config("REDIS_URL")
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": REDIS_CONNECTION_URL + '/3'
+        "LOCATION": REDIS_CONNECTION_URL + '/0'
     },
     "users": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -139,6 +137,10 @@ CACHES = {
     "scraping": {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": REDIS_CONNECTION_URL + '/2'
+    },
+    "pages_cache": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": REDIS_CONNECTION_URL + '/3'
     },
 }
 PAGE_CACHED_SECONDS = 21600

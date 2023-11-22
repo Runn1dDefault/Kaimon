@@ -6,7 +6,7 @@ from functools import lru_cache
 import qrcode
 
 from .enums import Site, SiteCurrency
-from .models import Conversion
+from .models import Conversion, Currencies
 
 
 def import_model(model_import_path: str):
@@ -100,8 +100,7 @@ def convert_price(current_price: float | Decimal | int, price_per: Decimal):
 
 def get_currency_by_id(instance_id):
     site = Site.from_instance_id(instance_id)
-    currency_name = SiteCurrency.from_string(site).value
-    return Conversion.Currencies.from_string(currency_name)
+    return Currencies.from_string(SiteCurrency.from_string(site).value)
 
 
 def generate_qrcode(filepath: str, url: str):

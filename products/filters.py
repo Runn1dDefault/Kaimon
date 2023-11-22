@@ -1,10 +1,9 @@
 from django.db.models import Subquery
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
-from rest_framework.exceptions import ValidationError
 from rest_framework.filters import BaseFilterBackend
 
-from .models import Site, Category
+from .models import Category
 
 
 class CategoryLevelFilter(BaseFilterBackend):
@@ -33,13 +32,18 @@ class CategoryLevelFilter(BaseFilterBackend):
 
 
 class ProductReferenceFilter(BaseFilterBackend):
-    product_id_param = 'product_id'
-    product_id_description = _('Recommendations by product meta')
+    description = _('Popular products ordering')
+    popular_param = 'popular'
 
     def filter_queryset(self, request, queryset, view):
-        product_id = request.query_params.get(self.product_id_param)
-        orders = ('-site_rating_count', '-site_avg_rating')
-        if product_id:
+        popular_value = getattr(request, self.popular_param, '')
+        if popular_value != 1:
+            return queryset
+
+        orders = ('-avg_rating', '-reviews_count', '-site_rating_count', '-site_avg_rating')
+        if view.detail is True:
+            lookup_field = view.lookup_url_kwarg or view.lookup_field
+            product_id = view.kwargs[lookup_field]
             genre = Subquery(
                 Category.objects.filter(products__id=product_id)
                                 .order_by('-level')
@@ -51,12 +55,13 @@ class ProductReferenceFilter(BaseFilterBackend):
     def get_schema_operation_parameters(self, view):
         return [
             {
-                'name': self.product_id_param,
+                'name': self.popular_param,
                 'required': False,
                 'in': 'query',
-                'description': force_str(self.product_id_description),
+                'description': force_str(self.description),
                 'schema': {
                     'type': 'string',
+                    'default': '0'
                 }
             }
         ]

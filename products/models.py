@@ -48,6 +48,7 @@ class Category(BaseModel):
     level = models.PositiveIntegerField(default=0)
     deactivated = models.BooleanField(default=False)
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, related_name='children', null=True, blank=True)
+    avg_weight = models.FloatField(null=True)
 
     class Meta:
         verbose_name_plural = _('Categories')
@@ -71,7 +72,7 @@ class TagQuerySet(models.QuerySet):
                     id=models.F('id'),
                     name=models.F('name')
                 ),
-                filter=models.Q(tags__id__in=tag_ids) if tag_ids else None,
+                filter=models.Q(id__in=tag_ids) if tag_ids else None,
                 distinct=True  # required
             )
         )
@@ -113,12 +114,17 @@ class Product(BaseModel):
     categories = models.ManyToManyField(Category, related_name='products')
     tags = models.ManyToManyField(Tag, related_name='products')
 
+    def __str__(self):
+        return self.id
+
     @property
     def price(self):
         return increase_price(self.site_price, self.increase_per)
 
 
 class ProductImage(models.Model):
+    objects = models.Manager()
+
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
     url = models.TextField(blank=True, null=True)
 
@@ -134,6 +140,7 @@ class ProductReview(models.Model):
     rating = models.FloatField(validators=[MinValueValidator(0), MaxValueValidator(5)], default=0)
     comment = models.TextField(blank=True, null=True)
     moderated = models.BooleanField(default=False)
+    is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
 

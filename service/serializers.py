@@ -12,16 +12,18 @@ from rest_framework.fields import DateField, ChoiceField
 from rest_framework.utils.serializer_helpers import ReturnDict
 from pandas import concat, DataFrame
 
-from .models import Conversion
+from .models import Conversion, Currencies
 from .utils import get_currencies_price_per, convert_price, get_currency_by_id
 from .querysets import BaseAnalyticsQuerySet, AnalyticsFilterBy
 
 
 class ConversionField(serializers.FloatField):
-    def __init__(self, instance_currency: str = None,  check_site_field: str = None, **kwargs):
+    def __init__(self, all_conversions: bool = False, instance_currency: str = None,
+                 check_site_field: str = None, **kwargs):
         super().__init__(**kwargs)
-        self.instance_currency = Conversion.Currencies.from_string(instance_currency) if instance_currency else None
+        self.instance_currency = Currencies.from_string(instance_currency) if instance_currency else None
         self.check_site_field = check_site_field
+        self.all_conversions = all_conversions
 
     def get_attribute(self, instance):
         if not self.instance_currency:
@@ -29,18 +31,15 @@ class ConversionField(serializers.FloatField):
             self.instance_currency = get_currency_by_id(instance_id)
         return super().get_attribute(instance)
 
-    def get_currency(self) -> Conversion.Currencies:
-        return Conversion.Currencies.from_string(self.context.get('currency', 'yen'))
-
-    def all_conversions(self) -> bool:
-        return self.context.get('all_conversions') is True
+    def get_currency(self) -> Currencies:
+        return Currencies.from_string(self.context.get('currency', 'yen'))
 
     def to_representation(self, value):
         value = super().to_representation(value)
 
         if self.all_conversions:
             data = {}
-            for currency in Conversion.Currencies:
+            for currency in Currencies:
                 if currency == self.instance_currency:
                     data[currency] = value
                     continue

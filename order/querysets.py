@@ -2,7 +2,7 @@ from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import F, Case, When, Value, Sum, DecimalField, Count
 from django.db.models.functions import JSONObject, Round
 
-from utils.querysets import AnalyticsQuerySet
+from service.querysets import BaseAnalyticsQuerySet
 
 
 def sale_price_calc_case(currency_field: str = None, from_receipt_obj: bool = True):
@@ -29,7 +29,7 @@ def sale_price_calc_case(currency_field: str = None, from_receipt_obj: bool = Tr
     )
 
 
-class OrderAnalyticsQuerySet(AnalyticsQuerySet):
+class OrderAnalyticsQuerySet(BaseAnalyticsQuerySet):
     def total_prices(self):
         return self.annotate(
             yen=Sum(sale_price_calc_case(from_receipt_obj=False)),

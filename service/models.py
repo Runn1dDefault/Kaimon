@@ -4,23 +4,29 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 
+class Currencies(models.TextChoices):
+    usd = 'usd', _('Dollar')
+    som = 'som', _('Som')
+    yen = 'yen', _('Yen')
+
+    @classmethod
+    def from_string(cls, currency: str):
+        match currency:
+            case cls.usd.value:
+                return cls.usd
+            case cls.yen.value:
+                return cls.yen
+            case cls.som.value:
+                return cls.som
+
+    @classmethod
+    def main_currency(cls):
+        return cls.yen
+
+
 class Conversion(models.Model):
-    class Currencies(models.TextChoices):
-        usd = 'usd', _('Dollar')
-        som = 'som', _('Som')
-        yen = 'yen', _('Yen')
-
-        @classmethod
-        def from_string(cls, currency: str):
-            match currency:
-                case cls.usd.value:
-                    return cls.usd
-                case cls.yen.value:
-                    return cls.yen
-                case cls.som.value:
-                    return cls.som
-
     objects = models.Manager()
+
     currency_from = models.CharField(max_length=10, choices=Currencies.choices, default=Currencies.yen)
     currency_to = models.CharField(max_length=10, choices=Currencies.choices)
     price_per = models.DecimalField(max_digits=20, decimal_places=10, help_text=_('unit price currency_from'))
