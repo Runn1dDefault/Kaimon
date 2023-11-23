@@ -1,5 +1,4 @@
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -97,6 +96,7 @@ class Product(BaseModel):
     site_price = models.DecimalField(max_digits=20, decimal_places=10)
     site_avg_rating = models.FloatField(default=0)
     site_reviews_count = models.FloatField(default=0)
+    product_url = models.URLField(max_length=700, blank=True, null=True)
 
     avg_rating = models.FloatField(default=0)
     reviews_count = models.PositiveIntegerField(default=0)
@@ -156,8 +156,7 @@ class ProductReview(models.Model):
     objects = models.Manager()
     analytics = ReviewAnalyticsQuerySet.as_manager()
 
-    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='product_reviews',
-                             db_constraint=False)
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='product_reviews')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
     rating = models.FloatField(validators=[MinValueValidator(0), MaxValueValidator(5)], default=0)
     comment = models.TextField(blank=True, null=True)
