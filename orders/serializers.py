@@ -208,12 +208,11 @@ class FedexQuoteRateSerializer(serializers.Serializer):
             fedex_response = fedex_international_quotes(
                 products_with_count=attrs['products'],
                 country_code=attrs['country_code'],
-                postal_code=attrs.get('postal_code') or "00000"
+                postal_code=attrs.get('postal_code') or "0000"
             )
-        except HTTPError as http_err:
-            logging.error(http_err)
-            # TODO: handling errors on prod
-            raise serializers.ValidationError({'detail': "Something went wrong!"})
+        except HTTPError as http_exc:
+            error_data = http_exc.response.json()
+            raise serializers.ValidationError({'detail': error_data['errors']})
         else:
             return fedex_response['output']
 
@@ -224,7 +223,6 @@ class FedexQuoteRateSerializer(serializers.Serializer):
         shipment_data = service_detail['ratedShipmentDetails'][0]
 
         data = OrderedDict()
-        # data['quote_date'] = validated_data['quoteDate']
         data['base_rate'] = shipment_data['totalBaseCharge']
         data['surcharges'] = [
             {"title": sur["description"], "amount": sur['amount']}
@@ -232,8 +230,9 @@ class FedexQuoteRateSerializer(serializers.Serializer):
         ]
         data['fees_and_taxes_details'] = [
             {"title": fees["description"], "amount": fees['amount']}
-            for fees in shipment_data['ancillaryFeesAndTaxes']
+            for fees in shipment_data.get('ancillaryFeesAndTaxes') or []
         ]
         data['fees_and_taxes'] = shipment_data['totalAncillaryFeesAndTaxes']
         data['total_estimate'] = shipment_data['totalNetChargeWithDutiesAndTaxes']
+        data['fedex_currency'] = shipment_data['currency']
         return data

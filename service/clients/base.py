@@ -48,9 +48,11 @@ class BaseAPIClient:
                     response.status_code,
                     response.text,
                     response.request.url
-                )
+                ),
+                response=response
             )
 
+        self.logger.info(response.status_code)
         try:
             return response.json()
         except (JSONDecodeError, ValueError):

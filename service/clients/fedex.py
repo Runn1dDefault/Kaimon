@@ -100,7 +100,7 @@ class FedexCommodity:
 
 
 class FedexAPIClient(BaseAPIClient):
-    BASE_URL = ''
+    BASE_URL = 'https://apis.fedex.com'
     TEST_URL = 'https://apis-sandbox.fedex.com'
     ERROR_STATUSES = [400, 401, 500, 503]
     SECONDS_TO_SUBSTRACT = 5
@@ -161,7 +161,6 @@ class FedexAPIClient(BaseAPIClient):
                 "recipient": {"address": recipient.payload()},
                 "shipDateStamp": str(ship_date),
                 "pickupType": pickup_type.value,
-                # "preferredCurrency": "JYE",
                 "serviceType": "INTERNATIONAL_PRIORITY",
                 "rateRequestType": ["LIST", "ACCOUNT"],
                 "customsClearanceDetail": {
@@ -178,29 +177,30 @@ class FedexAPIClient(BaseAPIClient):
 
 
 if __name__ == '__main__':
+    # import json
+
     client = FedexAPIClient(
-        client_id='l74d183751b6f54e14808394421c87c8d0',
-        client_secret='442ffdc44b954f0393d6a57f3280b384',
-        account_number='740561073',
-        use_test=True
+        client_id='l7766482a2061f4738b06386df74defc41',
+        client_secret='a6e57a4975074e5da35d01873355c3bc',
+        account_number='515281100',
+        use_test=False
     )
 
     resp_data = client.international_rate_quotes(
         shipper=FedexAddress(postal_code="658-0032", country_code="JP"),
-        recipient=FedexAddress(postal_code=720000, country_code="KG"),
+        recipient=FedexAddress(postal_code="0000", country_code="KG"),
         pickup_type=FedexPickupType.CONTACT_FEDEX_TO_SCHEDULE,
         commodities=(
             FedexCommodity(
-                weight=FedexWeight(units="KG", value=10.0),
-                currency_amount=FedexCurrencyAmount(currency='JYE', amount=100),
-                desciption="Camera",
+                weight=FedexWeight(units="KG", value=0.300),
+                currency_amount=FedexCurrencyAmount(currency='USD', amount=5),
                 quantity=1,
                 quantity_units="PCS"
             ),
         ),
-        ship_date=datetime(year=2023, month=11, day=15).date()
+        ship_date=datetime(year=2023, month=11, day=30).date()
     )
-
+    #
     # with open('response.json', 'w') as json_file:
     #     json.dump(resp_data, json_file)
 
@@ -213,7 +213,7 @@ if __name__ == '__main__':
     for i in data['shipmentRateDetail']['surCharges']:
         print(i['description'], ': ', i['amount'])
 
-    for i in data['ancillaryFeesAndTaxes']:
+    for i in data.get('ancillaryFeesAndTaxes') or []:
         print(i['description'], ': ', i['amount'])
 
     print('Total Ancillary Fees And Taxes: ', data['totalAncillaryFeesAndTaxes'])
