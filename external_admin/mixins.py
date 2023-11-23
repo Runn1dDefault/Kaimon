@@ -4,10 +4,8 @@ from users.permissions import IsDirector, IsStaffUser
 
 
 class DirectorViewMixin:
-    pass
-    # permission_classes = (permissions.IsAuthenticated, IsDirector,)
+    permission_classes = (permissions.IsAuthenticated, IsDirector,)
 
 
 class StaffViewMixin:
-    pass
-    # permission_classes = (permissions.IsAuthenticated, IsStaffUser,)
+    permission_classes = (permissions.IsAuthenticated, IsStaffUser,)
