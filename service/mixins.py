@@ -16,6 +16,7 @@ class CurrencyMixin:
 class CachingMixin:
     cache_timeout = settings.PAGE_CACHED_SECONDS
     cache_name = 'pages_cache'
+    addition_cache_keys = ()
 
     @classmethod
     def get_cache_prefix(cls) -> str:
@@ -30,3 +31,6 @@ class CachingMixin:
     def cache_clear(cls):
         cache = caches[cls.cache_name]
         cache.delete_pattern(f'{cls.get_cache_prefix()}*')
+
+        for key in cls.addition_cache_keys:
+            cache.delete_pattern(f'{key}*')
