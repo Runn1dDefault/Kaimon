@@ -62,7 +62,7 @@ class Category(BaseModel):
         return f"{self.short_name} ({self.id})"
 
 
-class TagQuerySet(models.QuerySet):
+class TagQuerySet(QuerySet):
     def grouped_tags(self, tag_ids: list[str] = None):
         return self.values(
             tag_group_id=models.F('group_id'),

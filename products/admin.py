@@ -81,7 +81,7 @@ class TagAdmin(admin.ModelAdmin):
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         site = request.path.split('/')[-3].split('_')[0]
         if db_field.name == 'group':
-            kwargs['queryset'] = Tag.objects.query_by_site(site=site).filter(group_id__isnull=True)
+            kwargs['queryset'] = Tag.objects.filter(group_id__isnull=True).filter_by_site(site=site)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
