@@ -20,7 +20,7 @@ from .paginations import CategoryPagination, ProductReviewPagination, ProductPag
 from .serializers import CategorySerializer, ShortProductSerializer, ProductDetailSerializer, ProductReviewSerializer
 
 
-class CategoryViewSet(ReadOnlyModelViewSet):
+class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
     permission_classes = (AllowAny,)
     queryset = Category.objects.filter(level__gt=0, deactivated=False)
     serializer_class = CategorySerializer
