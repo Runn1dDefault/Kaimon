@@ -24,6 +24,7 @@ class CategoryAdmin(admin.ModelAdmin):
     search_fields = ("id", "name",)
     list_display = ("id", "name", "level", "deactivated")
     list_filter = (SiteFilter, "level", "deactivated")
+    readonly_fields = ("id",)
     list_per_page = 15
 
     def get_search_results(self, request, queryset, search_term):
@@ -128,7 +129,7 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ("id", "name")
     list_filter = (SiteFilter, "is_active", "modified_at", HasReviewFilter, "site_avg_rating",)
     list_per_page = 15
-    readonly_fields = ("created_at", "modified_at")
+    readonly_fields = ("id", "created_at", "modified_at")
 
     fieldsets = (
         (
