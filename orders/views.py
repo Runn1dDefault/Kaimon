@@ -88,11 +88,11 @@ def order_info(request, order_id):
     general_rows = ((order.customer.name, order.bayer_code, str(order.created_at.date()),
                     round(order.shipping_detail.total_price, 2)),)
 
-    receipts_columns = ("Наименование товара", "Количество", "Сумма (йен)",  "Цена", "Оригинальная Цена",
+    receipts_columns = ("URL", "Наименование товара", "Количество", "Сумма (йен)",  "Цена", "Оригинальная Цена",
                         "Валюта (орг. цены)")
     receipts_rows = [
         (
-            # TODO: add site product url
+            receipt.product.product_url,
             receipt.product_name,
             receipt.quantity,
             round(receipt.total_price, 2),
