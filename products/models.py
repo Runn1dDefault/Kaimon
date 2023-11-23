@@ -3,11 +3,12 @@ from django.contrib.auth import get_user_model
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models.functions import JSONObject
+from django.db.models.functions import JSONObject, Round
 from django.template.defaultfilters import truncatechars
 from django.utils.translation import gettext_lazy as _
 
 from service.enums import Site
+from service.querysets import BaseAnalyticsQuerySet, AnalyticsFilterBy
 from service.utils import increase_price
 
 
@@ -132,10 +133,31 @@ class ProductImage(models.Model):
         indexes = (models.Index(fields=('product', 'url')),)
 
 
+class ReviewAnalyticsQuerySet(BaseAnalyticsQuerySet):
+    def by_dates(self, by: AnalyticsFilterBy):
+        return self.values(date=by.value('created_at')).annotate(
+            info=ArrayAgg(
+                JSONObject(
+                    user_id=models.F('user__id'),
+                    email=models.F('user__email'),
+                    name=models.F('user__full_name'),
+                    comment=models.F('comment'),
+                    rating=models.F('rating'),
+                    moderated=models.F('moderated'),
+                    is_read=models.F('is_read')
+                )
+            ),
+            count=models.Count('id'),
+            avg_rating=Round(models.Avg('rating'), precision=1)
+        )
+
+
 class ProductReview(models.Model):
     objects = models.Manager()
+    analytics = ReviewAnalyticsQuerySet.as_manager()
 
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='product_reviews')
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='product_reviews',
+                             db_constraint=False)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
     rating = models.FloatField(validators=[MinValueValidator(0), MaxValueValidator(5)], default=0)
     comment = models.TextField(blank=True, null=True)
@@ -148,10 +170,10 @@ class ProductInventory(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='inventories')
     quantity = models.PositiveIntegerField(default=0)
     site_unit_price = models.DecimalField(max_digits=20, decimal_places=10)
-    color = models.CharField(blank=True, null=True)
+    color = models.CharField(max_length=100, blank=True, null=True)
     color_image_url = models.TextField(blank=True, null=True)
-    size = models.CharField(blank=True, null=True)
-    status_code = models.CharField(blank=True, null=True)
+    size = models.CharField(max_length=100, blank=True, null=True)
+    status_code = models.CharField(max_length=100, blank=True, null=True)
 
     @property
     def price(self):

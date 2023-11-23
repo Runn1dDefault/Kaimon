@@ -9,6 +9,6 @@ router.register('', OrderViewSet, basename='orders')
 
 
 urlpatterns = [
-    path('fedex-quote-rate/', FedexQuoteRateView.as_view(), name='order-fedex-quotes-rates'),
+    path('fedex-quote-rate/', FedexQuoteRateView.as_view(), name='orders-fedex-quotes-rates'),
     path('', include(router.urls)),
 ]

@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, mixins, viewsets, status, filters, parsers
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -12,8 +13,9 @@ from products.views import CategoryViewSet
 from service.models import Conversion
 from products.models import Product, ProductReview, Tag, Category
 from promotions.models import Promotion
+from service.utils import recursive_single_tree
 from users.models import User
-from order.models import Order
+from orders.models import Order
 from service.mixins import CachingMixin
 from service.filters import FilterByFields, DateRangeFilter, ListFilter
 
@@ -24,7 +26,7 @@ from .serializers import (
     ProductAdminSerializer, ProductDetailAdminSerializer,
     ProductImageAdminSerializer, UserAdminSerializer, TagAdminSerializer,
     ProductReviewAdminSerializer, OrderAnalyticsSerializer, UserAnalyticsSerializer, ReviewAnalyticsSerializer,
-    OrderAdminSerializer, CategoryAdminSerializer
+    OrderAdminSerializer, CategoryAdminSerializer, ReceiptAdminSerializer
 )
 
 
@@ -86,22 +88,6 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         return self.serializer_class
 
     @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
-    @action(
-        methods=['POST'],
-        detail=True,
-        url_path='remove-image'
-    )
-    def remove_image(self, request, **kwargs):
-        product = self.get_object()
-        image_url = request.data.get('image')
-        if not image_url:
-            return Response({'image': [_('is required')]}, status=status.HTTP_400_BAD_REQUEST)
-
-        image_fk = get_object_or_404(product.image_urls.all(), url=image_url)
-        image_fk.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
     @action(methods=['GET'], detail=True, url_path='change-activity')
     def activate_or_deactivate_product(self, request, **kwargs):
         genre = self.get_object()
@@ -110,43 +96,83 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(responses={status.HTTP_200_OK: None}, request=ProductImageAdminSerializer)
-    @action(methods=['POST'], detail=False)
+    @action(methods=['POST'], detail=False, url_path='add-image')
     def add_new_image(self, request, **kwargs):
-        serializer = ProductImageAdminSerializer(
-            data=request.data,
-            many=False,
-            context=self.get_serializer_context()
-        )
+        serializer = ProductImageAdminSerializer(data=request.data, many=False, context=self.get_serializer_context())
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(status=status.HTTP_200_OK)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
+    @extend_schema(responses={status.HTTP_204_NO_CONTENT: None}, request=ProductImageAdminSerializer)
+    @action(
+        methods=['DELETE'],
+        detail=False,
+        url_path='remove-image'
+    )
+    def remove_image(self, request, **kwargs):
+        serializer = ProductImageAdminSerializer(data=request.data, many=False, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        product = serializer.validated_data['product']
+        image = product.images.filter(url=serializer.validated_data['url']).first()
+        if not image:
+            raise ValidationError({'url': _('Image url does not exists!')})
+        image.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @extend_schema(responses={status.HTTP_204_NO_CONTENT: None, status.HTTP_404_NOT_FOUND: None})
     @action(
         methods=['DELETE'],
         detail=True,
         url_path=r'remove-tag/(?P<tag_id>.+)'
     )
     def remove_tag(self, request, **kwargs):
-        tag_fk = get_object_or_404(
-            self.get_object().tags.all(),
-            tag_id=self.kwargs['tag_id']
-        )
-        tag_fk.delete()
+        tag = get_object_or_404(self.get_object().tags.all(), id=kwargs['tag_id'])
+        tag.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @extend_schema(responses={status.HTTP_200_OK: None})
+    @extend_schema(responses={status.HTTP_200_OK: TagAdminSerializer, status.HTTP_404_NOT_FOUND: None})
     @action(
         methods=['GET'],
         detail=True,
         url_path=r'add-tag/(?P<tag_id>.+)'
     )
     def add_tag(self, request, **kwargs):
-        tag_id = self.kwargs['tag_id']
+        tag_id = kwargs['tag_id']
         if not Tag.objects.filter(id=tag_id).exists():
-            return Response({'detail': _('Tag does with id %s not exist!') % tag_id})
-        self.get_object().tags.add(tag_id)
-        return Response(status=status.HTTP_200_OK)
+            return Response(
+                {'detail': _('Tag does with id %s not exist!') % tag_id},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        product = self.get_object()
+        product.tags.add(tag_id)
+        serializer = TagAdminSerializer(
+            instance=product.tags.get(id=tag_id),
+            many=False,
+            context=self.get_serializer_context()
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        responses={status.HTTP_200_OK: CategoryAdminSerializer, status.HTTP_404_NOT_FOUND: None},
+        request=None
+    )
+    @action(
+        methods=['PATCH'],
+        detail=True,
+        url_path=r'change-category/(?P<category_id>.+)'
+    )
+    def change_category(self, request, **kwargs):
+        product = self.get_object()
+        category = get_object_or_404(Category.objects.all(), id=kwargs['category_id'])
+        categories_tree = recursive_single_tree(category, "parent")
+        product.categories.clear()
+        product.categories.add(*categories_tree)
+        serializer = CategoryAdminSerializer(
+            instance=product.categories.all(),
+            many=True,
+            context=self.get_serializer_context()
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 # ---------------------------------------------- Reviews ---------------------------------------------------------------
@@ -211,7 +237,47 @@ class OrderAdminViewSet(StaffViewMixin, mixins.UpdateModelMixin, mixins.ListMode
         queryset = self.get_queryset().filter(status=Order.Status.pending)
         return Response({'count': queryset.count()})
 
-    # TODO: maybe we need add mark order success action
+    @extend_schema(
+        request=ReceiptAdminSerializer,
+        responses={status.HTTP_200_OK: ReceiptAdminSerializer, status.HTTP_404_NOT_FOUND: None}
+    )
+    @action(methods=['PATCH'], detail=True, url_path='update-receipt/(?P<receipt_id>.+)')
+    def update_receipt(self, request, **kwargs):
+        order = self.get_object()
+        receipt = get_object_or_404(order.receipts.all(), id=kwargs['receipt_id'])
+        serializer = ReceiptAdminSerializer(
+            instance=receipt,
+            data=request.data,
+            partial=True,
+            many=False,
+            context=self.get_serializer_context()
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        request=ReceiptAdminSerializer,
+        responses={status.HTTP_200_OK: ReceiptAdminSerializer}
+    )
+    @action(methods=['POST'], detail=False, url_path='add-receipt')
+    def add_receipt(self, request, **kwargs):
+        serializer = ReceiptAdminSerializer(
+            data=request.data,
+            many=False,
+            context=self.get_serializer_context()
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(request=None, responses={status.HTTP_204_NO_CONTENT: None})
+    @action(methods=['DELETE'], detail=True, url_path='remove-receipt/(?P<receipt_id>.+)')
+    def remove_receipt(self, request, **kwargs):
+        order = self.get_object()
+        receipt = get_object_or_404(order.receipts.all(), kwargs['receipt_id'])
+        receipt.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ----------------------------------------------- Promotions -----------------------------------------------------------
@@ -223,7 +289,7 @@ class PromotionAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     lookup_field = 'id'
     lookup_url_kwarg = 'promotion_id'
     filter_backends = (SearchFilter, OrderingFilter)
-    search_fields = ('banner__name',)
+    search_fields = ('id', 'banner__name',)
     ordering_fields = ('id', 'created_at',)
 
     def perform_create(self, serializer):
@@ -236,6 +302,22 @@ class PromotionAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         promotion = self.get_object()
         promotion.deactivated = not promotion.deactivated
         promotion.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @extend_schema(responses={status.HTTP_200_OK: None, status.HTTP_404_NOT_FOUND: None}, request=None)
+    @action(methods=['PATCH'], detail=True, url_path="add-product/(?P<product_id>.+)")
+    def add_product(self, request, **kwargs):
+        promotion = self.get_object()
+        product = get_object_or_404(Product.objects.all(), id=kwargs['product_id'])
+        promotion.products.add(product)
+        return Response(status=status.HTTP_200_OK)
+
+    @extend_schema(responses={status.HTTP_204_NO_CONTENT: None, status.HTTP_404_NOT_FOUND: None}, request=None)
+    @action(methods=['DELETE'], detail=True, url_path="remove-product/(?P<product_id>.+)")
+    def remove_product(self, request, **kwargs):
+        promotion = self.get_object()
+        product = get_object_or_404(Product.objects.all(), id=kwargs['product_id'])
+        promotion.products.remove(product)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

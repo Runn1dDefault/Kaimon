@@ -55,7 +55,7 @@ class DeliveryAddress(BaseModel):
     user = models.ForeignKey(get_user_model(), on_delete=models.SET(get_sentinel_user),
                              related_name='delivery_addresses')
     recipient_name = models.CharField(max_length=100)
-    country_code = models.CharField(choices=CountryCode.choices, default=CountryCode.KG)
+    country_code = models.CharField(max_length=5, choices=CountryCode.choices, default=CountryCode.KG)
     city = models.CharField(max_length=100)
     postal_code = models.CharField(max_length=20, null=True, blank=True)
     address_line = models.TextField(blank=True, null=True)
@@ -102,7 +102,7 @@ class OrderConversion(models.Model):
     objects = models.Manager()
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='conversions')
-    currency = models.CharField(choices=Currencies.choices)
+    currency = models.CharField(max_length=5, choices=Currencies.choices)
     price_per = models.DecimalField(max_digits=20, decimal_places=10)
 
 

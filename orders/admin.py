@@ -15,7 +15,7 @@ class DeliveryAddressAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', 'country_code', 'postal_code')
     search_fields = ('id', 'user__email', 'postal_code',)
     list_filter = ('created_at', 'country_code')
-    readonly_fields = ('created_at',)
+    readonly_fields = ('created_at', 'modified_at')
 
 
 @admin.register(Order)

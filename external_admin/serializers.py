@@ -7,7 +7,7 @@ from rest_framework import serializers
 
 from products.models import Product, Category, Tag, ProductImage, ProductReview
 from promotions.models import Banner, Promotion, Discount
-from order.models import Order, Customer, DeliveryAddress, Receipt, OrderShipping
+from orders.models import Order, Customer, DeliveryAddress, Receipt, OrderShipping
 from service.models import Conversion
 from service.serializers import ConversionField, AnalyticsSerializer
 from service.utils import get_currencies_price_per, recursive_single_tree
@@ -119,14 +119,14 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
         return ProductImage.objects.bulk_create([ProductImage(product=instance, url=url) for url in image_urls])
 
     def save(self, **kwargs):
-        genre = self.validated_data.pop('genre', None)
+        category = self.validated_data.pop('category', None)
         images = self.validated_data.pop('images', None)
         tags = self.validated_data.pop('tags', None)
         product = super().save(**kwargs)
-        if genre:
-            genres_tree = recursive_single_tree(genre, "parent")
-            product.genres.clear()
-            product.genres.add(*genres_tree)
+        if category:
+            category_tree = recursive_single_tree(category, "parent")
+            product.categories.clear()
+            product.categories.add(*category_tree)
         if tags:
             product.tags.clear()
             product.tags.add(*tags)
@@ -241,35 +241,19 @@ class DeliveryAddressAdminSerializer(serializers.ModelSerializer):
 
 
 class ReceiptAdminSerializer(serializers.ModelSerializer):
-    product_name = serializers.SerializerMethodField(read_only=True)
-    images = serializers.SerializerMethodField(read_only=True)
-    total_prices = serializers.SerializerMethodField(read_only=True)
+    product = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.filter(is_active=True),
+        many=False
+    )
 
     class Meta:
         model = Receipt
-        fields = ('id', 'product', 'product_name', 'images', 'discount', 'quantity', 'unit_price', 'total_prices')
-
-    def get_product_name(self, instance):
-        return instance.product.name
-
-    def get_images(self, instance):
-        product_images = instance.product.image_urls
-        if not product_images.exists():
-            return []
-        return list(product_images.values_list('url', flat=True))
-
-    def get_total_prices(self, instance):
-        unit_price = instance.unit_price
-        if instance.discount > 0:
-            per = (instance.discount * 100) / instance.discount
-            unit_price = unit_price - per
-
-        price = unit_price * instance.quantity
-
-        return {
-            'yen': price,
-            'som': price * instance.order.yen_to_som,
-            'dollar': price * instance.order.yen_to_usd
+        fields = ('id', 'product', 'product_name', 'product_image', 'quantity', 'unit_price', 'site_price', 'discount')
+        extra_kwargs = {
+            'product_name': {'read_only': True},
+            'product_image': {'read_only': True},
+            'unit_price': {'read_only': True},
+            'site_price': {'read_only': True}
         }
 
 
@@ -297,8 +281,7 @@ class OrderAnalyticsSerializer(AnalyticsSerializer):
     class Meta:
         model = Order
         fields = ('status',)
-        hide_fields = ('sale_prices_yen', 'sale_prices_som', 'sale_prices_dollar')
-        empty_template = {"receipts_info": [], "yen": 0, "som": 0, "dollar": 0, "count": 0}
+        empty_template = {"receipts_info": [], "total_price": 0, "count": 0}
         start_field = 'created_at__date'
         end_field = 'created_at__date'
 
@@ -342,6 +325,6 @@ class ReviewAnalyticsSerializer(AnalyticsSerializer):
     class Meta:
         model = ProductReview
         fields = ('is_read', 'is_active')
-        empty_template = {'info': [], 'count': 0, 'avg_rank': 0.0}
+        empty_template = {'info': [], 'count': 0, 'avg_rating': 0.0}
         start_field = 'created_at__date'
         end_field = 'created_at__date'

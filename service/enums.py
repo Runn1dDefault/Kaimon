@@ -37,3 +37,11 @@ class SiteCurrency(Enum):
         if isinstance(site, Site):
             site = site.value
         return getattr(cls, site)
+
+
+class Spider(Enum):
+    rakuten = Site.rakuten.value
+    rakuten_category = 'rakuten_category'
+    uniqlo = Site.uniqlo.value
+    uniqlo_category = 'uniqlo_category'
+

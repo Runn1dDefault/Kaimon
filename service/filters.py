@@ -47,13 +47,10 @@ class ListFilter(BaseFilterBackend):
 
     def get_queries_kwargs(self, request, queryset, view) -> dict[str, list[str]]:
         queries = {}
-        for field_name, source in self.get_field_names(view).items():
-            if not hasattr(queryset.model, source):
-                continue
-
-            params = [i for i in request.query_params.get(field_name, '').split(',') if i.strip()]
+        for param, field in self.get_field_names(view).items():
+            params = [i for i in request.query_params.get(param, '').split(',') if i.strip()]
             if params:
-                queries[source + '__in'] = params
+                queries[field + '__in'] = params
         return queries
 
     def filter_queryset(self, request, queryset, view):

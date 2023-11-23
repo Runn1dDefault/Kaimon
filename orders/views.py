@@ -13,7 +13,6 @@ from users.utils import get_sentinel_user
 from .models import DeliveryAddress, Order
 from .permissions import OrderPermission
 from .serializers import DeliveryAddressSerializer, OrderSerializer, FedexQuoteRateSerializer
-from .tasks import create_order_conversions, create_order_shipping_details
 
 
 class DeliveryAddressViewSet(viewsets.ModelViewSet):
@@ -52,17 +51,12 @@ class OrderViewSet(
     def perform_create(self, serializer):
         with transaction.atomic():
             super().perform_create(serializer)
-            order_id = serializer.instance.id
-
-        create_order_conversions.delay(order_id)
-        create_order_shipping_details.delay(order_id)
 
     def get_queryset(self):
         return super().get_queryset().filter(delivery_address__user=self.request.user)
 
 
 class FedexQuoteRateView(generics.GenericAPIView):
-    authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
     parser_classes = (parsers.JSONParser,)
     serializer_class = FedexQuoteRateSerializer

@@ -1,5 +1,5 @@
 from django.conf import settings
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema
 from rest_framework import mixins
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -21,7 +21,7 @@ from .serializers import CategorySerializer, ShortProductSerializer, ProductDeta
 
 class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
     permission_classes = (AllowAny,)
-    queryset = Category.objects.filter(deactivated=False)
+    queryset = Category.objects.filter(level__gt=0, deactivated=False)
     serializer_class = CategorySerializer
     pagination_class = CategoryPagination
     lookup_url_kwarg = "category_id"
