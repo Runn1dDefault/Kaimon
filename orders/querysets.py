@@ -13,8 +13,8 @@ def sale_price_calc_case():
     # if you change some field types to FloatField, you will need to make changes
     discount_formula = (unit_field - (discount_field * unit_field) / hundred) * quantity_field
     return Case(
-        When(discount=0, then=Round(unit_field * quantity_field, precision=2)),
-        When(discount__gt=0, then=Round(discount_formula, precision=2))
+        When(receipts__discount=0, then=Round(unit_field * quantity_field, precision=2)),
+        When(receipts__discount__gt=0, then=Round(discount_formula, precision=2))
     )
 
 
