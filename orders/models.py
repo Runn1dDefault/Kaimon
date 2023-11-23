@@ -129,7 +129,8 @@ class Receipt(BaseModel):
     discount = models.DecimalField(
         max_digits=5,
         decimal_places=2,
-        validators=[MinValueValidator(0), MaxValueValidator(100)]
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        default=0
     )
     avg_weight = models.FloatField()
     tags = models.ManyToManyField(Tag, blank=True)
