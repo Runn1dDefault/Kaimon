@@ -67,7 +67,7 @@ class TagListAdminView(CachingMixin, StaffViewMixin, generics.ListAPIView):
     pagination_class = AdminPagePagination
     serializer_class = TagAdminSerializer
     filter_backends = (SearchFilter,)
-    search_fields = ('id', 'name',)
+    search_fields = ('id', 'name', 'group_id', 'group__name')
 
 
 # ----------------------------------------------- Product --------------------------------------------------------------
