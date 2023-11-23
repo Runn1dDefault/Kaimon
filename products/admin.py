@@ -134,7 +134,7 @@ class ProductAdmin(admin.ModelAdmin):
     fieldsets = (
         (
             _('Product Info'),
-            {'fields': ('id', 'name', 'description', 'site_price', 'increase_per', 'is_active')}
+            {'fields': ('id', 'name', 'description', 'site_price', 'increase_per', 'is_active', 'product_url')}
         ),
         (
             _('Dates'),
