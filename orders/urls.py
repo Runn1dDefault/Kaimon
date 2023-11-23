@@ -1,7 +1,7 @@
-from django.urls import path, include
+from django.urls import path, include, re_path
 from rest_framework.routers import SimpleRouter
 
-from .views import OrderViewSet, DeliveryAddressViewSet, FedexQuoteRateView
+from .views import OrderViewSet, DeliveryAddressViewSet, FedexQuoteRateView, order_info
 
 router = SimpleRouter()
 router.register('delivery-address', DeliveryAddressViewSet, basename='delivery-address')
@@ -11,4 +11,5 @@ router.register('', OrderViewSet, basename='orders')
 urlpatterns = [
     path('fedex-quote-rate/', FedexQuoteRateView.as_view(), name='orders-fedex-quotes-rates'),
     path('', include(router.urls)),
+    re_path('^order-info/(?P<order_id>.+)/$', order_info, name="order-info")
 ]

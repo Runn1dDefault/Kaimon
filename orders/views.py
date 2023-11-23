@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.shortcuts import get_object_or_404, render
 from rest_framework import viewsets, generics, mixins, parsers, permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -65,3 +66,38 @@ class FedexQuoteRateView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         return Response(data=serializer.data)
+
+
+def order_info(request, order_id):
+    order = get_object_or_404(Order, pk=order_id)
+    general_columns = (
+        "Покупатель", "Код покупателя", "Дата покупки", "Общая сумма заказа"
+    )
+    general_rows = (
+        (order.customer.name, order.bayer_code, str(order.created_at.date()),
+         round(order.shipping_detail.total_price, 2)),
+    )
+
+    receipts_columns = (
+        "Наименование товара", "Количество", "Сумма (йен)",  "Цена", "Оригинальная Цена", "Валюта (орг. цены)"
+    )
+    receipts_rows = [
+        (
+            # TODO: add site product url
+            receipt.product_name,
+            receipt.quantity,
+            round(receipt.total_price, 2),
+            round(receipt.sale_unit_price, 2),
+            round(receipt.site_price, 2),
+            receipt.site_currency
+        ) for receipt in order.receipts.all()
+    ]
+    tables = (
+        {"table_subject": "", "columns": general_columns, "rows": general_rows},
+        {"table_subject": "Состав Заказа", "columns": receipts_columns, "rows": receipts_rows},
+    )
+    return render(
+        request,
+        "table.html",
+        context={"tables": tables, "title": "Сводка по закаку {%s}" % order_id}
+    )
