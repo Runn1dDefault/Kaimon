@@ -320,11 +320,11 @@ class UserAnalyticsSerializer(AnalyticsSerializer):
 
 class ReviewAnalyticsSerializer(AnalyticsSerializer):
     is_read = serializers.BooleanField(required=False, write_only=True)
-    is_active = serializers.BooleanField(required=False, write_only=True)
+    moderated = serializers.BooleanField(required=False, write_only=True)
 
     class Meta:
         model = ProductReview
-        fields = ('is_read', 'is_active')
+        fields = ('is_read', 'moderated')
         empty_template = {'info': [], 'count': 0, 'avg_rating': 0.0}
         start_field = 'created_at__date'
         end_field = 'created_at__date'
