@@ -115,8 +115,11 @@ class OrderSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def create_customer(user, phone):
+        name = user.full_name or user.email
+        bayer_code = f"{''.join([i[0].title() for i in name.split()])}{Customer.objects.count() + 1}"
         customer, _ = Customer.objects.get_or_create(
             name=user.full_name,
+            bayer_code=bayer_code,
             email=user.email,
             phone=phone
         )
@@ -138,11 +141,10 @@ class OrderSerializer(serializers.ModelSerializer):
             product = product_data['product_id']
             product_currency = get_currency_by_id(product.id)
 
-            price, site_price = product.price, product.site_price
+            price = product.price
             if product_currency != main_currency:
                 price_per = get_currencies_price_per(main_currency, product_currency)
                 price = convert_price(price, price_per)
-                site_price = convert_price(site_price, price_per)
 
             image = product.images.first()
             category = product.categories.filter(
@@ -156,7 +158,8 @@ class OrderSerializer(serializers.ModelSerializer):
                 product_image=image.url if image else None,
                 quantity=product_data['quantity'],
                 unit_price=price,
-                site_price=site_price,
+                site_price=product.site_price,
+                site_currency=product_currency,
                 avg_weight=avg_weight,
                 discount=product.discount.percentage if getattr(product, 'discount', None) else 0.0,
             )

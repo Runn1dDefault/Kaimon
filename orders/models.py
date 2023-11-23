@@ -31,16 +31,17 @@ class Customer(BaseModel):
     objects = models.Manager()
 
     name = models.CharField(max_length=100)
+    bayer_code = models.CharField(max_length=50, unique=True)
     email = models.EmailField()
     phone = models.CharField(max_length=20, validators=[only_digit_validator])
 
     def __str__(self):
         return self.name
 
-    @property
-    def bayer_code(self):
-        name_symbols = ''.join([i[0].title() for i in getattr(self, 'name').split()])
-        return f"{name_symbols}{self.id}"
+    # @property
+    # def bayer_code(self):
+    #     name_symbols = ''.join([i[0].title() for i in getattr(self, 'name').split()])
+    #     return f"{name_symbols}{self.id}"
 
 
 class DeliveryAddress(BaseModel):
@@ -63,6 +64,9 @@ class DeliveryAddress(BaseModel):
     class Meta:
         verbose_name = _('Delivery Address')
         verbose_name_plural = _('Delivery Addresses')
+
+    def __str__(self):
+        return f"{self.recipient_name} ({self.country_code})"
 
 
 class Order(BaseModel):
@@ -126,6 +130,7 @@ class Receipt(BaseModel):
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)], default=1)
     unit_price = models.DecimalField(max_digits=20, decimal_places=10)
     site_price = models.DecimalField(max_digits=20, decimal_places=10)
+    site_currency = models.CharField(max_length=5, choices=Currencies.choices)
     discount = models.DecimalField(
         max_digits=5,
         decimal_places=2,
@@ -142,3 +147,11 @@ class Receipt(BaseModel):
         if discount > 0:
             unit_price -= (unit_price * discount) / 100
         return unit_price * self.quantity
+
+    @property
+    def sale_unit_price(self):
+        discount = getattr(self, 'discount')
+        unit_price = getattr(self, 'unit_price')
+        if discount <= 0:
+            return unit_price
+        return unit_price - (unit_price * discount) / 100
