@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.views.decorators.cache import cache_page
 from drf_spectacular.utils import extend_schema
 from rest_framework import mixins
 from rest_framework.decorators import action
@@ -19,7 +20,7 @@ from .paginations import CategoryPagination, ProductReviewPagination, ProductPag
 from .serializers import CategorySerializer, ShortProductSerializer, ProductDetailSerializer, ProductReviewSerializer
 
 
-class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
+class CategoryViewSet(ReadOnlyModelViewSet):
     permission_classes = (AllowAny,)
     queryset = Category.objects.filter(level__gt=0, deactivated=False)
     serializer_class = CategorySerializer
@@ -28,7 +29,9 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
     lookup_field = "id"
     filter_backends = (SearchFilter, SiteFilter, CategoryLevelFilter)
     search_fields = ('id', 'name')
+    addition_cache_keys = ('category_children', 'category_tree', 'category_tags')
 
+    @cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache', key_prefix='category_children')
     @action(methods=['GET'], detail=True, url_path='children')
     def children(self, request, **kwargs):
         category = self.get_object()
@@ -36,6 +39,7 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    @cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache', key_prefix='category_tree')
     @action(methods=['GET'], detail=True, url_path='tree')
     def categories_tree(self, request, **kwargs):
         category = self.get_object()
@@ -46,6 +50,7 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
         serializer = self.get_serializer(instance=category_tree, many=True)
         return Response(serializer.data)
 
+    @cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache', key_prefix='category_tags')
     @action(methods=['GET'], detail=True, url_path='tags')
     def tags(self, request, **kwargs):
         category = self.get_object()
@@ -54,7 +59,7 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
         )
 
 
-class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
+class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
     permission_classes = (AllowAny,)
     queryset = Product.objects.filter(is_active=True)
     pagination_class = ProductPagination
@@ -66,6 +71,7 @@ class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
     list_filter_fields = {"product_ids": "id", "category_ids": "categories__id", "tag_ids": "tags__id"}
     search_fields = ("name", "categories__name")
     ordering_fields = ("created_at",)
+    addition_cache_keys = ("product_tags",)
 
     @extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM])
     def list(self, request, *args, **kwargs):
@@ -80,6 +86,7 @@ class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
             return self.retrieve_serializer_class
         return self.serializer_class
 
+    @cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache', key_prefix='product_tags')
     @action(methods=['GET'], detail=True, url_path='tags')
     def tags(self, request, **kwargs):
         product = self.get_object()
