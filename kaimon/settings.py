@@ -267,3 +267,4 @@ SHIPPER_COUNTRY_CODE = "JP"
 
 DEFAULT_INCREASE_PRICE_PER = 15
 CRAWLER_URL = config("CRAWLER_URL")
+QR_URL_TEMPLATE = "http://109.123.237.209:9010/api/v1/orders/order-info/{order_id}?shipping_code={code}"

@@ -5,6 +5,7 @@ from django.core.exceptions import ObjectDoesNotExist
 
 from kaimon.celery import app
 from orders.models import Order, OrderConversion, OrderShipping
+from orders.utils import generate_shipping_code
 from service.models import Currencies
 from service.utils import get_currencies_price_per, generate_qrcode
 
@@ -40,9 +41,11 @@ def update_order_shipping_details(order_id: str):
         shipping_detail = order.shipping_detail
     except ObjectDoesNotExist:
         shipping_detail = OrderShipping(order_id=order_id)
-        qr_filename = f'{order_id}{uuid4()}.png'
+        shipping_code = generate_shipping_code()
+        shipping_detail.shipping_code = shipping_code
+        qr_filename = f'{order_id}.png'
         qr_filepath = settings.MEDIA_ROOT / 'qrcodes' / qr_filename
-        generate_qrcode(qr_filepath, url=settings.QR_URL_TEMPLATE.format(order_id))
+        generate_qrcode(qr_filepath, url=settings.QR_URL_TEMPLATE.format(order_id=order_id, code=shipping_code))
         shipping_detail.qrcode_image.name = qr_filename
 
     shipping_detail.shipping_weight = shipping_weight

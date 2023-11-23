@@ -1,4 +1,6 @@
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.http import HttpResponseNotFound
 from django.shortcuts import get_object_or_404, render
 from rest_framework import viewsets, generics, mixins, parsers, permissions
 from rest_framework.permissions import IsAuthenticated
@@ -69,18 +71,25 @@ class FedexQuoteRateView(generics.GenericAPIView):
 
 
 def order_info(request, order_id):
-    order = get_object_or_404(Order, pk=order_id)
-    general_columns = (
-        "Покупатель", "Код покупателя", "Дата покупки", "Общая сумма заказа"
-    )
-    general_rows = (
-        (order.customer.name, order.bayer_code, str(order.created_at.date()),
-         round(order.shipping_detail.total_price, 2)),
-    )
+    shipping_code = request.query_params.get('shipping_code')
+    if not shipping_code:
+        return HttpResponseNotFound()
 
-    receipts_columns = (
-        "Наименование товара", "Количество", "Сумма (йен)",  "Цена", "Оригинальная Цена", "Валюта (орг. цены)"
-    )
+    order = get_object_or_404(Order, pk=order_id)
+    try:
+        shipping_detail = order.shipping_detail
+    except ObjectDoesNotExist:
+        return HttpResponseNotFound()
+
+    if shipping_code != shipping_detail.shipping_code:
+        return HttpResponseNotFound()
+
+    general_columns = ("Покупатель", "Код покупателя", "Дата покупки", "Общая сумма заказа")
+    general_rows = ((order.customer.name, order.bayer_code, str(order.created_at.date()),
+                    round(order.shipping_detail.total_price, 2)),)
+
+    receipts_columns = ("Наименование товара", "Количество", "Сумма (йен)",  "Цена", "Оригинальная Цена",
+                        "Валюта (орг. цены)")
     receipts_rows = [
         (
             # TODO: add site product url
@@ -92,12 +101,10 @@ def order_info(request, order_id):
             receipt.site_currency
         ) for receipt in order.receipts.all()
     ]
-    tables = (
-        {"table_subject": "", "columns": general_columns, "rows": general_rows},
-        {"table_subject": "Состав Заказа", "columns": receipts_columns, "rows": receipts_rows},
-    )
+    tables = ({"table_subject": "", "columns": general_columns, "rows": general_rows},
+              {"table_subject": "Состав Заказа", "columns": receipts_columns, "rows": receipts_rows})
     return render(
         request,
         "table.html",
-        context={"tables": tables, "title": "Сводка по закаку {%s}" % order_id}
+        context={"tables": tables, "title": "Сводка по закаку"}
     )

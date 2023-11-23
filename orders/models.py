@@ -96,6 +96,7 @@ class Order(BaseModel):
 
 class OrderShipping(models.Model):
     order = models.OneToOneField(Order, on_delete=models.CASCADE, primary_key=True, related_name='shipping_detail')
+    shipping_code = models.CharField(max_length=100)
     shipping_carrier = models.CharField(max_length=50, default='FedEx')
     shipping_weight = models.IntegerField(verbose_name=_('Shipping weight'), blank=True, null=True)
     qrcode_image = models.ImageField(upload_to='qrcodes/', blank=True, null=True)

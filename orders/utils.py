@@ -1,7 +1,10 @@
 from typing import Any
+import hashlib
+from uuid import uuid4
 
 from django.conf import settings
 from django.utils import timezone
+from django.utils.timezone import now
 
 from products.models import Product
 from service.clients import fedex
@@ -24,6 +27,12 @@ def duplicate_delivery_address(delivery_address, updates: dict[str, Any]):
             setattr(new_address, field, value)
     new_address.save()
     return new_address
+
+
+def generate_shipping_code():
+    sha256_hash = hashlib.sha256()
+    sha256_hash.update(f"{uuid4()}{now().timestamp()}".encode('utf-8'))
+    return sha256_hash.hexdigest()
 
 
 def fedex_international_quotes(
