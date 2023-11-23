@@ -8,8 +8,8 @@ from orders.tasks import update_order_shipping_details, create_order_conversions
 @receiver(post_save, sender=Order)
 def create_order_details(sender, instance, created, **kwargs):
     if created:
-        create_order_conversions.delay(instance.order.id)
-        update_order_shipping_details.delay(instance.order.id)
+        create_order_conversions.delay(instance.id)
+        update_order_shipping_details.delay(instance.id)
 
 
 @receiver(post_save, sender=Receipt)
