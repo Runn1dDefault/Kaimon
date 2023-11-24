@@ -3,13 +3,16 @@ from rest_framework.permissions import BasePermission
 
 class RegistrationPayedPermission(BasePermission):
     """
-    to check the status of the authorized user's payment for registration
+    to check the status of the authorized user's to registration paid
     """
     def has_permission(self, request, view):
         return request.user and request.user.registration_payed
 
 
 class EmailConfirmedPermission(BasePermission):
+    """
+    to check the status of the authorized user's to email confirmed
+    """
 
     def has_permission(self, request, view):
         return request.user and request.user.email_confirmed
@@ -28,10 +31,11 @@ class IsStaffUser(BasePermission):
 
 
 class IsAuthor(BasePermission):
-    user_field_param = 'user_field'
+    user_field_attr = 'user_field'
+    default_user_field = 'user'
 
     def get_user_field(self, view):
-        return getattr(view, self.user_field_param, 'user')
+        return getattr(view, self.user_field_attr, self.default_user_field)
 
     def has_object_permission(self, request, view, obj):
-        return getattr(obj, self.get_user_field(view)) == request.user
+        return request.user and getattr(obj, self.get_user_field(view)) == request.user
