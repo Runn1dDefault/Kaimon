@@ -4,18 +4,18 @@ from rest_framework.routers import SimpleRouter
 from .views import (
     OrderAnalyticsView, UserAnalyticsView, ReviewAnalyticsView,
     ProductAdminViewSet, ProductReviewAdminViewSet,
-    CategoryListAdminView, TagListAdminView, PromotionAdminViewSet,
+    CategoryAdminViewSet, TagListAdminView, PromotionAdminViewSet,
     OrderAdminViewSet, ConversionAdminViewSet, UserAdminViewSet,
 )
 
 router = SimpleRouter()
+router.register('categories', CategoryAdminViewSet, basename='admin-categories')
 router.register('products', ProductAdminViewSet, basename='admin-products')
 router.register('reviews', ProductReviewAdminViewSet, basename='admin-reviews')
 router.register('orders', OrderAdminViewSet, basename='admin-orders')
 router.register('promotions', PromotionAdminViewSet, basename='admin-promotions')
 router.register('users', UserAdminViewSet, basename='admin-users')
 router.register('conversions', ConversionAdminViewSet, basename='admin-conversions')
-router.register('categories', CategoryListAdminView, basename='admin-categories')
 
 analytics_urlpatterns = [
     path('analytics/orders/', OrderAnalyticsView.as_view(), name='admin-analytics-orders'),
