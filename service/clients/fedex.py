@@ -67,6 +67,17 @@ class FedexWeight:
 
 
 @dataclass
+class FedexDimension:
+    width: int
+    length: int
+    height: int
+    units: Literal["CM", "IN"] = "CM"
+
+    def payload(self):
+        return asdict(self)
+
+
+@dataclass
 class FedexCurrencyAmount:
     # https://developer.fedex.com/api/en-us/guides/api-reference.html#currencycodes
     currency: Literal['USD', 'JYE']
@@ -77,25 +88,65 @@ class FedexCurrencyAmount:
 
 
 @dataclass
+class FedexRequestedPackageLineItem:
+    weight: FedexWeight
+    dimensions: FedexDimension
+    group_package_count: int = 1
+    physical_packaging: str = "YOUR_PACKAGING"
+
+    def payload(self):
+        return {
+            "groupPackageCount": self.group_package_count,
+            "physicalPackaging": self.physical_packaging,
+            "insuredValue": {
+                "currency": "JYE",
+                "currencySymbol": None,
+                "amount": 0
+            },
+            "weight": self.weight.payload(),
+            "dimensions": self.dimensions.payload()
+        }
+
+
+@dataclass
 class FedexCommodity:
     weight: FedexWeight
     currency_amount: FedexCurrencyAmount
     quantity: int = 1
-    # https://developer.fedex.com/api/en-kg/guides/api-reference.html#harmonizedsystemcodeunitofmeasure-table1
-    quantity_units: str = None
-    # https://developer.fedex.com/api/en-kg/guides/api-reference.html#vaguecommoditydescriptions
-    desciption: str = None
 
     def payload(self):
         payload = {
-            "quantity": self.quantity,
+            "name": "NON_DOCUMENTS",
+            "numberOfPieces": 1,
+            "description": "",
+            "countryOfManufacture": "",
+            "harmonizedCode": "",
+            "harmonizedCodeDescription": "",
+            "itemDescriptionForClearance": "",
             "weight": self.weight.payload(),
-            "customsValue": self.currency_amount.payload()
+            "quantity": self.quantity,
+            "quantityUnits": "",
+            "unitPrice": self.currency_amount.payload(),
+            "unitsOfMeasures": [
+                {
+                    "category": "",
+                    "code": "",
+                    "name": "",
+                    "value": "",
+                    "originalCode": ""
+                }
+            ],
+            "excises": [{"values": [""], "code": ""}],
+            "customsValue": {
+                "currency": "JYE",
+                "amount": 1,
+                "currencySymbol": ""
+            },
+            "exportLicenseNumber": "",
+            "partNumber": "",
+            "exportLicenseExpirationDate": "",
+            "getcIMarksAndNumbers": ""
         }
-        if self.quantity_units:
-            payload['quantityUnits'] = self.quantity_units
-        if self.desciption:
-            payload['description'] = self.desciption
         return payload
 
 
@@ -141,12 +192,12 @@ class FedexAPIClient(BaseAPIClient):
         self._token_exp = datetime.utcnow() + timedelta(seconds=response_data['expires_in'] - self.SECONDS_TO_SUBSTRACT)
 
     def international_rate_quotes(
-            self,
-            shipper: FedexAddress,
-            recipient: FedexAddress,
-            pickup_type: FedexPickupType,
-            commodities: Iterable[FedexCommodity],
-            ship_date: datetime.date
+        self,
+        shipper: FedexAddress,
+        recipient: FedexAddress,
+        commodities: Iterable[FedexCommodity],
+        ship_date: datetime.date,
+        package_line_items: Iterable[FedexRequestedPackageLineItem]
     ) -> dict[str, Any]:
         """
         docs: https://developer.fedex.com/api/en-us/catalog/rate/v1/docs.html#operation/Rate%20and%20Transit%20times
@@ -156,28 +207,34 @@ class FedexAPIClient(BaseAPIClient):
             "accountNumber": {
                 "value": self.account_number
             },
+            "rateRequestControlParameters": {
+                "rateSortOrder": "COMMITASCENDING",
+                "returnTransitTimes": True,
+                "variableOptions": None,
+                "servicesNeededOnRateFailure": False
+            },
             "requestedShipment": {
                 "shipper": {"address": shipper.payload()},
                 "recipient": {"address": recipient.payload()},
                 "shipDateStamp": str(ship_date),
-                "pickupType": pickup_type.value,
-                "serviceType": "INTERNATIONAL_PRIORITY",
-                "rateRequestType": ["LIST"],
+                "pickupType": "CONTACT_FEDEX_TO_SCHEDULE",
+                "packagingType": "YOUR_PACKAGING",
+                "serviceType": "FEDEX_INTERNATIONAL_PRIORITY",
+                "rateRequestType": ["ACCOUNT"],
+                "requestedPackageLineItems": [item.payload() for item in package_line_items],
+                "preferredCurrency": "JYE",
                 "customsClearanceDetail": {
-                    "dutiesPayment": {
-                        "paymentType": "SENDER",
-                        "payor": {"responsibleParty": None}
-                    },
-                    "commodities": [c.payload() for c in commodities]
+                    "dutiesPayment": {"paymentType": "SENDER", "payor": {"responsibleParty": None}},
+                    "commodities": [commodity.payload() for commodity in commodities]
                 },
-                "requestedPackageLineItems": [{"weight": c.weight.payload()} for c in commodities]
-            }
+            },
+            "carrierCodes": ["FDXG", "FDXE"]
         }
         return self.post('/rate/v1/rates/quotes', json=payload)
 
 
 if __name__ == '__main__':
-    # import json
+    import json
 
     client = FedexAPIClient(
         client_id='l7766482a2061f4738b06386df74defc41',
@@ -187,34 +244,44 @@ if __name__ == '__main__':
     )
 
     resp_data = client.international_rate_quotes(
-        shipper=FedexAddress(postal_code="658-0032", country_code="JP"),
-        recipient=FedexAddress(postal_code="0000", country_code="KG"),
-        pickup_type=FedexPickupType.CONTACT_FEDEX_TO_SCHEDULE,
+        shipper=FedexAddress(postal_code="658-0032", country_code="JP", residential=False),
+        recipient=FedexAddress(postal_code="0000", country_code="KG", city="Bishkek", residential=False),
         commodities=(
             FedexCommodity(
                 weight=FedexWeight(units="KG", value=0.300),
-                currency_amount=FedexCurrencyAmount(currency='USD', amount=5),
-                quantity=1,
-                quantity_units="PCS"
+                currency_amount=FedexCurrencyAmount(currency='JYE', amount=5),
+                quantity=1
             ),
         ),
-        ship_date=datetime(year=2023, month=11, day=30).date()
+        ship_date=datetime(year=2023, month=11, day=30).date(),
+        package_line_items=(
+            FedexRequestedPackageLineItem(
+                weight=FedexWeight(units="KG", value=0.300),
+                dimensions=FedexDimension(width=10, length=10, height=10)
+            ),
+        )
     )
-    #
     # with open('response.json', 'w') as json_file:
     #     json.dump(resp_data, json_file)
 
-    ouput = resp_data['output']
-    data = ouput['rateReplyDetails'][0]['ratedShipmentDetails'][0]
+    data = resp_data['output']['rateReplyDetails'][0]
+    commit = data['commit']
+    print('Service Name: ', data['serviceName'])
+    print('Date: ', commit['dateDetail']['dayFormat'])
+    print('Shipment Details: ')
+    for rate in data['ratedShipmentDetails']:
+        print('-----------------------------------------------------')
+        print('\tType: ', rate['rateType'])
+        currency = rate['currency']
+        print('\tBase rate: ', rate['totalBaseCharge'], ' ', currency)
 
-    print('quoteDate: ', ouput['quoteDate'])
-    print('Base Rate: ', data['totalBaseCharge'])
+        shipment_detail = rate['shipmentRateDetail']
 
-    for i in data['shipmentRateDetail']['surCharges']:
-        print(i['description'], ': ', i['amount'])
+        for surcharge in shipment_detail['surCharges']:
+            print('\t', surcharge['description'], ': ', surcharge['amount'])
 
-    for i in data.get('ancillaryFeesAndTaxes') or []:
-        print(i['description'], ': ', i['amount'])
+        for discount in shipment_detail['freightDiscount']:
+            print('\t', discount['description'], ': -', discount['amount'])
 
-    print('Total Ancillary Fees And Taxes: ', data['totalAncillaryFeesAndTaxes'])
-    print('Estimated Total: ', data['totalNetChargeWithDutiesAndTaxes'])
+        print('\tTotal Estimate: ', rate['totalNetCharge'])
+        print('\n\n')
