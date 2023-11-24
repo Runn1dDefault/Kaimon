@@ -289,6 +289,6 @@ class FedexQuoteRateSerializer(serializers.Serializer):
                 ],
                 "total_estimate": rate['totalNetCharge']
             }
-            for rate in data['ratedShipmentDetails']
+            for rate in rate_details['ratedShipmentDetails']
         ]
         return data
