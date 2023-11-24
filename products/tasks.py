@@ -36,3 +36,8 @@ def update_product_sale_price(product_id: int):
 
     product.sale_price = discount.calc_price(product.price)
     product.save()
+
+
+@app.task()
+def test():
+    print('Hello world')
