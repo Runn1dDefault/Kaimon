@@ -9,7 +9,7 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 
-from products.views import CategoryViewSet
+from products.filters import CategoryLevelFilter
 from service.models import Conversion
 from products.models import Product, ProductReview, Tag, Category
 from promotions.models import Promotion
@@ -17,7 +17,7 @@ from service.utils import recursive_single_tree
 from users.models import User
 from orders.models import Order
 from service.mixins import CachingMixin
-from service.filters import FilterByFields, DateRangeFilter, ListFilter
+from service.filters import FilterByFields, DateRangeFilter, ListFilter, SiteFilter
 
 from .mixins import DirectorViewMixin, StaffViewMixin
 from .paginators import UserListPagination, AdminPagePagination
@@ -46,19 +46,50 @@ class UserAdminViewSet(DirectorViewMixin, viewsets.ModelViewSet):
 
 
 # ------------------------------------------------ Categories ----------------------------------------------------------
-class CategoryListAdminView(StaffViewMixin, mixins.UpdateModelMixin, CategoryViewSet):
-    queryset = Category.objects.all()
+class CategoryAdminViewSet(
+    StaffViewMixin,
+    mixins.UpdateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet
+):
+    queryset = Category.objects.filter(level__gt=0)
     serializer_class = CategoryAdminSerializer
     pagination_class = AdminPagePagination
+    lookup_url_kwarg = "category_id"
+    lookup_field = "id"
+    filter_backends = (SearchFilter, SiteFilter, CategoryLevelFilter)
+    search_fields = ('id', 'name')
 
     @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
     @action(methods=['GET'], detail=True, url_path='change-activity')
     def activate_or_deactivate_genre(self, request, **kwargs):
-        genre = self.get_object()
-        genre.deactivated = not genre.deactivated
-        genre.products.update(is_active=not genre.deactivated)
-        genre.save()
+        category = self.get_object()
+        category.deactivated = not category.deactivated
+        category.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(methods=['GET'], detail=True, url_path='children')
+    def children(self, request, **kwargs):
+        category = self.get_object()
+        queryset = self.filter_queryset(category.children.all())
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(methods=['GET'], detail=True, url_path='tree')
+    def categories_tree(self, request, **kwargs):
+        category = self.get_object()
+        category_tree = [category]
+        parent_ids = recursive_single_tree(category, 'parent')
+        parents = list(self.filter_queryset(self.get_queryset().filter(id__in=parent_ids)))
+        category_tree.extend(parents)
+        serializer = self.get_serializer(instance=category_tree, many=True)
+        return Response(serializer.data)
+
+    @action(methods=['GET'], detail=True, url_path='tags')
+    def tags(self, request, **kwargs):
+        category = self.get_object()
+        return Response(Tag.collections.filter(products__in=category.products.all()).grouped_tags())
 
 
 # -------------------------------------------------- Tag ---------------------------------------------------------------
