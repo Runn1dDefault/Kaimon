@@ -49,7 +49,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def _readable_fields(self):
         for field_name, field_ins in self.fields.items():
             # this will prevent a representation field from appearing
-            if field_name not in self.show_fields:
+            if self.show_fields and field_name not in self.show_fields:
                 continue
 
             if not field_ins.write_only:
