@@ -3,6 +3,7 @@ from typing import Iterable
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.cache import caches
+from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.fields import empty
@@ -43,6 +44,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             )
             send_code_template.delay(email=email, code=str(new_code))
             validated_data['email_confirmed'] = False
+            validated_data['username'] = slugify(email)
         return super().update(instance, validated_data)
 
     @property
