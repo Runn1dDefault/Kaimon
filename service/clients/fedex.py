@@ -162,7 +162,7 @@ class FedexAPIClient(BaseAPIClient):
                 "shipDateStamp": str(ship_date),
                 "pickupType": pickup_type.value,
                 "serviceType": "INTERNATIONAL_PRIORITY",
-                "rateRequestType": ["LIST", "ACCOUNT"],
+                "rateRequestType": ["LIST"],
                 "customsClearanceDetail": {
                     "dutiesPayment": {
                         "paymentType": "SENDER",
