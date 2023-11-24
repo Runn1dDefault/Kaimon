@@ -4,7 +4,6 @@ from django.db.models import Avg
 from kaimon.celery import app
 
 from .models import Product
-from .views import ProductsViewSet, CategoryViewSet
 
 
 @app.task()
@@ -37,13 +36,3 @@ def update_product_sale_price(product_id: int):
 
     product.sale_price = discount.calc_price(product.price)
     product.save()
-
-
-@app.task()
-def products_cache_clear():
-    ProductsViewSet.cache_clear()
-
-
-@app.task()
-def categories_cache_clear():
-    CategoryViewSet.cache_clear()

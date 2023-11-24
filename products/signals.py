@@ -2,29 +2,31 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
 from .models import Product, Category, ProductReview
-from .tasks import update_product_reviews_data, products_cache_clear, categories_cache_clear
+from .tasks import update_product_reviews_data
+from .views import ProductsViewSet, CategoryViewSet
 
 
 @receiver(post_save, sender=Product)
 def cache_clear_on_update_product(sender, instance, created, **kwargs):
     if not created:
-        products_cache_clear.delay()
+        ProductsViewSet.cache_clear()
 
 
 @receiver(post_save, sender=Category)
-def cache_clear_on_update_category(sender, instance, created, **kwargs):
+def on_update_category(sender, instance, created, **kwargs):
     if not created:
-        categories_cache_clear.delay()
+        CategoryViewSet.cache_clear()
+        instance.products.update(is_active=not instance.deactivated)
 
 
 @receiver(post_delete, sender=Product)
 def cache_clear_on_delete_product(sender, instance, **kwargs):
-    products_cache_clear.delay()
+    ProductsViewSet.cache_clear()
 
 
 @receiver(post_delete, sender=Category)
 def cache_clear_on_delete_category(sender, instance, **kwargs):
-    categories_cache_clear.delay()
+    CategoryViewSet.cache_clear()
 
 
 @receiver(post_save, sender=ProductReview)
