@@ -5,7 +5,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import mixins
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, get_object_or_404
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet, GenericViewSet
@@ -64,6 +64,23 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
         return Response(
             Tag.collections.filter(products__in=category.products.all()).grouped_tags()
         )
+
+
+class CategoryProductListView(ListAPIView):
+    queryset = Category.objects.filter(level__gt=0, deactivated=False)
+    serializer_class = ShortProductSerializer
+    pagination_class = ProductPagination
+    lookup_url_kwarg = 'category_id'
+    lookup_field = 'id'
+    filter_backends = (SiteFilter, ListFilter, SearchFilter, OrderingFilter, ProductReferenceFilter)
+    list_filter_fields = {"product_ids": "id", "category_ids": "categories__id", "tag_ids": "tags__id"}
+    search_fields = ("name", "categories__name")
+    ordering_fields = ("created_at",)
+
+    def get_queryset(self):
+        filter_kwargs = {self.lookup_field: self.kwargs[self.lookup_url_kwarg]}
+        category = get_object_or_404(super().get_queryset(), **filter_kwargs)
+        return category.products.filter(is_active=True)
 
 
 class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
