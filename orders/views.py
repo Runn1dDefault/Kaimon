@@ -25,7 +25,7 @@ class DeliveryAddressViewSet(viewsets.ModelViewSet):
     pagination_class = PagePagination
 
     def get_queryset(self):
-        return super().get_queryset().filter(delivery_addresses__user=self.request.user)
+        return super().get_queryset().filter(user=self.request.user)
 
     def perform_destroy(self, instance):
         if instance.orders.exists():
