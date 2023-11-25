@@ -111,7 +111,7 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     lookup_url_kwarg = 'product_id'
     lookup_field = 'id'
     filter_backends = (filters.SearchFilter, ListFilter)
-    search_fields = ('id', 'name', 'genres__name')
+    search_fields = ('id', 'name', 'categories__name')
 
     def get_serializer_class(self):
         if self.request.method == 'GET' and self.detail is False:
