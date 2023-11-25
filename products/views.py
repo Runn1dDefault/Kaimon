@@ -73,7 +73,7 @@ class CategoryProductListView(ListAPIView):
     lookup_url_kwarg = 'category_id'
     lookup_field = 'id'
     filter_backends = (SiteFilter, ListFilter, SearchFilter, OrderingFilter, ProductReferenceFilter)
-    list_filter_fields = {"product_ids": "id", "category_ids": "categories__id", "tag_ids": "tags__id"}
+    list_filter_fields = {"product_ids": "id", "tag_ids": "tags__id"}
     search_fields = ("name", "categories__name")
     ordering_fields = ("created_at",)
 
