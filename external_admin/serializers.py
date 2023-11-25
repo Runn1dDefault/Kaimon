@@ -72,7 +72,7 @@ class ProductAdminSerializer(serializers.ModelSerializer):
 class ProductDetailAdminSerializer(serializers.ModelSerializer):
     price = ConversionField(all_conversions=True)
     sale_price = ConversionField(all_conversions=True, read_only=True)
-    image_urls = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
+    images = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
     categories = CategoryAdminSerializer(many=True, read_only=True)
 
     category = serializers.PrimaryKeyRelatedField(
@@ -87,7 +87,7 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
-    images = serializers.ListField(child=serializers.URLField(), write_only=True, required=False)
+    image_urls = serializers.ListField(child=serializers.URLField(), write_only=True, required=False)
 
     class Meta:
         model = Product
