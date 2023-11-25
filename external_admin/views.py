@@ -110,7 +110,7 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     parser_classes = (parsers.JSONParser,)
     lookup_url_kwarg = 'product_id'
     lookup_field = 'id'
-    filter_backends = (filters.SearchFilter, ListFilter)
+    filter_backends = (filters.SearchFilter, SiteFilter, ListFilter)
     search_fields = ('id', 'name', 'categories__name')
 
     def get_serializer_class(self):
