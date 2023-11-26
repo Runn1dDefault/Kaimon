@@ -95,6 +95,7 @@ class ProductImageInline(admin.TabularInline):
 
 
 class ProductInventoryInline(admin.StackedInline):
+    autocomplete_fields = ("tags",)
     verbose_name = "Inventory"
     verbose_name_plural = "Inventories"
     model = ProductInventory
@@ -125,7 +126,7 @@ class HasReviewFilter(admin.SimpleListFilter):
 class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductImageInline, ProductInventoryInline]
     autocomplete_fields = ("categories", "tags")
-    list_display = ("id", 'product_name', "product_price", "is_active", "created_at")
+    list_display = ("id", 'product_name', "product_price", "is_active", "site_reviews_count", "site_avg_rating")
     search_fields = ("id", "name")
     list_filter = (SiteFilter, "is_active", "modified_at", HasReviewFilter, "site_avg_rating",)
     list_per_page = 15
@@ -134,7 +135,8 @@ class ProductAdmin(admin.ModelAdmin):
     fieldsets = (
         (
             _('Product Info'),
-            {'fields': ('id', 'name', 'description', 'site_price', 'increase_per', 'is_active', 'product_url')}
+            {'fields': ('id', 'name', 'description', 'is_active', 'shop_url', 'shop_code', 'site_avg_rating',
+                        'site_reviews_count', 'reviews_count', 'avg_rating')}
         ),
         (
             _('Dates'),
@@ -153,9 +155,11 @@ class ProductAdmin(admin.ModelAdmin):
     product_name.short_description = _('Product Name')
 
     def product_price(self, obj):
-        return float(obj.price)
+        inventory = obj.inventories.first()
+        if inventory:
+            return float(inventory.price)
 
-    product_price.admin_order_field = 'site_price'
+    product_price.admin_order_field = 'inventories__site_price'
     product_price.short_description = _('Price')
 
 

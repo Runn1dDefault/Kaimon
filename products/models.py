@@ -93,13 +93,47 @@ class Tag(BaseModel):
 class Product(BaseModel):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    site_price = models.DecimalField(max_digits=20, decimal_places=10)
     site_avg_rating = models.FloatField(default=0)
     site_reviews_count = models.FloatField(default=0)
-    product_url = models.URLField(max_length=700, blank=True, null=True)
+
+    categories = models.ManyToManyField(Category, related_name='products')
+    tags = models.ManyToManyField(Tag, blank=True, related_name='products')
 
     avg_rating = models.FloatField(default=0)
     reviews_count = models.PositiveIntegerField(default=0)
+
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+
+    shop_code = models.CharField(max_length=100)
+    shop_url = models.URLField(max_length=700)
+    catch_copy = models.CharField(max_length=300, blank=True, null=True)
+
+    def __str__(self):
+        return self.id
+
+
+class ProductImage(models.Model):
+    objects = models.Manager()
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
+    url = models.URLField(max_length=700)
+
+    class Meta:
+        indexes = (models.Index(fields=('product', 'url')),)
+
+
+class ProductInventory(BaseModel):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='inventories')
+    item_code = models.CharField(max_length=100)
+    site_price = models.DecimalField(max_digits=20, decimal_places=10)
+    product_url = models.URLField(max_length=700)
+    name = models.CharField(max_length=255, blank=True, null=True)
+    tags = models.ManyToManyField(Tag, blank=True, related_name='product_inventories')
+    can_choose_tags = models.BooleanField(default=False)
+    quantity = models.PositiveIntegerField(null=True, blank=True)
+    status_code = models.CharField(max_length=100, blank=True, null=True)
     increase_per = models.FloatField(
         default=settings.DEFAULT_INCREASE_PRICE_PER,
         validators=[
@@ -108,29 +142,11 @@ class Product(BaseModel):
         ]
     )
     sale_price = models.DecimalField(max_digits=20, decimal_places=10, null=True)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    modified_at = models.DateTimeField(auto_now=True)
-
-    categories = models.ManyToManyField(Category, related_name='products')
-    tags = models.ManyToManyField(Tag, related_name='products')
-
-    def __str__(self):
-        return self.id
+    color_image = models.URLField(max_length=700, blank=True, null=True)
 
     @property
     def price(self):
         return increase_price(self.site_price, self.increase_per)
-
-
-class ProductImage(models.Model):
-    objects = models.Manager()
-
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
-    url = models.TextField(blank=True, null=True)
-
-    class Meta:
-        indexes = (models.Index(fields=('product', 'url')),)
 
 
 class ReviewAnalyticsQuerySet(BaseAnalyticsQuerySet):
@@ -163,18 +179,3 @@ class ProductReview(models.Model):
     moderated = models.BooleanField(default=False)
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-
-
-class ProductInventory(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='inventories')
-    quantity = models.PositiveIntegerField(default=0)
-    site_unit_price = models.DecimalField(max_digits=20, decimal_places=10)
-    color = models.CharField(max_length=100, blank=True, null=True)
-    color_image_url = models.TextField(blank=True, null=True)
-    size = models.CharField(max_length=100, blank=True, null=True)
-    status_code = models.CharField(max_length=100, blank=True, null=True)
-
-    @property
-    def price(self):
-        increase_per = getattr(self.product, 'increase_per')
-        return increase_price(self.site_unit_price, increase_per)

@@ -5,7 +5,7 @@ from django.core.validators import MaxValueValidator
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from products.models import Product, Category, Tag, ProductImage, ProductReview
+from products.models import Product, Category, Tag, ProductImage, ProductReview, ProductInventory
 from promotions.models import Banner, Promotion, Discount
 from orders.models import Order, Customer, DeliveryAddress, Receipt, OrderShipping
 from service.models import Conversion
@@ -55,13 +55,24 @@ class CategoryAdminSerializer(serializers.ModelSerializer):
 
 
 class ProductAdminSerializer(serializers.ModelSerializer):
-    price = ConversionField(all_conversions=True, read_only=True)
-    sale_price = ConversionField(all_conversions=True, read_only=True)
+    site_price = ConversionField(method_name="get_price", all_conversions=True, read_only=True)
+    sale_price = ConversionField(method_name="get_sale_price", all_conversions=True, read_only=True)
     image = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'sale_price', 'is_active', 'avg_rating', 'reviews_count', 'image')
+        fields = ('id', 'name', 'site_price', 'sale_price', 'is_active', 'avg_rating', 'reviews_count', 'image')
+        extra_fields = {"id": {"read_only": True}}
+
+    def get_price(self, instance):
+        inventory = instance.inventories.first()
+        if inventory:
+            return inventory.site_price
+
+    def get_sale_price(self, instance):
+        inventory = instance.inventories.first()
+        if inventory:
+            return inventory.sale_price
 
     def get_image(self, instance):
         image = instance.images.first()
@@ -69,12 +80,36 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             return image.url
 
 
-class ProductDetailAdminSerializer(serializers.ModelSerializer):
-    price = ConversionField(all_conversions=True)
+class ProductInventorySerializer(serializers.ModelSerializer):
+    site_price = ConversionField(all_conversions=True)
     sale_price = ConversionField(all_conversions=True, read_only=True)
-    images = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
-    categories = CategoryAdminSerializer(many=True, read_only=True)
+    tags = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.filter(group__isnull=True),
+        many=True,
+        write_only=True,
+        required=False
+    )
 
+    class Meta:
+        model = ProductInventory
+        fields = "__all__"
+
+    def create(self, validated_data):
+        tags = validated_data.pop('tags', None)
+        instance = super().create(validated_data)
+        instance.tags.add(*tags)
+        return instance
+
+    def update(self, instance, validated_data):
+        tags = validated_data.pop('tags', None)
+        if tags:
+            instance.tags.clear()
+            instance.tags.add(*tags)
+        return super().update(instance, validated_data)
+
+
+class ProductDetailAdminSerializer(serializers.ModelSerializer):
+    categories = CategoryAdminSerializer(many=True, read_only=True)
     category = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.exclude(level=0),
         many=False,
@@ -87,20 +122,33 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
+    images = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
     image_urls = serializers.ListField(child=serializers.URLField(), write_only=True, required=False)
+    discount = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
         fields = (
-            'id', 'name', 'description', 'price', 'increase_per', 'sale_price', 'is_active', 'avg_rating',
-            'reviews_count', 'image_urls', 'categories', 'category', 'tags', 'images'
+            'id', 'name', 'description', 'site_avg_rating', 'site_reviews_count', 'avg_rating', 'reviews_count',
+            'is_active', 'created_at', 'modified_at', 'category', 'tags', 'images', "discount", "categories",
+            "image_urls"
         )
         extra_kwargs = {
             'id': {'read_only': True},
             'price': {'required': True},
             'avg_rating': {'read_only': True},
             'reviews_count': {'read_only': True},
+            'created_at': {'read_only': True},
+            'modified_at': {'read_only': True}
         }
+
+    def get_discount(self, instance):
+        promotion = instance.promotions.active_promotions().first()
+        try:
+            discount = promotion.discount
+            return discount.percentage
+        except ObjectDoesNotExist:
+            return
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -260,7 +308,7 @@ class ReceiptAdminSerializer(serializers.ModelSerializer):
 class OrderShippingSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderShipping
-        fields = ('shipping_carrier', 'shipping_weight', 'qrcode_image', 'total_price')
+        fields = ('shipping_carrier', 'qrcode_image', 'total_price')
 
 
 class OrderAdminSerializer(serializers.ModelSerializer):

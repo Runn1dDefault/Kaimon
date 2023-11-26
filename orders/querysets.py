@@ -25,8 +25,12 @@ class OrderAnalyticsQuerySet(BaseAnalyticsQuerySet):
                 JSONObject(
                     order_id=F('id'),
                     status=F('status'),
-                    product_id=F('receipts__product_id'),
+                    product_code=F('receipts__product_code'),
+                    product_name=F('receipts__product_name'),
+                    product_image=F('receipts__product_image'),
+                    product_url=F('receipts__product_url'),
                     unit_price=F("receipts__unit_price"),
+                    site_currency=F("receipts__site_currency"),
                     site_price=F("receipts__site_price"),
                     discount=F("receipts__discount"),
                     quantity=F('receipts__quantity'),

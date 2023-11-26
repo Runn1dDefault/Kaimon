@@ -1,3 +1,4 @@
+import json
 from enum import Enum
 
 from requests import Request
@@ -173,5 +174,8 @@ if __name__ == '__main__':
     # data = rakuten.genres_search(genre_id="568753")
 
     # data = rakuten.product_search(genre_id=568674)
-    data = rakuten.item_search(item_code="sweetrag:13058716")
+    data = rakuten.item_search(shop_code="tokeiband", keyword="中身が選べる福袋 カジュアルウォッチ")
+    # with open('rakuten.json', 'w') as file:
+    #     json.dump(data, file)
+
     pprint(data)

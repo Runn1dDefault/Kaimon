@@ -11,7 +11,7 @@ from rest_framework.response import Response
 
 from products.filters import CategoryLevelFilter
 from service.models import Conversion
-from products.models import Product, ProductReview, Tag, Category
+from products.models import Product, ProductReview, Tag, Category, ProductInventory
 from promotions.models import Promotion
 from service.utils import recursive_single_tree
 from users.models import User
@@ -26,7 +26,7 @@ from .serializers import (
     ProductAdminSerializer, ProductDetailAdminSerializer,
     ProductImageAdminSerializer, UserAdminSerializer, TagAdminSerializer,
     ProductReviewAdminSerializer, OrderAnalyticsSerializer, UserAnalyticsSerializer, ReviewAnalyticsSerializer,
-    OrderAdminSerializer, CategoryAdminSerializer, ReceiptAdminSerializer
+    OrderAdminSerializer, CategoryAdminSerializer, ReceiptAdminSerializer, ProductInventorySerializer
 )
 
 
@@ -184,7 +184,7 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
-        responses={status.HTTP_200_OK: CategoryAdminSerializer, status.HTTP_404_NOT_FOUND: None},
+        responses={status.HTTP_200_OK: CategoryAdminSerializer(many=True), status.HTTP_404_NOT_FOUND: None},
         request=None
     )
     @action(
@@ -204,6 +204,28 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
             context=self.get_serializer_context()
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(responses={status.HTTP_200_OK: ProductInventorySerializer(many=True)}, request=None)
+    @action(methods=['GET'], detail=True, url_path='inventories')
+    def get_inventories(self, request, product_id):
+        inventories = ProductInventory.objects.filter(product_id=product_id)
+        serializer = ProductInventorySerializer(instance=inventories, many=True, context=self.get_serializer_context())
+        return Response(serializer.data)
+
+    @extend_schema(responses={status.HTTP_201_CREATED: ProductInventorySerializer(many=False)},
+                   request=ProductInventorySerializer(many=False))
+    @action(methods=['POST'], detail=False, url_path='inventories')
+    def create_inventories(self, request, product_id):
+        serializer = ProductInventorySerializer(data=request.data, many=False, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ProductInventoryViewSet(StaffViewMixin, mixins.CreateModelMixin, mixins.UpdateModelMixin,
+                              viewsets.GenericViewSet):
+    queryset = ProductInventory.objects.all()
+    serializer_class = ProductInventorySerializer
 
 
 # ---------------------------------------------- Reviews ---------------------------------------------------------------

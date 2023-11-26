@@ -41,7 +41,7 @@ class OrderAdmin(admin.ModelAdmin):
 
 @admin.register(Receipt)
 class ReceiptAdmin(admin.ModelAdmin):
-    autocomplete_fields = ('order', 'product', 'tags',)
-    list_display = ('id', 'order', 'product')
-    search_fields = ('id', 'order_id', 'product_id')
+    autocomplete_fields = ('order',)
+    list_display = ('id', 'order', 'product_code')
+    search_fields = ('id', 'order_id', 'product_code', "product_name", "shop_code")
     readonly_fields = ("id",)

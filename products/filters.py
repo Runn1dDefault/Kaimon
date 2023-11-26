@@ -1,4 +1,4 @@
-from django.db.models import Subquery
+from django.db.models import Subquery, Q
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 from rest_framework.filters import BaseFilterBackend
@@ -36,11 +36,11 @@ class ProductReferenceFilter(BaseFilterBackend):
     popular_param = 'popular'
 
     def filter_queryset(self, request, queryset, view):
-        popular_value = getattr(request, self.popular_param, '')
-        if popular_value != 1:
+        popular_value = request.query_params.get(self.popular_param, '')
+        if popular_value != '1':
             return queryset
 
-        orders = ('-avg_rating', '-reviews_count', '-site_rating_count', '-site_avg_rating')
+        orders = ('-reviews_count', '-avg_rating', '-site_reviews_count', '-site_avg_rating')
         if view.detail is True:
             lookup_field = view.lookup_url_kwarg or view.lookup_field
             product_id = view.kwargs[lookup_field]
@@ -62,6 +62,32 @@ class ProductReferenceFilter(BaseFilterBackend):
                 'schema': {
                     'type': 'string',
                     'default': '0'
+                }
+            }
+        ]
+
+
+class ProductTagFilter(BaseFilterBackend):
+    tag_param = "tag_ids"
+    description = _("Filter by tag ids...")
+
+    def filter_queryset(self, request, queryset, view):
+        tag_ids = request.query_params.get(self.tag_param)
+        if not tag_ids:
+            return queryset
+
+        tag_ids = (tag_id for tag_id in tag_ids.split(',') if tag_id.strip())
+        return queryset.filter(Q(tags__id__in=tag_ids) | Q(inventories__tags__id__in=tag_ids))
+
+    def get_schema_operation_parameters(self, view):
+        return [
+            {
+                'name': self.tag_param,
+                'required': False,
+                'in': 'query',
+                'description': force_str(self.description),
+                'schema': {
+                    'type': 'string'
                 }
             }
         ]

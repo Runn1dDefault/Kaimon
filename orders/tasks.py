@@ -15,14 +15,17 @@ def create_order_conversions(order_id: str):
     order = Order.objects.get(id=order_id)
     new_conversions = []
 
-    main_currency = Currencies.main_currency()
-    for conversion in Currencies:
-        if conversion != main_currency:
+    for conversion_from in Currencies:
+        for conversion_to in Currencies:
+            if conversion_from == conversion_to:
+                continue
+
             new_conversions.append(
                 OrderConversion(
                     order=order,
-                    currenry=conversion,
-                    price_per=get_currencies_price_per(main_currency, conversion)
+                    currency_from=conversion_from,
+                    currency_to=conversion_to,
+                    price_per=get_currencies_price_per(conversion_from, conversion_to)
                 )
             )
 
@@ -33,21 +36,17 @@ def create_order_conversions(order_id: str):
 @app.task()
 def update_order_shipping_details(order_id: str):
     order = Order.objects.get(id=order_id)
-    shipping_weight = 0
-    for quantity, avg_weight in order.receipts.values_list('quantity', 'avg_weight'):
-        shipping_weight += avg_weight * quantity
-
     try:
         shipping_detail = order.shipping_detail
     except ObjectDoesNotExist:
-        shipping_detail = OrderShipping(order_id=order_id)
         shipping_code = generate_shipping_code()
-        shipping_detail.shipping_code = shipping_code
         qr_filename = f'{order_id}.png'
         qr_filepath = settings.MEDIA_ROOT / 'qrcodes' / qr_filename
         generate_qrcode(qr_filepath, url=settings.QR_URL_TEMPLATE.format(order_id=order_id, code=shipping_code))
+
+        shipping_detail = OrderShipping(order_id=order_id)
+        shipping_detail.shipping_code = shipping_code
         shipping_detail.qrcode_image.name = qr_filename
 
-    shipping_detail.shipping_weight = shipping_weight
     shipping_detail.total_price = sum([receipt.total_price for receipt in order.receipts.all()])
     shipping_detail.save()

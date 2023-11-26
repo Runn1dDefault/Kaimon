@@ -3,7 +3,7 @@ from django.db.models import Avg
 
 from kaimon.celery import app
 
-from .models import Product
+from .models import Product, ProductInventory
 
 
 @app.task()
@@ -17,25 +17,28 @@ def update_product_reviews_data(product_id):
 @app.task()
 def update_product_sale_price(product_id: int):
     product = Product.objects.get(id=product_id)
-
-    product.sale_price = None
-    if not product.availability or not product.price or product.price <= 0:
-        product.save()
-        return
+    inventories = product.inventories.all()
+    update_inventories = []
 
     promotion = product.promotions.active_promotions().first()
     if not promotion:
-        product.save()
+        inventories.update(sale_price=0.0)
         return
 
     try:
         discount = promotion.discount
     except ObjectDoesNotExist:
-        # in the future here can be changed, when new promotion logic will be added
-        return None
+        inventories.update(sale_price=0.0)
+        return
 
-    product.sale_price = discount.calc_price(product.price)
-    product.save()
+    for inventory in inventories:
+        inventory.sale_price = None
+        if inventory.price and inventory.price > 0:
+            inventory.sale_price = discount.calc_price(product.price)
+        update_inventories.append(inventory)
+
+    if update_inventories:
+        ProductInventory.objects.bulk_update(update_inventories, fields={'sale_price'})
 
 
 @app.task()

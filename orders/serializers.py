@@ -7,14 +7,13 @@ from django.utils.translation import gettext_lazy as _
 from requests import HTTPError
 from rest_framework import serializers
 
-from products.models import Product, Tag
+from products.models import Product, ProductInventory
 from service.clients import fedex
-from service.models import Currencies
 from service.serializers import ConversionField
-from service.utils import get_currencies_price_per, get_currency_by_id, convert_price
+from service.utils import get_currency_by_id, convert_price
 
-from .models import DeliveryAddress, Order, Receipt, Customer
-from .utils import duplicate_delivery_address, get_product_yen_price
+from .models import DeliveryAddress, Order, Receipt
+from .utils import duplicate_delivery_address, get_product_yen_price, order_currencies_price_per, create_customer
 from .validators import only_digit_validator
 
 
@@ -37,52 +36,84 @@ class DeliveryAddressSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
+class OrderConversionField(ConversionField):
+    def __init__(self, order_id_field: str = "order_id", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.order_id_field = order_id_field
+        self.order_id = None
+
+    def init_instance_currency(self, instance):
+        self.instance_currency = instance.site_currency
+        self.order_id = getattr(instance, self.order_id_field)
+
+    def convert(self, currency, value):
+        if not value or currency == self.instance_currency:
+            return value
+
+        price_per = order_currencies_price_per(
+            order_id=self.order_id,
+            currency_from=self.instance_currency,
+            currency_to=currency
+        )
+        return convert_price(value, price_per) if price_per else None
+
+
 class ReceiptSerializer(serializers.ModelSerializer):
-    tags = serializers.SlugRelatedField(slug_field='name', read_only=True)
-    product_id = serializers.PrimaryKeyRelatedField(
-        queryset=Product.objects.filter(is_active=True),
+    inventory_id = serializers.PrimaryKeyRelatedField(
+        queryset=ProductInventory.objects.filter(product__is_active=True),
         write_only=True,
         required=True
     )
-    tag_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Tag.objects.all(),
-        write_only=True,
-        required=False,
-        many=True
-    )
-    unit_price = ConversionField(read_only=True)
+    unit_price = OrderConversionField(read_only=True)
+    total_price = OrderConversionField(read_only=True)
+    sale_unit_price = OrderConversionField(read_only=True)
 
     class Meta:
         model = Receipt
-        fields = ('order', 'product_id', 'product_name', 'product_image', 'unit_price', 'discount', 'quantity', 'tags',
-                  'tag_ids',)
+        fields = ('order', 'product_name', 'product_image', 'unit_price', 'total_price', 'sale_unit_price', 'discount',
+                  'quantity', 'tags', 'inventory_id')
         extra_kwargs = {
             'order': {'read_only': True},
             'discount': {'read_only': True},
-            'product_image': {'read_only': True}
+            'product_image': {'read_only': True},
+            'product_name': {'read_only': True},
+            'tags': {'read_only': True}
         }
-
-    def validate(self, attrs):
-        tags = attrs.get('tag_ids')
-        product = attrs['product_id']
-        for tag in tags or []:
-            if not product.tags.filter(tag_id=tag.id).exists():
-                raise serializers.ValidationError(
-                    {'tag_ids': _("Invalid pk \"%s\" - object does not exist.") % tag.id}
-                )
-        return attrs
 
     def get_currency(self) -> str:
         return self.context.get('currency', 'yen')
 
+    def validate(self, attrs):
+        inventory = attrs.get('inventory_id', None)
+        if inventory:
+            attrs['unit_price'] = inventory.price
+            product = inventory.product
+            promotion = product.promotions.active_promotions().first()
+            if promotion:
+                try:
+                    attrs['discount'] = promotion.discount.percentage
+                except ObjectDoesNotExist:
+                    attrs['discount'] = 0.0
+
+            image = product.images.first()
+            attrs['shop_url'] = product.shop_url
+            attrs['product_code'] = product.id
+            attrs['product_url'] = inventory.product_url
+            if inventory.id.startswith('uniqlo'):
+                attrs['product_name'] = product.name
+            else:
+                attrs['product_name'] = inventory.name
+            attrs['product_image'] = image.url if image else None
+            attrs['site_currency'] = get_currency_by_id(product.id)
+            attrs['site_price'] = inventory.site_price
+            attrs['tags'] = ', '.join(inventory.tags.values_list('name', flat=True))
+        return attrs
+
     def create(self, validated_data):
-        product = validated_data['product_id']
-        validated_data['unit_price'] = product.price
-        try:
-            validated_data['discount'] = product.discount.percentage
-        except ObjectDoesNotExist:
-            validated_data['discount'] = 0.0
-        return super().create(validated_data)
+        inventory = validated_data.pop('inventory_id')
+        receipt = super().create(validated_data)
+        receipt.tags.add(*list(inventory.tags.values_list('id', flat=True)))
+        return receipt
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -97,14 +128,11 @@ class OrderSerializer(serializers.ModelSerializer):
         required=True
     )
     delivery_address = DeliveryAddressSerializer(many=False, read_only=True)
-    receipts = ReceiptSerializer(many=True, read_only=True)
-    products = ReceiptSerializer(many=True, write_only=True, required=True)
-    total_price = serializers.SerializerMethodField(read_only=True)
+    receipts = ReceiptSerializer(many=True, required=True)
 
     class Meta:
         model = Order
-        fields = ('id', 'status', 'delivery_address', 'receipts', 'products', 'address_id', 'phone', 'comment',
-                  'created_at', 'total_price')
+        fields = ('id', 'status', 'delivery_address', 'receipts', 'address_id', 'phone', 'comment', 'created_at')
         extra_kwargs = {'status': {'read_only': True}}
 
     def validate(self, attrs):
@@ -115,76 +143,22 @@ class OrderSerializer(serializers.ModelSerializer):
             )
         return attrs
 
-    @staticmethod
-    def create_customer(user, phone):
-        name = user.full_name or user.email
-        bayer_code = f"{''.join([i[0].title() for i in name.split()])}{Customer.objects.count() + 1}"
-        customer, _ = Customer.objects.get_or_create(
-            name=user.full_name,
-            bayer_code=bayer_code,
-            email=user.email,
-            phone=phone
-        )
-        return customer
-
     def create(self, validated_data):
         user = self.context['request'].user
-
-        validated_data['customer'] = self.create_customer(user, validated_data.pop('phone'))
+        validated_data['customer'] = create_customer(user, validated_data.pop('phone'))
         validated_data['delivery_address'] = validated_data.pop('address_id')
-        products_data = validated_data.pop('products')
 
+        products_data = validated_data.pop('receipts')
         order = super().create(validated_data)
-
         receipts = []
-        collected_tags = {}
-        main_currency = Currencies.main_currency()
         for product_data in products_data:
-            product = product_data['product_id']
-            product_currency = get_currency_by_id(product.id)
-
-            price = product.price
-            if product_currency != main_currency:
-                price_per = get_currencies_price_per(main_currency, product_currency)
-                price = convert_price(price, price_per)
-
-            image = product.images.first()
-            category = product.categories.filter(
-                avg_weight__isnull=False
-            ).order_by('level').first()
-            avg_weight = 0 if not category else category.avg_weight
-            receipt = Receipt(
-                order=order,
-                product=product,
-                product_name=product.name,
-                product_image=image.url if image else None,
-                quantity=product_data['quantity'],
-                unit_price=price,
-                site_price=product.site_price,
-                site_currency=product_currency,
-                avg_weight=avg_weight,
-                discount=product.discount.percentage if getattr(product, 'discount', None) else 0.0,
-            )
-            receipts.append(receipt)
-
-            tags = product_data.get('tag_ids')
-            if tags:
-                collected_tags[product.id] = tags
+            product_data['order'] = order
+            product_data.pop('inventory_id')
+            receipts.append(Receipt(**product_data))
 
         if receipts:
-            for receipt in Receipt.objects.bulk_create(receipts):
-                product_id = getattr(receipt, 'product_id')
-                tags = collected_tags.get(product_id)
-                if tags:
-                    receipt.tags.add(*tags)
+            Receipt.objects.bulk_create(receipts)
         return order
-
-    def get_total_price(self, instance):
-        if not instance.receipts.exists():
-            return 0.0
-
-        currency = self.context.get('currency', 'yen')
-        return instance.total_prices.get(currency) or instance.total_prices['yen']
 
 
 class ProductQuantitySerializer(serializers.Serializer):
