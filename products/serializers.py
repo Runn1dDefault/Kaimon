@@ -59,12 +59,11 @@ class ProductInventorySerializer(serializers.ModelSerializer):
 
 class ProductDetailSerializer(serializers.ModelSerializer):
     images = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
-    inventories = ProductInventorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
         fields = ('id', 'name',  'description',  'avg_rating', 'reviews_count',
-                  'site_avg_rating', 'site_reviews_count', 'images', 'inventories')
+                  'site_avg_rating', 'site_reviews_count', 'images')
 
 
 class ProductReviewSerializer(serializers.ModelSerializer):

@@ -17,11 +17,12 @@ from service.filters import ListFilter, SiteFilter
 from service.utils import recursive_single_tree
 
 from .filters import CategoryLevelFilter, ProductReferenceFilter, ProductTagFilter
-from .models import Category, Product, Tag, ProductReview
+from .models import Category, Product, Tag, ProductReview, ProductInventory
 from .paginations import CategoryPagination, ProductReviewPagination, ProductPagination
 from .serializers import (
     CategorySerializer,
-    ShortProductSerializer, ProductDetailSerializer, ProductReferenceSerializer, ProductReviewSerializer
+    ShortProductSerializer, ProductDetailSerializer, ProductReferenceSerializer, ProductReviewSerializer,
+    ProductInventorySerializer
 )
 
 
@@ -110,9 +111,9 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
                            .grouped_tags(product.tags.values_list('id', flat=True))
         )
 
+    @extend_schema(request=ProductReferenceSerializer)
     @method_decorator(cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache',
                                  key_prefix='product_reference'))
-    @extend_schema(request=ProductReferenceSerializer)
     @action(methods=['POST'], detail=True, url_path='reference')
     def get_reference(self, request, product_id):
         reference_serializer = ProductReferenceSerializer(data=request.data, many=False)
@@ -128,6 +129,14 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
         page = self.paginate_queryset(reference_queryset)
         data = self.serializer_class(instance=page, many=True, context=self.get_serializer_context()).data
         return self.get_paginated_response(data)
+
+    @method_decorator(cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache',
+                                 key_prefix='product_inventories'))
+    @action(methods=['GET'], detail=True, url_path="inventories")
+    def get_inventories(self, request, product_id):
+        inventories = ProductInventory.objects.filter(product_id=product_id, product__is_active=True)
+        serializer = ProductInventorySerializer(instance=inventories, many=True, context=self.get_serializer_context())
+        return Response(serializer.data)
 
 
 class ProductReviewsAPIView(ListAPIView):
