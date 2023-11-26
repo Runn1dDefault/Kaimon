@@ -30,7 +30,7 @@ class CachingMixin:
     @classmethod
     def cache_clear(cls):
         cache = caches[cls.cache_name]
-        cache.delete_pattern(f'{cls.get_cache_prefix()}*')
+        cache.delete_pattern(f'*{cls.get_cache_prefix()}*')
 
         for key in cls.addition_cache_keys:
-            cache.delete_pattern(f'{key}*')
+            cache.delete_pattern(f'*{key}*')
