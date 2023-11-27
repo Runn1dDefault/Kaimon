@@ -122,7 +122,7 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
         required=True
     )
     tags = serializers.PrimaryKeyRelatedField(
-        queryset=Tag.objects.filter(group__isnull=True),
+        queryset=Tag.objects.filter(group__isnull=False),
         many=True,
         write_only=True,
         required=False
