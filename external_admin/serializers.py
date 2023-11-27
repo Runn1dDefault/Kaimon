@@ -83,19 +83,24 @@ class ProductAdminSerializer(serializers.ModelSerializer):
 class ProductInventorySerializer(serializers.ModelSerializer):
     site_price = ConversionField(all_conversions=True)
     sale_price = ConversionField(all_conversions=True, read_only=True)
-    tags = serializers.PrimaryKeyRelatedField(
+    tag_ids = serializers.PrimaryKeyRelatedField(
         queryset=Tag.objects.filter(group__isnull=True),
         many=True,
         write_only=True,
         required=False
     )
+    tags = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ProductInventory
-        fields = "__all__"
+        fields = ("id", "product", "item_code", "site_price", "product_url", "name", "tags", "can_choose_tags",
+                  "quantity", "status_code", "increase_per", "sale_price", "color_image", "tag_ids")
+
+    def get_tags(self, instance):
+        return Tag.collections.filter(id__in=instance.tags.all()).grouped_tags()
 
     def create(self, validated_data):
-        tags = validated_data.pop('tags', None)
+        tags = validated_data.pop('tag_ids', None)
         instance = super().create(validated_data)
         instance.tags.add(*tags)
         return instance
