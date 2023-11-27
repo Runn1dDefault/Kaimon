@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers
 
 from service.serializers import ConversionField
@@ -46,24 +47,26 @@ class ShortProductSerializer(serializers.ModelSerializer):
 class ProductInventorySerializer(serializers.ModelSerializer):
     price = ConversionField()
     sale_price = ConversionField()
-    tags = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ProductInventory
-        fields = ("id", 'item_code', 'name', 'tags', 'can_choose_tags', "quantity", "status_code", 'price',
+        fields = ("id", 'item_code', 'name', 'can_choose_tags', "quantity", "status_code", 'price',
                   "sale_price", "color_image")
-
-    def get_tags(self, instance):
-        return Tag.collections.filter(id__in=instance.tags.all()).grouped_tags()
 
 
 class ProductDetailSerializer(serializers.ModelSerializer):
     images = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
+    tags = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
         fields = ('id', 'name',  'description',  'avg_rating', 'reviews_count',
-                  'site_avg_rating', 'site_reviews_count', 'images')
+                  'site_avg_rating', 'site_reviews_count', 'images', 'tags')
+
+    def get_tags(self, instance):
+        return Tag.collections.filter(
+            Q(products__id=instance.id) | Q(product_inventories__product_id=instance.id)
+        ).grouped_tags()
 
 
 class ProductReviewSerializer(serializers.ModelSerializer):
