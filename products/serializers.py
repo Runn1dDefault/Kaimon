@@ -49,11 +49,13 @@ class ProductInventorySerializer(serializers.ModelSerializer):
     sale_price = ConversionField()
     size = serializers.SerializerMethodField(read_only=True)
     color = serializers.SerializerMethodField(read_only=True)
+    color_name = serializers.SerializerMethodField(read_only=True)
+    size_name = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ProductInventory
         fields = ("id", 'item_code', 'name', 'can_choose_tags', "quantity", "status_code", 'price',
-                  "sale_price", "color_image", 'size', 'color')
+                  "sale_price", "color_image", 'size', 'color', 'color_name', 'size_name')
 
     def get_size(self, instance):
         if 'uniqlo' not in instance.id:
@@ -62,6 +64,22 @@ class ProductInventorySerializer(serializers.ModelSerializer):
         size = instance.tags.filter(group_id="uniqlo_s1izes").first()
         if size:
             return size.id
+
+    def get_size_name(self, instance):
+        if 'uniqlo' not in instance.id:
+            return
+
+        size = instance.tags.filter(group_id="uniqlo_s1izes").first()
+        if size:
+            return size.name
+
+    def get_color_name(self, instance):
+        if 'uniqlo' not in instance.id:
+            return
+
+        color = instance.tags.filter(group_id="uniqlo_c1olors").first()
+        if color:
+            return color.name
 
     def get_color(self, instance):
         if 'uniqlo' not in instance.id:
