@@ -44,11 +44,11 @@ def update_order_shipping_details(order_id: str):
         shipping_detail = order.shipping_detail
     except ObjectDoesNotExist:
         shipping_code = generate_shipping_code()
-        qr_filename = f'{order_id}.png'
+        qr_filename = f'qrcodes/{order_id}.png'
         directory = settings.MEDIA_ROOT / 'qrcodes'
         if not os.path.exists(directory):
             os.mkdir(directory)
-        qr_filepath = settings.MEDIA_ROOT / 'qrcodes' / qr_filename
+        qr_filepath = settings.MEDIA_ROOT / qr_filename
         generate_qrcode(qr_filepath, url=settings.QR_URL_TEMPLATE.format(order_id=order_id, code=shipping_code))
 
         shipping_detail = OrderShipping(order_id=order_id)
