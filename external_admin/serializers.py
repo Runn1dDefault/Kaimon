@@ -7,10 +7,10 @@ from rest_framework import serializers
 
 from products.models import Product, Category, Tag, ProductImage, ProductReview, ProductInventory
 from promotions.models import Banner, Promotion, Discount
-from orders.models import Order, Customer, DeliveryAddress, Receipt, OrderShipping
+from orders.models import Order, Customer, DeliveryAddress, Receipt, OrderShipping, OrderConversion
 from service.models import Conversion
 from service.serializers import ConversionField, AnalyticsSerializer
-from service.utils import get_currencies_price_per, recursive_single_tree
+from service.utils import get_currencies_price_per, recursive_single_tree, get_currency_by_id
 from users.models import User
 
 
@@ -291,20 +291,48 @@ class DeliveryAddressAdminSerializer(serializers.ModelSerializer):
 
 
 class ReceiptAdminSerializer(serializers.ModelSerializer):
-    product = serializers.PrimaryKeyRelatedField(
-        queryset=Product.objects.filter(is_active=True),
-        many=False
+    inventory = serializers.PrimaryKeyRelatedField(
+        queryset=ProductInventory.objects.all(),
+        many=False,
+        write_only=True
     )
 
     class Meta:
         model = Receipt
-        fields = ('id', 'product', 'product_name', 'product_image', 'quantity', 'unit_price', 'site_price', 'discount')
+        fields = ('id', 'inventory', 'product_name', 'product_image', 'quantity', 'unit_price', 'site_price',
+                  'discount')
         extra_kwargs = {
             'product_name': {'read_only': True},
             'product_image': {'read_only': True},
             'unit_price': {'read_only': True},
             'site_price': {'read_only': True}
         }
+
+    def validate(self, attrs):
+        inventory = attrs.pop('inventory', None)
+        if inventory:
+            attrs['unit_price'] = inventory.price
+            product = inventory.product
+            promotion = product.promotions.active_promotions().first()
+            if promotion:
+                try:
+                    attrs['discount'] = promotion.discount.percentage
+                except ObjectDoesNotExist:
+                    attrs['discount'] = 0.0
+
+            image = product.images.first()
+            attrs['shop_url'] = product.shop_url
+            attrs['product_code'] = product.id
+            attrs['product_url'] = inventory.product_url
+            if inventory.id.startswith('uniqlo'):
+                attrs['product_name'] = product.name
+            else:
+                attrs['product_name'] = inventory.name
+            attrs['product_image'] = image.url if image else None
+            attrs['site_currency'] = get_currency_by_id(product.id)
+            attrs['site_price'] = inventory.site_price
+            attrs['tags'] = ', '.join(inventory.tags.values_list('name', flat=True))
+        return attrs
 
 
 class OrderShippingSerializer(serializers.ModelSerializer):
@@ -313,15 +341,23 @@ class OrderShippingSerializer(serializers.ModelSerializer):
         fields = ('shipping_carrier', 'qrcode_image', 'total_price')
 
 
+class OrderConversionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderConversion
+        fields = "__all__"
+
+
 class OrderAdminSerializer(serializers.ModelSerializer):
     shipping_detail = OrderShippingSerializer(many=False, read_only=True)
     customer = OrderCustomerAdminSerializer(read_only=True)
     delivery_address = DeliveryAddressAdminSerializer(read_only=True)
     receipts = ReceiptAdminSerializer(many=True, read_only=True)
+    conversions = OrderConversionSerializer(many=True, read_only=True)
 
     class Meta:
         model = Order
-        fields = ('id', 'status', 'comment', 'customer', 'receipts', 'delivery_address', 'shipping_detail')
+        fields = ('id', 'status', 'comment', 'customer', 'receipts', 'delivery_address', 'shipping_detail',
+                  "conversions")
 
 
 # ------------------------------------------------- Analytics ----------------------------------------------------------
