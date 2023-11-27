@@ -1,4 +1,4 @@
-from uuid import uuid4
+import os.path
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -20,12 +20,16 @@ def create_order_conversions(order_id: str):
             if conversion_from == conversion_to:
                 continue
 
+            price_per = get_currencies_price_per(conversion_from, conversion_to)
+            if not price_per:
+                continue
+
             new_conversions.append(
                 OrderConversion(
                     order=order,
                     currency_from=conversion_from,
                     currency_to=conversion_to,
-                    price_per=get_currencies_price_per(conversion_from, conversion_to)
+                    price_per=price_per
                 )
             )
 
@@ -41,6 +45,9 @@ def update_order_shipping_details(order_id: str):
     except ObjectDoesNotExist:
         shipping_code = generate_shipping_code()
         qr_filename = f'{order_id}.png'
+        directory = settings.MEDIA_ROOT / 'qrcodes'
+        if not os.path.exists(directory):
+            os.mkdir(directory)
         qr_filepath = settings.MEDIA_ROOT / 'qrcodes' / qr_filename
         generate_qrcode(qr_filepath, url=settings.QR_URL_TEMPLATE.format(order_id=order_id, code=shipping_code))
 
