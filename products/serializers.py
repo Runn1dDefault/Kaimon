@@ -57,11 +57,12 @@ class ProductInventorySerializer(serializers.ModelSerializer):
 class ProductDetailSerializer(serializers.ModelSerializer):
     images = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
     tags = serializers.SerializerMethodField(read_only=True)
+    inventories = ProductInventorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
         fields = ('id', 'name',  'description',  'avg_rating', 'reviews_count',
-                  'site_avg_rating', 'site_reviews_count', 'images', 'tags')
+                  'site_avg_rating', 'site_reviews_count', 'images', 'tags', 'inventories')
 
     def get_tags(self, instance):
         return Tag.collections.filter(
