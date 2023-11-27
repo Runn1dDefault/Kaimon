@@ -182,7 +182,7 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
         if category:
             category_tree = recursive_single_tree(category, "parent")
             product.categories.clear()
-            product.categories.add(*category_tree)
+            product.categories.add(category, *category_tree)
         if tags:
             product.tags.clear()
             product.tags.add(*tags)
