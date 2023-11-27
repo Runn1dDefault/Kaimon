@@ -272,7 +272,8 @@ class ProductReviewAdminViewSet(
 
 
 # ---------------------------------------------- Order -----------------------------------------------------------------
-class OrderAdminViewSet(StaffViewMixin, mixins.UpdateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
+class OrderAdminViewSet(StaffViewMixin, mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
+                        mixins.ListModelMixin, viewsets.GenericViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderAdminSerializer
     pagination_class = AdminPagePagination
