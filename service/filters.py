@@ -113,10 +113,10 @@ class DateRangeFilter(BaseFilterBackend):
         start_field = self.get_start_field(view)
         end_field = self.get_end_field(view)
 
-        if start and hasattr(queryset.model, start_field):
+        if start and start_field:
             range_queries[start_field + '__gte'] = start
-        if end and hasattr(queryset.model, end_field):
-            range_queries[self.get_end_field(view) + '__lte'] = end
+        if end and end_field:
+            range_queries[end_field + '__lte'] = end
 
         if range_queries:
             return queryset.filter(**range_queries)
