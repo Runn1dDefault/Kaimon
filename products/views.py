@@ -105,10 +105,8 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
                                  key_prefix='product_tags'))
     @action(methods=['GET'], detail=True, url_path='tags')
     def tags(self, request, product_id):
-        product = self.get_object()
         return Response(
-            Tag.collections.filter(products__id=product_id)
-                           .grouped_tags(product.tags.values_list('id', flat=True))
+            Tag.collections.filter(products__id=product_id).grouped_tags()
         )
 
     @extend_schema(request=ProductReferenceSerializer)
@@ -137,6 +135,14 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
         inventories = ProductInventory.objects.filter(product_id=product_id, product__is_active=True)
         serializer = ProductInventorySerializer(instance=inventories, many=True, context=self.get_serializer_context())
         return Response(serializer.data)
+
+    @method_decorator(cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache',
+                                 key_prefix='product_inventories_tags'))
+    @action(methods=['GET'], detail=True, url_path='inventories_tags')
+    def get_inventories_tags(self, request, product_id):
+        return Response(
+            Tag.collections.filter(product_inventories__product_id=product_id).grouped_tags()
+        )
 
 
 class ProductReviewsAPIView(ListAPIView):
