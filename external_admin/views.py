@@ -118,6 +118,10 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
             return self.list_serializer_class or self.serializer_class
         return self.serializer_class
 
+    @action(methods=['GET'], detail=True, url_path='tags')
+    def tags(self, request, product_id):
+        return Response(Tag.collections.filter(products__id=product_id).grouped_tags())
+
     @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
     @action(methods=['GET'], detail=True, url_path='change-activity')
     def activate_or_deactivate_product(self, request, **kwargs):
@@ -349,6 +353,10 @@ class PromotionAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         with transaction.atomic():
             super().perform_create(serializer)
+
+    def perform_update(self, serializer):
+        with transaction.atomic():
+            super().perform_update(serializer)
 
     @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
     @action(methods=['GET'], detail=True, url_path='change-activity')
