@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -175,9 +176,9 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
 
     def save(self, **kwargs):
         category = self.validated_data.pop('category', None)
-        images = self.validated_data.pop('images', None)
+        images = self.validated_data.pop('image_urls', None)
         tags = self.validated_data.pop('tags', None)
-        product = super().save(**kwargs)
+        product = self.instance
         if category:
             category_tree = recursive_single_tree(category, "parent")
             product.categories.clear()
@@ -187,7 +188,7 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
             product.tags.add(*tags)
         if images:
             self.update_images(product, images)
-        return product
+        return super().save(**kwargs)
 
 
 class ProductReviewAdminSerializer(serializers.ModelSerializer):
