@@ -70,8 +70,8 @@ class ReceiptSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Receipt
-        fields = ('order', 'product_name', 'product_image', 'unit_price', 'total_price', 'sale_unit_price', 'discount',
-                  'quantity', 'tags', 'inventory_id')
+        fields = ('order', 'product_code', 'product_name', 'product_image', 'unit_price', 'total_price',
+                  'sale_unit_price', 'discount', 'quantity', 'tags', 'inventory_id')
         extra_kwargs = {
             'order': {'read_only': True},
             'discount': {'read_only': True},
