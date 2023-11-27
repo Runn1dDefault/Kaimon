@@ -11,7 +11,7 @@ class CategoryLevelFilter(BaseFilterBackend):
     description = _("Filter by categories level")
 
     def filter_queryset(self, request, queryset, view):
-        level = request.query_params.get('level')
+        level = request.query_params.get(self.query_param)
         if level:
             return queryset.filter(level=level)
         return queryset
