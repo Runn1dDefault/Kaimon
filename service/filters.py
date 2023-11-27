@@ -163,10 +163,7 @@ class FilterByFields(BaseFilterBackend):
 
         filtered_queryset = queryset
 
-        for query_field, db_field in filter_fields.items():
-            if not hasattr(queryset.model, db_field):
-                continue
-
+        for query_field, field in filter_fields.items():
             value = request.query_params.get(query_field, None)
             if not value:
                 continue

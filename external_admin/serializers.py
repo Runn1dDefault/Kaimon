@@ -144,9 +144,11 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
 
     def get_discount(self, instance):
         promotion = instance.promotions.active_promotions().first()
+        if not promotion:
+            return
+
         try:
-            discount = promotion.discount
-            return discount.percentage
+            return promotion.discount.percentage
         except ObjectDoesNotExist:
             return
 
