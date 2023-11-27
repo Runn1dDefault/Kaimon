@@ -34,7 +34,7 @@ class OrderAdmin(admin.ModelAdmin):
     autocomplete_fields = ('customer', 'delivery_address')
     list_display = ('id', 'delivery_address', 'status', 'created_at')
     list_display_links = ('id', 'delivery_address')
-    search_fields = ('id', 'customer__email', 'customer__phone', 'delivery_address_id')
+    search_fields = ('id', 'customer__email', 'customer__name', 'delivery_address_id')
     list_filter = ('status', 'created_at')
     readonly_fields = ('id', 'created_at', 'modified_at')
 

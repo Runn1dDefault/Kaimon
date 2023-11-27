@@ -239,8 +239,12 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
     description = serializers.CharField(write_only=True, required=False)
     image = serializers.ImageField(write_only=True, required=False)
 
-    set_products = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), write_only=True, many=True,
-                                                      required=False)
+    set_products = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(),
+        write_only=True,
+        many=True,
+        required=False
+    )
     set_discount = serializers.FloatField(validators=[MaxValueValidator(100)], write_only=True, required=False)
     discount = serializers.SlugRelatedField(slug_field='percentage', read_only=True)
     banner = BannerAdminSerializer(many=False, read_only=True)
@@ -312,7 +316,7 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
 class OrderCustomerAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
-        fields = ('id', 'bayer_code', 'name', 'email', 'phone')
+        fields = ('id', 'bayer_code', 'name', 'email')
 
 
 class DeliveryAddressAdminSerializer(serializers.ModelSerializer):

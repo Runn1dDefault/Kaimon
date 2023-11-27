@@ -52,13 +52,15 @@ def order_currencies_price_per(order_id, currency_from: str, currency_to: str):
         return conversion.price_per
 
 
-def create_customer(user, phone):
+def get_bayer_code(user):
     name = user.full_name or user.email
-    bayer_code = f"{''.join([i[0].title() for i in name.split()])}{Customer.objects.count() + 1}"
+    return f"{''.join([i[0].title() for i in name.split()])}{user.id}"
+
+
+def create_customer(user):
     customer, _ = Customer.objects.get_or_create(
         name=user.full_name,
-        bayer_code=bayer_code,
-        email=user.email,
-        phone=phone
+        bayer_code=get_bayer_code(user),
+        email=user.email
     )
     return customer

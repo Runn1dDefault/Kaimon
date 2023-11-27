@@ -29,7 +29,6 @@ class Customer(BaseModel):
     name = models.CharField(max_length=100)
     bayer_code = models.CharField(max_length=50, unique=True)
     email = models.EmailField()
-    phone = models.CharField(max_length=20, validators=[only_digit_validator])
 
     def __str__(self):
         return self.name
@@ -79,10 +78,6 @@ class Order(BaseModel):
     @property
     def bayer_code(self):
         return getattr(self.customer, 'bayer_code')
-
-    @property
-    def phone(self):
-        return getattr(self.customer, 'phone', None)
 
 
 class OrderShipping(models.Model):

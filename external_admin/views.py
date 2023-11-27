@@ -291,7 +291,7 @@ class OrderAdminViewSet(StaffViewMixin, mixins.RetrieveModelMixin, mixins.Update
     lookup_field = 'id'
     lookup_url_kwarg = 'order_id'
     filter_backends = (SearchFilter, ListFilter, OrderingFilter, DateRangeFilter)
-    search_fields = ('customer__email', 'customer__name', 'customer__phone')
+    search_fields = ('customer__email', 'customer__name', 'customer__bayer_code')
     list_filter_fields = {'status': 'status'}
     ordering_fields = ('id', 'created_at')
     start_param, end_param = 'start_date', 'end_date'

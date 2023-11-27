@@ -118,11 +118,6 @@ class ReceiptSerializer(serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    phone = serializers.CharField(
-        max_length=13,
-        required=True,
-        validators=[only_digit_validator]
-    )
     address_id = serializers.PrimaryKeyRelatedField(
         queryset=DeliveryAddress.objects.all(),
         write_only=True,
@@ -133,7 +128,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ('id', 'status', 'delivery_address', 'receipts', 'address_id', 'phone', 'comment', 'created_at')
+        fields = ('id', 'status', 'delivery_address', 'receipts', 'address_id', 'comment', 'created_at')
         extra_kwargs = {'status': {'read_only': True}}
 
     def validate(self, attrs):
@@ -146,7 +141,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = self.context['request'].user
-        validated_data['customer'] = create_customer(user, validated_data.pop('phone'))
+        validated_data['customer'] = create_customer(user)
         validated_data['delivery_address'] = validated_data.pop('address_id')
 
         products_data = validated_data.pop('receipts')

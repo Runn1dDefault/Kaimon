@@ -71,7 +71,10 @@ class FedexQuoteRateView(generics.GenericAPIView):
 
 
 def order_info(request, order_id):
-    shipping_code = request.query_params.get('shipping_code')
+    if request.method != 'GET':
+        return HttpResponseNotFound()
+
+    shipping_code = request.GET.get('shipping_code')
     if not shipping_code:
         return HttpResponseNotFound()
 
