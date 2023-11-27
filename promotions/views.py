@@ -6,6 +6,7 @@ from rest_framework.permissions import AllowAny
 
 from products.models import Product
 from products.serializers import ShortProductSerializer
+from service.filters import SiteFilter
 from service.mixins import CurrencyMixin
 from service.paginations import PagePagination
 
@@ -28,7 +29,7 @@ class PromotionProductListView(CurrencyMixin, generics.ListAPIView):
     pagination_class = PagePagination
     lookup_url_kwarg = 'promotion_id'
     lookup_field = 'id'
-    filter_backends = (filters.OrderingFilter,)
+    filter_backends = (filters.OrderingFilter, SiteFilter)
     ordering_fields = ('created_at', 'price')
 
     def get_promotion(self):
@@ -45,16 +46,13 @@ class PromotionProductListView(CurrencyMixin, generics.ListAPIView):
 @extend_schema_view(get=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
 class DiscountProductListView(CurrencyMixin, generics.ListAPIView):
     permission_classes = (AllowAny,)
-    promotion_queryset = Promotion.objects.active_promotions()
+    queryset = Product.objects.filter(
+        is_active=True,
+        promotion__isnull=False,
+        promotion__deactivated=False,
+        promotion__discount__isnull=False
+    )
     serializer_class = ShortProductSerializer
     pagination_class = PagePagination
-    filter_backends = (filters.OrderingFilter,)
+    filter_backends = (filters.OrderingFilter, SiteFilter)
     ordering_fields = ('created_at', 'price')
-
-    def get_promotions_with_discount(self):
-        return self.promotion_queryset.filter(products__isnull=False, discount__isnull=False).distinct()
-
-    def get_queryset(self):
-        promotions = self.promotion_queryset.filter(products__isnull=False, discount__isnull=False).distinct()
-        product_ids = promotions.values_list('products', flat=True)
-        return Product.objects.filter(is_active=True, id__in=product_ids)

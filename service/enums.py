@@ -17,6 +17,7 @@ class CountryPostalCodePattern(Enum):
 class Site(Enum):
     rakuten = 'rakuten'
     uniqlo = 'uniqlo'
+    kaimono = 'kaimono'
 
     @classmethod
     def from_string(cls, site: str):
@@ -31,6 +32,7 @@ class Site(Enum):
 class SiteCurrency(Enum):
     rakuten = "yen"
     uniqlo = "usd"
+    kaimono = "usd"
 
     @classmethod
     def from_string(cls, site: str | Site):

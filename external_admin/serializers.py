@@ -253,8 +253,9 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Promotion
         banner_fields = ('name', 'description', 'image')
-        fields = ('id', 'discount', 'set_discount', 'banner', 'products', 'set_products',
+        fields = ('id', 'site', 'discount', 'set_discount', 'banner', 'products', 'set_products',
                   'deactivated', 'created_at', *banner_fields)
+        extra_kwargs = {"site": {"required": True}}
 
     def collect_banner_data(self, validated_data) -> dict[str, Any]:
         banner_data = {}
@@ -263,6 +264,21 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
             if field in self.Meta.banner_fields:
                 banner_data[field] = validated_data.pop(field)
         return banner_data
+
+    @staticmethod
+    def validate_products_site(site, products) -> bool:
+        return all(product.id.startswith(site) for product in products)
+
+    def validate(self, attrs):
+        products = attrs.get('set_products')
+        if products:
+            site = attrs.get('site')
+            if not site and self.instance:
+                site = self.instance.site
+
+            if not self.validate_products_site(site, products):
+                raise serializers.ValidationError({"set_products": _("All products must be for site %s" % site)})
+        return attrs
 
     def create(self, validated_data):
         discount = validated_data.pop('set_discount', None)

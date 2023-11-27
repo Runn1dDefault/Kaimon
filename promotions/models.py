@@ -4,6 +4,7 @@ from django.utils.translation import gettext_lazy as _
 
 from products.models import Product
 from promotions.querysets import PromotionQueryset
+from service.enums import Site
 
 
 class Banner(models.Model):
@@ -23,6 +24,7 @@ class Promotion(models.Model):
     objects = PromotionQueryset.as_manager()
 
     banner = models.ForeignKey(Banner, on_delete=models.CASCADE, related_name='promotions')
+    site = models.CharField(choices=tuple((site.name, site.value) for site in Site))
     products = models.ManyToManyField(
         Product,
         blank=True,
