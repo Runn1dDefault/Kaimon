@@ -149,7 +149,7 @@ class ProductReviewsAPIView(ListAPIView):
     permission_classes = (AllowAny,)
     lookup_url_kwarg = "product_id"
     lookup_field = 'id'
-    queryset = Product.objects.filter(is_active=True)
+    queryset = Product.objects.all()
     serializer_class = ProductReviewSerializer
     pagination_class = ProductReviewPagination
 
