@@ -93,12 +93,19 @@ class CategoryAdminViewSet(
 
 
 # -------------------------------------------------- Tag ---------------------------------------------------------------
-class TagListAdminView(CachingMixin, StaffViewMixin, generics.ListAPIView):
-    queryset = Tag.objects.filter(group__isnull=False)
+class TagGroupAdminViewSet(CachingMixin, StaffViewMixin, generics.ListAPIView):
+    queryset = Tag.collections.filter(group__isnull=True)
+    filter_backends = (SiteFilter, SearchFilter)
     pagination_class = AdminPagePagination
     serializer_class = TagAdminSerializer
-    filter_backends = (SearchFilter,)
-    search_fields = ('id', 'name', 'group_id', 'group__name')
+    search_fields = ("name",)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        query_ids = queryset.values_list("id", flat=True)
+        page = self.paginate_queryset(query_ids)
+        queryset = Tag.collections.filter(group_id__in=page)
+        return self.get_paginated_response(queryset.grouped_tags())
 
 
 # ----------------------------------------------- Product --------------------------------------------------------------

@@ -4,8 +4,8 @@ from rest_framework.routers import SimpleRouter
 from .views import (
     OrderAnalyticsView, UserAnalyticsView, ReviewAnalyticsView,
     ProductAdminViewSet, ProductReviewAdminViewSet,
-    CategoryAdminViewSet, TagListAdminView, PromotionAdminViewSet,
-    OrderAdminViewSet, ConversionAdminViewSet, UserAdminViewSet, ProductInventoryViewSet,
+    CategoryAdminViewSet, PromotionAdminViewSet,
+    OrderAdminViewSet, ConversionAdminViewSet, UserAdminViewSet, ProductInventoryViewSet, TagGroupAdminViewSet,
 )
 
 router = SimpleRouter()
@@ -25,6 +25,6 @@ analytics_urlpatterns = [
 ]
 
 urlpatterns = analytics_urlpatterns + [
-    path('products/tags/', TagListAdminView.as_view(), name='admin-tag-list'),
+    path('tags/', TagGroupAdminViewSet.as_view(), name="admin-grouped-tags"),
     path('', include(router.urls)),
 ]

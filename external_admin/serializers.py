@@ -1,6 +1,6 @@
-import logging
 from typing import Any
 
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import MaxValueValidator
 from django.utils.translation import gettext_lazy as _
@@ -11,7 +11,7 @@ from promotions.models import Banner, Promotion, Discount
 from orders.models import Order, Customer, DeliveryAddress, Receipt, OrderShipping, OrderConversion
 from service.models import Conversion
 from service.serializers import ConversionField, AnalyticsSerializer
-from service.utils import get_currencies_price_per, recursive_single_tree, get_currency_by_id
+from service.utils import get_currencies_price_per, recursive_single_tree, get_currency_by_id, uid_generate
 from users.models import User
 
 
@@ -35,9 +35,16 @@ class ConversionAdminSerializer(serializers.ModelSerializer):
 
 
 class TagAdminSerializer(serializers.ModelSerializer):
+    group = serializers.SlugRelatedField(slug_field="name", read_only=True)
+    group_id = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.filter(group__isnull=True),
+        write_only=True,
+        required=False
+    )
+
     class Meta:
         model = Tag
-        fields = ('id', 'name')
+        fields = ('id', 'name', "group", "group_id")
 
 
 class ProductImageAdminSerializer(serializers.ModelSerializer):
@@ -82,6 +89,7 @@ class ProductAdminSerializer(serializers.ModelSerializer):
 
 
 class ProductInventorySerializer(serializers.ModelSerializer):
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), required=True)
     site_price = ConversionField(all_conversions=True)
     sale_price = ConversionField(all_conversions=True, read_only=True)
     tag_ids = serializers.PrimaryKeyRelatedField(
@@ -94,20 +102,29 @@ class ProductInventorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductInventory
-        fields = ("id", "product", "item_code", "site_price", "product_url", "name", "tags", "can_choose_tags",
+        fields = ("id", "product", "item_code", "site_price", "product_url", "name", "tags",
                   "quantity", "status_code", "increase_per", "sale_price", "color_image", "tag_ids")
+        extra_kwargs = {
+            "item_code": {"read_only": True},
+            "product_url": {'read_only': True},
+            "color_image": {"read_only": True},
+        }
 
     def get_tags(self, instance):
         return Tag.collections.filter(id__in=instance.tags.all()).grouped_tags()
 
     def create(self, validated_data):
+        product = validated_data['product']
+        validated_data['id'] = uid_generate()
+        validated_data['item_code'] = product.id
+        validated_data['product_url'] = settings.PRODUCT_URL_TEMPLATE.format(product_id=product.id)
         tags = validated_data.pop('tag_ids', None)
         instance = super().create(validated_data)
         instance.tags.add(*tags)
         return instance
 
     def update(self, instance, validated_data):
-        tags = validated_data.pop('tags', None)
+        tags = validated_data.pop('tag_ids', None)
         if tags:
             instance.tags.clear()
             instance.tags.add(*tags)
@@ -137,11 +154,12 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'name', 'description', 'site_avg_rating', 'site_reviews_count', 'avg_rating', 'reviews_count',
             'is_active', 'created_at', 'modified_at', 'category', 'tags', 'images', "discount", "categories",
-            "image_urls"
+            "image_urls", 'can_choose_tags'
         )
         extra_kwargs = {
             'id': {'read_only': True},
-            'price': {'required': True},
+            'site_avg_rating': {'read_only': True},
+            'site_reviews_count': {'read_only': True},
             'avg_rating': {'read_only': True},
             'reviews_count': {'read_only': True},
             'created_at': {'read_only': True},
@@ -160,6 +178,8 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        if not self.instance:
+            attrs['id'] = uid_generate()
         price = attrs.pop('price', None)
         if price:
             attrs['site_price'] = price
@@ -174,11 +194,10 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
         ProductImage.objects.filter(product=instance).delete()
         return ProductImage.objects.bulk_create([ProductImage(product=instance, url=url) for url in image_urls])
 
-    def save(self, **kwargs):
-        category = self.validated_data.pop('category', None)
-        images = self.validated_data.pop('image_urls', None)
-        tags = self.validated_data.pop('tags', None)
-        product = self.instance
+    def update_relates(self, product, validated_data):
+        category = validated_data.pop('category', None)
+        images = validated_data.pop('image_urls', None)
+        tags = validated_data.pop('tags', None)
         if category:
             category_tree = recursive_single_tree(category, "parent")
             product.categories.clear()
@@ -188,7 +207,15 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
             product.tags.add(*tags)
         if images:
             self.update_images(product, images)
-        return super().save(**kwargs)
+
+    def create(self, validated_data):
+        product = super().create(validated_data)
+        self.update_relates(product, validated_data)
+        return product
+
+    def update(self, instance, validated_data):
+        self.update_relates(instance, validated_data)
+        return super().update(instance, validated_data)
 
 
 class ProductReviewAdminSerializer(serializers.ModelSerializer):
