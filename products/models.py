@@ -141,7 +141,7 @@ class ProductInventory(BaseModel):
             MaxValueValidator(limit_value=100)
         ]
     )
-    sale_price = models.DecimalField(max_digits=20, decimal_places=10, null=True)
+    sale_price = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True)
     color_image = models.URLField(max_length=700, blank=True, null=True)
 
     @property
