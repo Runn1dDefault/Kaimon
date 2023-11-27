@@ -47,11 +47,29 @@ class ShortProductSerializer(serializers.ModelSerializer):
 class ProductInventorySerializer(serializers.ModelSerializer):
     price = ConversionField()
     sale_price = ConversionField()
+    size = serializers.SerializerMethodField(read_only=True)
+    color = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ProductInventory
         fields = ("id", 'item_code', 'name', 'can_choose_tags', "quantity", "status_code", 'price',
-                  "sale_price", "color_image")
+                  "sale_price", "color_image", 'size', 'color')
+
+    def get_size(self, instance):
+        if 'uniqlo' not in instance.id:
+            return
+
+        size = instance.tags.filter(group_id="uniqlo_s1izes").first()
+        if size:
+            return size.id
+
+    def get_color(self, instance):
+        if 'uniqlo' not in instance.id:
+            return
+
+        color = instance.tags.filter(group_id="uniqlo_c1olors").first()
+        if color:
+            return color.id
 
 
 class ProductDetailSerializer(serializers.ModelSerializer):
