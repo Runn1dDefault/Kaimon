@@ -5,6 +5,6 @@ from .views import PromotionListView, PromotionProductListView, DiscountProductL
 
 urlpatterns = [
     path('', PromotionListView.as_view(), name='promotions_list'),
-    path('products/', DiscountProductListView.as_view(), name='promotions_products_discount_list'),
-    re_path('^products/(?P<id>.+)/$', PromotionProductListView.as_view(), name='promotions_products_list')
+    path('discount-products/', DiscountProductListView.as_view(), name='promotions_products_discount_list'),
+    re_path('^(?P<promotion_id>.+)/products/$', PromotionProductListView.as_view(), name='promotions_products_list')
 ]

@@ -22,13 +22,13 @@ def update_product_sale_price(product_id: int):
 
     promotion = product.promotions.active_promotions().first()
     if not promotion:
-        inventories.update(sale_price=0.0)
+        inventories.update(sale_price=None)
         return
 
     try:
         discount = promotion.discount
     except ObjectDoesNotExist:
-        inventories.update(sale_price=0.0)
+        inventories.update(sale_price=None)
         return
 
     for inventory in inventories:

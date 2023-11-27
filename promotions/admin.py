@@ -20,9 +20,9 @@ class DiscountAdminInline(admin.StackedInline):
 @admin.register(Promotion)
 class PromotionAdmin(admin.ModelAdmin):
     inlines = [DiscountAdminInline]
+    autocomplete_fields = ("products",)
     list_display = ('id', 'banner', 'deactivated', 'created_at')
     list_display_links = ('id', 'banner')
     list_filter = ('deactivated', 'created_at')
     search_fields = ('id',)
-    readonly_fields = ('products',)
     search_help_text = _('Search By ID')

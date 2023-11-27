@@ -18,6 +18,7 @@ class PromotionListView(generics.ListAPIView):
     permission_classes = (AllowAny,)
     queryset = Promotion.objects.active_promotions()
     serializer_class = PromotionSerializer
+    filter_backends = (SiteFilter,)
     pagination_class = PagePagination
 
 
@@ -29,11 +30,10 @@ class PromotionProductListView(CurrencyMixin, generics.ListAPIView):
     pagination_class = PagePagination
     lookup_url_kwarg = 'promotion_id'
     lookup_field = 'id'
-    filter_backends = (filters.OrderingFilter, SiteFilter)
-    ordering_fields = ('created_at', 'price')
+    filter_backends = (filters.OrderingFilter,)
+    ordering_fields = ('created_at',)
 
     def get_promotion(self):
-        assert self.lookup_field in self.kwargs
         filter_kwargs = {self.lookup_field: self.kwargs[self.lookup_url_kwarg]}
         promotion = get_object_or_404(self.promotion_queryset, **filter_kwargs)
         self.check_object_permissions(self.request, promotion)
@@ -55,4 +55,4 @@ class DiscountProductListView(CurrencyMixin, generics.ListAPIView):
     serializer_class = ShortProductSerializer
     pagination_class = PagePagination
     filter_backends = (filters.OrderingFilter, SiteFilter)
-    ordering_fields = ('created_at', 'price')
+    ordering_fields = ('created_at',)
