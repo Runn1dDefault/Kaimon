@@ -54,7 +54,7 @@ class ProductInventorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductInventory
-        fields = ("id", 'item_code', 'name', 'can_choose_tags', "quantity", "status_code", 'price',
+        fields = ("id", 'item_code', 'name', "quantity", "status_code", 'price',
                   "sale_price", "color_image", 'size', 'color', 'color_name', 'size_name')
 
     def get_size(self, instance):
@@ -97,7 +97,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ('id', 'name',  'description',  'avg_rating', 'reviews_count',
+        fields = ('id', 'name',  'description',  'avg_rating', 'reviews_count', 'can_choose_tags',
                   'site_avg_rating', 'site_reviews_count', 'images', 'tags', 'inventories')
 
     def get_tags(self, instance):

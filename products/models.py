@@ -95,6 +95,7 @@ class Product(BaseModel):
     description = models.TextField(blank=True, null=True)
     site_avg_rating = models.FloatField(default=0)
     site_reviews_count = models.FloatField(default=0)
+    can_choose_tags = models.BooleanField(default=False)
 
     categories = models.ManyToManyField(Category, related_name='products')
     tags = models.ManyToManyField(Tag, blank=True, related_name='products')
@@ -131,7 +132,6 @@ class ProductInventory(BaseModel):
     product_url = models.URLField(max_length=700)
     name = models.CharField(max_length=255, blank=True, null=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='product_inventories')
-    can_choose_tags = models.BooleanField(default=False)
     quantity = models.PositiveIntegerField(null=True, blank=True)
     status_code = models.CharField(max_length=100, blank=True, null=True)
     increase_per = models.FloatField(
