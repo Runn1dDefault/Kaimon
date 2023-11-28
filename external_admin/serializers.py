@@ -109,6 +109,7 @@ class ProductInventorySerializer(serializers.ModelSerializer):
                   "quantity", "status_code", "increase_per", "sale_price", "color_image", "tag_ids")
         extra_kwargs = {
             "id": {"read_only": True},
+            "name": {"required": True},
             "item_code": {"read_only": True},
             "product_url": {'read_only': True},
             "color_image": {"read_only": True},
