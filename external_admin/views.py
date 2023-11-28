@@ -26,7 +26,8 @@ from .serializers import (
     ProductAdminSerializer, ProductDetailAdminSerializer,
     ProductImageAdminSerializer, UserAdminSerializer, TagAdminSerializer,
     ProductReviewAdminSerializer, OrderAnalyticsSerializer, UserAnalyticsSerializer, ReviewAnalyticsSerializer,
-    OrderAdminSerializer, CategoryAdminSerializer, ReceiptAdminSerializer, ProductInventorySerializer
+    OrderAdminSerializer, CategoryAdminSerializer, ReceiptAdminSerializer, ProductInventorySerializer,
+    BaseOrderAdminSerializer
 )
 
 
@@ -286,6 +287,7 @@ class ProductReviewAdminViewSet(
 class OrderAdminViewSet(StaffViewMixin, mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
                         mixins.ListModelMixin, viewsets.GenericViewSet):
     queryset = Order.objects.all()
+    list_serializer_class = BaseOrderAdminSerializer
     serializer_class = OrderAdminSerializer
     pagination_class = AdminPagePagination
     lookup_field = 'id'
@@ -293,9 +295,18 @@ class OrderAdminViewSet(StaffViewMixin, mixins.RetrieveModelMixin, mixins.Update
     filter_backends = (SearchFilter, ListFilter, OrderingFilter, DateRangeFilter)
     search_fields = ('customer__email', 'customer__name', 'customer__bayer_code')
     list_filter_fields = {'status': 'status'}
-    ordering_fields = ('id', 'created_at')
+    ordering_fields = ('id', 'created_at', 'modified_at')
     start_param, end_param = 'start_date', 'end_date'
     start_field, end_field = 'created_at__date', 'created_at__date'
+
+    def get_serializer_class(self):
+        if self.detail is False and self.request.method == 'GET':
+            return self.list_serializer_class
+        return self.serializer_class
+
+    @extend_schema(responses={status.HTTP_200_OK: BaseOrderAdminSerializer(many=True)})
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
     @action(methods=['GET'], detail=False, url_path='new-count')
     def new_count(self, request, **kwargs):

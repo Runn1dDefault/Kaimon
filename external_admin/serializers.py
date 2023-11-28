@@ -6,12 +6,15 @@ from django.core.validators import MaxValueValidator
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from orders.serializers import OrderConversionField
+from orders.utils import order_currencies_price_per
 from products.models import Product, Category, Tag, ProductImage, ProductReview, ProductInventory
 from promotions.models import Banner, Promotion, Discount
 from orders.models import Order, Customer, DeliveryAddress, Receipt, OrderShipping, OrderConversion
-from service.models import Conversion
+from service.models import Conversion, Currencies
 from service.serializers import ConversionField, AnalyticsSerializer
-from service.utils import get_currencies_price_per, recursive_single_tree, get_currency_by_id, uid_generate
+from service.utils import get_currencies_price_per, recursive_single_tree, get_currency_by_id, uid_generate, \
+    convert_price
 from users.models import User
 
 
@@ -349,16 +352,19 @@ class ReceiptAdminSerializer(serializers.ModelSerializer):
         many=False,
         write_only=True
     )
+    unit_price = OrderConversionField(read_only=True, all_conversions=True)
+    site_price = OrderConversionField(read_only=True, all_conversions=True)
+    total_price = OrderConversionField(read_only=True, all_conversions=True)
 
     class Meta:
         model = Receipt
-        fields = ('id', 'inventory', 'product_name', 'product_image', 'quantity', 'unit_price', 'site_price',
-                  'discount')
+        fields = ('id', 'inventory', 'product_name', 'product_image', 'product_url',
+                  'quantity', 'unit_price', 'total_price', 'site_price', 'discount', 'site_currency')
         extra_kwargs = {
             'product_name': {'read_only': True},
             'product_image': {'read_only': True},
-            'unit_price': {'read_only': True},
-            'site_price': {'read_only': True}
+            'product_url': {'read_only': True},
+            'site_currency': {'read_only': True}
         }
 
     def validate(self, attrs):
@@ -391,7 +397,7 @@ class ReceiptAdminSerializer(serializers.ModelSerializer):
 class OrderShippingSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderShipping
-        fields = ('shipping_carrier', 'qrcode_image', 'total_price')
+        fields = ('shipping_carrier', 'qrcode_image')
 
 
 class OrderConversionSerializer(serializers.ModelSerializer):
@@ -400,7 +406,35 @@ class OrderConversionSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class OrderAdminSerializer(serializers.ModelSerializer):
+class BaseOrderAdminSerializer(serializers.ModelSerializer):
+    total_price = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Order
+        fields = ("id", "comment", "status", "customer", "total_price")
+
+    def get_total_price(self, instance):
+        total_price = 0.0
+
+        for receipt in instance.receipts.all():
+            price = receipt.total_price
+
+            if receipt.site_currency != Currencies.yen:
+                price_per = order_currencies_price_per(
+                    order_id=receipt.order_id,
+                    currency_from=receipt.site_currency,
+                    currency_to=Currencies.yen
+                )
+                price = convert_price(price, price_per) if price_per else 0.0
+
+            if not price:
+                continue
+
+            total_price += float(price)
+        return total_price
+
+
+class OrderAdminSerializer(BaseOrderAdminSerializer):
     shipping_detail = OrderShippingSerializer(many=False, read_only=True)
     customer = OrderCustomerAdminSerializer(read_only=True)
     delivery_address = DeliveryAddressAdminSerializer(read_only=True)
@@ -410,7 +444,7 @@ class OrderAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = ('id', 'status', 'comment', 'customer', 'receipts', 'delivery_address', 'shipping_detail',
-                  "conversions")
+                  "conversions", "total_price")
 
 
 # ------------------------------------------------- Analytics ----------------------------------------------------------
