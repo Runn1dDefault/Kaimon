@@ -96,7 +96,7 @@ class ProductInventorySerializer(serializers.ModelSerializer):
     site_price = ConversionField(all_conversions=True)
     sale_price = ConversionField(all_conversions=True, read_only=True)
     tag_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Tag.objects.filter(group__isnull=True),
+        queryset=Tag.objects.filter(group__isnull=False),
         many=True,
         write_only=True,
         required=False
@@ -108,6 +108,7 @@ class ProductInventorySerializer(serializers.ModelSerializer):
         fields = ("id", "product", "item_code", "site_price", "product_url", "name", "tags",
                   "quantity", "status_code", "increase_per", "sale_price", "color_image", "tag_ids")
         extra_kwargs = {
+            "id": {"read_only": True},
             "item_code": {"read_only": True},
             "product_url": {'read_only': True},
             "color_image": {"read_only": True},
