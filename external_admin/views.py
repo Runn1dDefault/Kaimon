@@ -235,7 +235,7 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
 
 
 class ProductInventoryViewSet(StaffViewMixin, mixins.CreateModelMixin, mixins.UpdateModelMixin,
-                              viewsets.GenericViewSet):
+                              mixins.DestroyModelMixin, viewsets.GenericViewSet):
     queryset = ProductInventory.objects.all()
     serializer_class = ProductInventorySerializer
 
