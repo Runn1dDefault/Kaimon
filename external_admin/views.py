@@ -269,9 +269,10 @@ class ProductReviewAdminViewSet(
         review.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(methods=['GET'], detail=False, url_path='new-count')
+    @action(methods=['GET'], detail=False, url_path='count')
     def new_count(self, request, **kwargs):
-        return Response({'count': self.get_queryset().filter(moderated=False).count()})
+        queryset = self.filter_queryset(self.get_queryset())
+        return Response({'count': queryset.count()})
 
 
 # ---------------------------------------------- Order -----------------------------------------------------------------
