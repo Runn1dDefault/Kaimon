@@ -103,10 +103,10 @@ def order_info(request, order_id):
                 currency_from=receipt.site_currency,
                 currency_to=Currencies.yen
             )
-            price = convert_price(price, price_per) if price_per else None
-            unit_price = convert_price(unit_price, price_per) if price_per else None
+            price = convert_price(price, price_per) if price_per else 0.0
+            unit_price = convert_price(unit_price, price_per) if price_per else 0.0
 
-        total_price += price
+        total_price += float(price)
         purchased_products.append(
             {
                 "code": receipt.product_code,
