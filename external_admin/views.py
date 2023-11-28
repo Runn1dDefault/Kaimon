@@ -33,7 +33,7 @@ from .serializers import (
 
 # ---------------------------------------------- Users -----------------------------------------------------------------
 class UserAdminViewSet(DirectorViewMixin, viewsets.ModelViewSet):
-    queryset = User.objects.filter(role=User.Role.CLIENT)
+    queryset = User.objects.exclude(username="deleted").filter(role=User.Role.CLIENT)
     pagination_class = UserListPagination
     serializer_class = UserAdminSerializer
     filter_backends = (SearchFilter, DateRangeFilter)
