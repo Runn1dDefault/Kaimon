@@ -230,7 +230,7 @@ class ProductReviewAdminSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductReview
-        fields = ('id', 'user', 'product', 'product_id', 'rating', 'is_read', 'moderated', 'comment', 'created_at')
+        fields = ('id', 'user', 'product', 'product_id', 'rating', 'moderated', 'comment', 'created_at')
 
 
 class BannerAdminSerializer(serializers.ModelSerializer):
@@ -494,12 +494,11 @@ class UserAnalyticsSerializer(AnalyticsSerializer):
 
 
 class ReviewAnalyticsSerializer(AnalyticsSerializer):
-    is_read = serializers.BooleanField(required=False, write_only=True)
     moderated = serializers.BooleanField(required=False, write_only=True)
 
     class Meta:
         model = ProductReview
-        fields = ('is_read', 'moderated')
+        fields = ('moderated',)
         empty_template = {'info': [], 'count': 0, 'avg_rating': 0.0}
         start_field = 'created_at__date'
         end_field = 'created_at__date'

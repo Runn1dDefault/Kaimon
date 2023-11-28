@@ -166,10 +166,10 @@ class ProductAdmin(admin.ModelAdmin):
 @admin.register(ProductReview)
 class ProductReviewAdmin(admin.ModelAdmin):
     autocomplete_fields = ('user', 'product')
-    list_display = ('id', 'user', 'product_id', 'short_comment', 'moderated', 'is_read')
+    list_display = ('id', 'user', 'product_id', 'short_comment', 'moderated')
     list_display_links = ('id', 'user', 'product_id')
     search_fields = ('id', 'user__email', 'user__full_name')
-    list_filter = ('rating', 'created_at', 'is_read', 'moderated')
+    list_filter = ('rating', 'created_at', 'moderated')
 
     def product_id(self, obj):
         return obj.product.id

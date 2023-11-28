@@ -159,8 +159,7 @@ class ReviewAnalyticsQuerySet(BaseAnalyticsQuerySet):
                     name=models.F('user__full_name'),
                     comment=models.F('comment'),
                     rating=models.F('rating'),
-                    moderated=models.F('moderated'),
-                    is_read=models.F('is_read')
+                    moderated=models.F('moderated')
                 )
             ),
             count=models.Count('id'),
@@ -177,5 +176,4 @@ class ProductReview(models.Model):
     rating = models.FloatField(validators=[MinValueValidator(0), MaxValueValidator(5)], default=0)
     comment = models.TextField(blank=True, null=True)
     moderated = models.BooleanField(default=False)
-    is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -252,8 +252,7 @@ class ProductReviewAdminViewSet(
     serializer_class = ProductReviewAdminSerializer
     pagination_class = AdminPagePagination
     filter_backends = [FilterByFields, filters.SearchFilter, DateRangeFilter]
-    filter_fields = {'is_read': {'db_field': 'is_read', 'type': 'boolean'},
-                     'moderated': {'db_field': 'moderated', 'type': 'boolean'}}
+    filter_fields = {'moderated': {'db_field': 'moderated', 'type': 'boolean'}}
     search_fields = ('user__email', 'product__id', 'comment')
     start_field = 'created_at__date'
     start_param = 'start_date'
@@ -270,17 +269,9 @@ class ProductReviewAdminViewSet(
         review.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
-    @action(methods=['GET'], detail=True, url_path='mark-read')
-    def set_read(self, request, **kwargs):
-        review = self.get_object()
-        review.is_read = True
-        review.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
     @action(methods=['GET'], detail=False, url_path='new-count')
     def new_count(self, request, **kwargs):
-        return Response({'count': self.get_queryset().filter(is_read=False).count()})
+        return Response({'count': self.get_queryset().filter(moderated=False).count()})
 
 
 # ---------------------------------------------- Order -----------------------------------------------------------------
