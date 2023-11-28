@@ -15,11 +15,10 @@ def duplicate_delivery_address(delivery_address, updates: dict[str, Any]):
     new_address = DeliveryAddress(
         user=delivery_address.user,
         recipient_name=delivery_address.recipient_name,
-        address_line=delivery_address.address_line,
+        country_code=delivery_address.country_code,
         city=delivery_address.city,
-        state=delivery_address.state,
         postal_code=delivery_address.postal_code,
-        country=delivery_address.country
+        address_line=delivery_address.address_line
     )
 
     for field, value in updates.items():
