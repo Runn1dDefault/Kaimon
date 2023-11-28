@@ -1,8 +1,8 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
-from .models import Product, ProductInventory, Category, ProductReview
-from .tasks import update_product_reviews_data
+from .models import Product, Category, ProductReview
+from .tasks import update_product_reviews_data, update_category_products_activity
 from .views import ProductsViewSet, CategoryViewSet
 
 
@@ -15,7 +15,7 @@ def on_save_product(sender, instance, created, **kwargs):
 def on_save_category(sender, instance, created, **kwargs):
     CategoryViewSet.cache_clear()
     if not created:
-        instance.products.update(is_active=not instance.deactivated)
+        update_category_products_activity.delay()
 
 
 @receiver(post_delete, sender=Product)

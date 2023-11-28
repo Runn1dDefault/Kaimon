@@ -7,7 +7,7 @@ from django.db.models import Avg
 from kaimon.celery import app
 from service.utils import get_translated_text, is_japanese_char
 
-from .models import Product, ProductInventory, Tag
+from .models import Product, ProductInventory, Tag, Category
 
 
 @app.task()
@@ -69,3 +69,10 @@ def translated_tag_group(group_id):
 
     if updated_tags:
         Tag.objects.bulk_update(updated_tags, fields=("name",))
+
+
+@app.task()
+def update_category_products_activity(category_id):
+    category = Category.objects.get(id=category_id)
+    category.products.update(is_active=not category.deactivated)
+
