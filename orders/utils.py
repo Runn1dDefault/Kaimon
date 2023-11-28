@@ -47,7 +47,11 @@ def get_product_yen_price(product, quantity):
 
 @lru_cache(maxsize=100)
 def order_currencies_price_per(order_id, currency_from: str, currency_to: str):
-    conversion = OrderConversion.objects.filter(order_id=order_id, currency_from=currency_from, currency_to=currency_to)
+    conversion = OrderConversion.objects.filter(
+        order_id=order_id,
+        currency_from=currency_from,
+        currency_to=currency_to
+    ).first()
     if conversion:
         return conversion.price_per
 
