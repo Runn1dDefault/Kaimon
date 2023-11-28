@@ -49,6 +49,7 @@ class DeliveryAddress(BaseModel):
     city = models.CharField(max_length=100)
     postal_code = models.CharField(max_length=20, null=True, blank=True)
     address_line = models.TextField(blank=True, null=True)
+    as_deleted = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = _('Delivery Address')

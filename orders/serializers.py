@@ -14,7 +14,6 @@ from service.utils import get_currency_by_id, convert_price
 
 from .models import DeliveryAddress, Order, Receipt
 from .utils import duplicate_delivery_address, get_product_yen_price, order_currencies_price_per, create_customer
-from .validators import only_digit_validator
 
 
 class DeliveryAddressSerializer(serializers.ModelSerializer):

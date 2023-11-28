@@ -22,7 +22,7 @@ from .utils import order_currencies_price_per
 
 
 class DeliveryAddressViewSet(viewsets.ModelViewSet):
-    queryset = DeliveryAddress.objects.all()
+    queryset = DeliveryAddress.objects.filter(as_deleted=False)
     permission_classes = (IsAuthenticated, EmailConfirmedPermission, RegistrationPayedPermission)
     serializer_class = DeliveryAddressSerializer
     pagination_class = PagePagination
