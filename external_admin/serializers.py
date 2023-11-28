@@ -454,7 +454,7 @@ class OrderAnalyticsSerializer(AnalyticsSerializer):
     class Meta:
         model = Order
         fields = ('status',)
-        empty_template = {"receipts_info": [], "total_price": 0, "count": 0}
+        empty_template = {"receipts_info": [], "count": 0}
         start_field = 'created_at__date'
         end_field = 'created_at__date'
 

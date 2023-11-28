@@ -6,7 +6,6 @@ from django.utils.translation import gettext_lazy as _
 from service.models import Currencies
 from users.utils import get_sentinel_user
 
-from .validators import only_digit_validator
 from .querysets import OrderAnalyticsQuerySet
 
 
