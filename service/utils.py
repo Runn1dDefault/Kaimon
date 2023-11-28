@@ -4,6 +4,7 @@ from decimal import Decimal
 from functools import lru_cache
 
 import qrcode
+import requests
 
 from .enums import Site, SiteCurrency
 from .models import Conversion, Currencies
@@ -110,3 +111,9 @@ def generate_qrcode(filepath: str, url: str):
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
     img.save(filepath)
+
+
+def get_translated_text(select_lang, target_lang, text: str):
+    url = 'https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=%s&tl=%s&q=%s'
+    response = requests.get(url % (select_lang, target_lang, text))
+    return response.json()[0][0][0]

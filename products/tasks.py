@@ -1,9 +1,12 @@
+import logging
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Avg
 
 from kaimon.celery import app
+from service.utils import get_translated_text
 
-from .models import Product, ProductInventory
+from .models import Product, ProductInventory, Tag
 
 
 @app.task()
@@ -42,5 +45,22 @@ def update_product_sale_price(product_id: int):
 
 
 @app.task()
-def test():
-    print('Hello world')
+def translated_tag_group(group_id):
+    group = Tag.objects.get(id=group_id)
+    select_lang, target_lang = 'ja', 'en'
+    group.name = get_translated_text(select_lang, target_lang, group.name)
+    group.save()
+
+    updated_tags = []
+
+    for tag in group.children.all():
+        try:
+            tag.name = get_translated_text(select_lang, target_lang, tag.name)
+        except Exception as e:
+            logging.error(e)
+            break
+
+        updated_tags.append(tag)
+
+    if updated_tags:
+        Tag.objects.bulk_update(updated_tags, fields=("name",))
