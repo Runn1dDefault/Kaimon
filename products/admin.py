@@ -136,7 +136,7 @@ class ProductAdmin(admin.ModelAdmin):
         (
             _('Product Info'),
             {'fields': ('id', 'name', 'description', 'is_active', 'shop_url', 'shop_code', 'site_avg_rating',
-                        'site_reviews_count', 'reviews_count', 'avg_rating')}
+                        'site_reviews_count', 'reviews_count', 'avg_rating', 'catch_copy')}
         ),
         (
             _('Dates'),
