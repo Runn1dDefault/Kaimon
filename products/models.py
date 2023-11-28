@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 
 from service.enums import Site
 from service.querysets import BaseAnalyticsQuerySet, AnalyticsFilterBy
-from service.utils import increase_price
+from service.utils import increase_price, uid_generate
 
 
 class QuerySet(models.QuerySet):
@@ -37,7 +37,7 @@ class SiteManager(models.Manager):
 class BaseModel(models.Model):
     objects = SiteManager()
 
-    id = models.CharField(primary_key=True, max_length=100)
+    id = models.CharField(primary_key=True, max_length=100, default=uid_generate)
 
     class Meta:
         abstract = True
