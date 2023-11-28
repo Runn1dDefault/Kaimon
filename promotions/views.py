@@ -25,19 +25,17 @@ class PromotionListView(generics.ListAPIView):
 @extend_schema_view(get=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
 class PromotionProductListView(CurrencyMixin, generics.ListAPIView):
     permission_classes = (AllowAny,)
-    promotion_queryset = Promotion.objects.active_promotions().filter(products__isnull=False)
+    promotion_queryset = Promotion.objects.active_promotions().filter(products__isnull=False).distinct()
     serializer_class = ShortProductSerializer
     pagination_class = PagePagination
     lookup_url_kwarg = 'promotion_id'
     lookup_field = 'id'
-    filter_backends = (filters.OrderingFilter,)
-    ordering_fields = ('created_at',)
+    filter_backends = (SiteFilter,)
 
     def get_promotion(self):
+        promotions = self.filter_queryset(self.promotion_queryset)
         filter_kwargs = {self.lookup_field: self.kwargs[self.lookup_url_kwarg]}
-        promotion = get_object_or_404(self.promotion_queryset, **filter_kwargs)
-        self.check_object_permissions(self.request, promotion)
-        return promotion
+        return get_object_or_404(promotions, **filter_kwargs)
 
     def get_queryset(self):
         return self.get_promotion().products.filter(is_active=True)
