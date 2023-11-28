@@ -103,7 +103,7 @@
         {% for product in purchased_products %}
             <tr>
                 <td>{{ product.code }}</td>
-                <td><a href="{{ product.url }}" target="_blank">{{ product.product_name }}</a></td>
+                <td><a href="{{ product.url }}" target="_blank">{{ product.product_name|truncatewords:3 }}</a></td>
                 <td>{{ product.quantity }}</td>
                 <td>{{ product.unit_price }}</td>
                 <td>{{ product.total }}</td>
