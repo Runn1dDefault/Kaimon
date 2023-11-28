@@ -117,3 +117,23 @@ def get_translated_text(select_lang, target_lang, text: str):
     url = 'https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=%s&tl=%s&q=%s'
     response = requests.get(url % (select_lang, target_lang, text))
     return response.json()[0][0][0]
+
+
+def is_japanese_char(char):
+    code_point = ord(char)
+
+    # Check if the code point falls within the range of Japanese characters
+    # Hiragana: U+3040 to U+309F
+    # Katakana: U+30A0 to U+30FF
+    # Kanji: U+4E00 to U+9FFF
+    japanese_ranges = [
+        (0x3040, 0x309F),
+        (0x30A0, 0x30FF),
+        (0x4E00, 0x9FFF)
+    ]
+
+    for start, end in japanese_ranges:
+        if start <= code_point <= end:
+            return True
+
+    return False

@@ -1,10 +1,11 @@
 import logging
+import time
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Avg
 
 from kaimon.celery import app
-from service.utils import get_translated_text
+from service.utils import get_translated_text, is_japanese_char
 
 from .models import Product, ProductInventory, Tag
 
@@ -54,11 +55,15 @@ def translated_tag_group(group_id):
     updated_tags = []
 
     for tag in group.children.all():
+        if not is_japanese_char(tag.name):
+            continue
+
         try:
             tag.name = get_translated_text(select_lang, target_lang, tag.name)
         except Exception as e:
             logging.error(e)
-            break
+            time.sleep(10)
+            continue
 
         updated_tags.append(tag)
 
