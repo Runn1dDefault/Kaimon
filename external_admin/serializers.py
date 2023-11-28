@@ -212,6 +212,8 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
             self.update_images(product, images)
 
     def create(self, validated_data):
+        validated_data['shop_code'] = "kaimono"
+        validated_data['shop_url'] = "https://kaimono.vip"
         product = super().create(validated_data)
         self.update_relates(product, validated_data)
         return product
