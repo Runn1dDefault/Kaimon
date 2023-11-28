@@ -183,43 +183,42 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
         attrs = super().validate(attrs)
         if not self.instance:
             attrs['id'] = uid_generate()
-        price = attrs.pop('price', None)
-        if price:
-            attrs['site_price'] = price
+            attrs['shop_code'] = "kaimono"
+            attrs['shop_url'] = "https://kaimono.vip"
         return attrs
 
     def get_categories(self, instance):
         categories = instance.genres.exclude(level=0).filter(deactivated=False).order_by('-level')
         return CategoryAdminSerializer(instance=categories, many=True, context=self.context).data
 
-    @staticmethod
-    def update_images(instance, image_urls) -> list[ProductImage]:
-        ProductImage.objects.filter(product=instance).delete()
-        return ProductImage.objects.bulk_create([ProductImage(product=instance, url=url) for url in image_urls])
+    def create(self, validated_data):
+        category = validated_data.pop('category', None)
+        images = validated_data.pop('image_urls', None)
+        tags = validated_data.pop('tags', None)
+        product = super().create(validated_data)
+        if category:
+            category_tree = recursive_single_tree(category, "parent")
+            product.categories.add(category, *category_tree)
+        if tags:
+            product.tags.add(*tags)
+        if images:
+            ProductImage.objects.bulk_create([ProductImage(product=product, url=url) for url in images])
+        return product
 
-    def update_relates(self, product, validated_data):
+    def update(self, instance, validated_data):
         category = validated_data.pop('category', None)
         images = validated_data.pop('image_urls', None)
         tags = validated_data.pop('tags', None)
         if category:
             category_tree = recursive_single_tree(category, "parent")
-            product.categories.clear()
-            product.categories.add(category, *category_tree)
+            instance.categories.clear()
+            instance.categories.add(category, *category_tree)
         if tags:
-            product.tags.clear()
-            product.tags.add(*tags)
+            instance.tags.clear()
+            instance.tags.add(*tags)
         if images:
-            self.update_images(product, images)
-
-    def create(self, validated_data):
-        validated_data['shop_code'] = "kaimono"
-        validated_data['shop_url'] = "https://kaimono.vip"
-        product = super().create(validated_data)
-        self.update_relates(product, validated_data)
-        return product
-
-    def update(self, instance, validated_data):
-        self.update_relates(instance, validated_data)
+            ProductImage.objects.filter(product=instance).delete()
+            ProductImage.objects.bulk_create([ProductImage(product=instance, url=url) for url in images])
         return super().update(instance, validated_data)
 
 
