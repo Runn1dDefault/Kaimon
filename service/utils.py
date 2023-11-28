@@ -1,3 +1,4 @@
+import unicodedata
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -120,9 +121,10 @@ def get_translated_text(select_lang, target_lang, text: str):
 
 
 def is_japanese_char(char):
-    code_point = ord(char)
+    # Normalize the character to NFKC form to handle different representations
+    normalized_char = unicodedata.normalize('NFKC', char)
 
-    # Check if the code point falls within the range of Japanese characters
+    # Check if the normalized character is a Japanese character
     # Hiragana: U+3040 to U+309F
     # Katakana: U+30A0 to U+30FF
     # Kanji: U+4E00 to U+9FFF
@@ -133,7 +135,8 @@ def is_japanese_char(char):
     ]
 
     for start, end in japanese_ranges:
-        if start <= code_point <= end:
-            return True
+        for code_point in range(start, end + 1):
+            if normalized_char == chr(code_point):
+                return True
 
     return False
