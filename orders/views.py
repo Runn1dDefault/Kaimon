@@ -116,7 +116,8 @@ def order_info(request, order_id):
                 "unit_price": round(unit_price, 2),
                 "original_price": round(receipt.site_price, 2),
                 "currency": Currencies.to_symbol(receipt.site_currency),
-                "total": round(price, 2)
+                "total": round(price, 2),
+                "tags": receipt.tags
             }
         )
     return render(

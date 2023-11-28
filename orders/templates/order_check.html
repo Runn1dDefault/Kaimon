@@ -96,6 +96,7 @@
             <th>Unit Price (¥)</th>
             <th>Total (¥)</th>
             <th>Original Unit Price</th>
+            <th>Tags</th>
         </tr>
     </thead>
     <tbody>
@@ -107,6 +108,7 @@
                 <td>{{ product.unit_price }}</td>
                 <td>{{ product.total }}</td>
                 <td>{{ product.original_price }} {{ product.currency }}</td>
+                <td>{{ product.tags }}</td>
             </tr>
         {% endfor %}
     </tbody>
