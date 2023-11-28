@@ -407,11 +407,12 @@ class OrderConversionSerializer(serializers.ModelSerializer):
 
 
 class BaseOrderAdminSerializer(serializers.ModelSerializer):
+    customer = OrderCustomerAdminSerializer(read_only=True)
     total_price = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Order
-        fields = ("id", "comment", "status", "customer", "total_price")
+        fields = ("id", "customer", "comment", "status", "customer", "total_price")
 
     def get_total_price(self, instance):
         total_price = 0.0
@@ -436,7 +437,6 @@ class BaseOrderAdminSerializer(serializers.ModelSerializer):
 
 class OrderAdminSerializer(BaseOrderAdminSerializer):
     shipping_detail = OrderShippingSerializer(many=False, read_only=True)
-    customer = OrderCustomerAdminSerializer(read_only=True)
     delivery_address = DeliveryAddressAdminSerializer(read_only=True)
     receipts = ReceiptAdminSerializer(many=True, read_only=True)
     conversions = OrderConversionSerializer(many=True, read_only=True)
