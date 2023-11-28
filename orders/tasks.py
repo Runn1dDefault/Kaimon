@@ -54,6 +54,4 @@ def update_order_shipping_details(order_id: str):
         shipping_detail = OrderShipping(order_id=order_id)
         shipping_detail.shipping_code = shipping_code
         shipping_detail.qrcode_image.name = qr_filename
-
-    shipping_detail.total_price = sum([receipt.total_price for receipt in order.receipts.all()])
     shipping_detail.save()

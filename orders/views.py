@@ -9,13 +9,16 @@ from rest_framework.response import Response
 from products.serializers import ShortProductSerializer
 from service.filters import ListFilter
 from service.mixins import CurrencyMixin
+from service.models import Currencies
 from service.paginations import PagePagination
+from service.utils import convert_price
 from users.permissions import RegistrationPayedPermission, EmailConfirmedPermission
 from users.utils import get_sentinel_user
 
 from .models import DeliveryAddress, Order
 from .permissions import OrderPermission
 from .serializers import DeliveryAddressSerializer, OrderSerializer, FedexQuoteRateSerializer
+from .utils import order_currencies_price_per
 
 
 class DeliveryAddressViewSet(viewsets.ModelViewSet):
@@ -87,27 +90,46 @@ def order_info(request, order_id):
     if shipping_code != shipping_detail.shipping_code:
         return HttpResponseNotFound()
 
-    general_columns = ("Покупатель", "Код покупателя", "Дата покупки", "Общая сумма заказа")
-    general_rows = ((order.customer.name, order.bayer_code, str(order.created_at.date()),
-                    round(order.shipping_detail.total_price, 2)),)
+    purchased_products = []
+    total_price = 0
 
-    receipts_columns = ("URL", "Наименование товара", "Количество", "Сумма (йен)",  "Цена", "Оригинальная Цена",
-                        "Валюта (орг. цены)")
-    receipts_rows = [
-        (
-            receipt.product.product_url,
-            receipt.product_name,
-            receipt.quantity,
-            round(receipt.total_price, 2),
-            round(receipt.sale_unit_price, 2),
-            round(receipt.site_price, 2),
-            receipt.site_currency
-        ) for receipt in order.receipts.all()
-    ]
-    tables = ({"table_subject": "", "columns": general_columns, "rows": general_rows},
-              {"table_subject": "Состав Заказа", "columns": receipts_columns, "rows": receipts_rows})
+    for receipt in order.receipts.all():
+        price = receipt.total_price
+        unit_price = receipt.unit_price
+
+        if receipt.site_currency != Currencies.yen:
+            price_per = order_currencies_price_per(
+                order_id=receipt.order_id,
+                currency_from=receipt.site_currency,
+                currency_to=Currencies.yen
+            )
+            price = convert_price(price, price_per) if price_per else None
+            unit_price = convert_price(unit_price, price_per) if price_per else None
+
+        total_price += price
+        purchased_products.append(
+            {
+                "code": receipt.product_code,
+                "url": receipt.product_url,
+                "product_name": receipt.product_name,
+                "quantity": receipt.quantity,
+                "unit_price": round(unit_price, 2),
+                "original_price": round(receipt.site_price, 2),
+                "currency": Currencies.to_symbol(receipt.site_currency),
+                "total": round(price, 2)
+            }
+        )
     return render(
         request,
-        "table.html",
-        context={"tables": tables, "title": "Сводка по закаку"}
+        "order_check.html",
+        context={
+            "order": {
+                "buyer": order.customer.name,
+                "buyer_code": order.bayer_code,
+                "purchase_date": order.created_at.date(),
+                "total_order_amount": round(total_price, 2)
+            },
+            "purchased_products": purchased_products,
+            "currency": "¥"
+        }
     )

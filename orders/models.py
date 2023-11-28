@@ -85,7 +85,6 @@ class OrderShipping(models.Model):
     shipping_code = models.CharField(max_length=100)
     shipping_carrier = models.CharField(max_length=50, default='FedEx')
     qrcode_image = models.ImageField(upload_to='qrcodes/', blank=True, null=True)
-    total_price = models.DecimalField(max_digits=20, decimal_places=10)
 
 
 class OrderConversion(models.Model):

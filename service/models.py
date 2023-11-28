@@ -20,6 +20,11 @@ class Currencies(models.TextChoices):
                 return cls.som
 
     @classmethod
+    def to_symbol(cls, currency: str) -> str:
+        currency_symbols = {cls.usd.value: "$", cls.som.value: "С", cls.yen.value: "¥"}
+        return currency_symbols.get(currency, "")
+
+    @classmethod
     def main_currency(cls):
         return cls.yen
 

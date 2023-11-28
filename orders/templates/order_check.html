@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Details</title>
+
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f8f8f8; /* Light gray background */
+            color: #333;
+            margin: 20px;
+        }
+
+        h2 {
+            color: #e74c3c; /* Darker red for headers */
+        }
+
+        ul, table {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin-top: 20px;
+            width: 100%;
+            overflow-x: auto; /* Enable horizontal scrolling on small screens */
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            white-space: nowrap; /* Prevent line breaks within table cells */
+            min-width: 100px; /* Set a minimum width for the cells */
+        }
+
+        th {
+            background-color: #c0392b; /* Red */
+            color: #fff;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        a {
+            color: #e74c3c; /* Darker red for links */
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        a:hover {
+            text-decoration: none;
+        }
+
+        /* Responsive Styles */
+        @media only screen and (max-width: 600px) {
+            th, td {
+                font-size: 0.8em; /* Adjust font size for smaller screens */
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Display Order Information -->
+<h2>Order Information</h2>
+<ul>
+    <li><strong>Buyer:</strong> {{ order.buyer }}</li>
+    <li><strong>Buyer Code:</strong> {{ order.buyer_code }}</li>
+    <li><strong>Purchase Date:</strong> {{ order.purchase_date }}</li>
+    <li><strong>Total Order Amount:</strong> {{ order.total_order_amount }} ¥</li>
+</ul>
+
+<!-- Display List of Purchased Products -->
+<h2>Purchased Products</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Product Code</th>
+            <th>Product Name</th>
+            <th>Quantity</th>
+            <th>Unit Price (¥)</th>
+            <th>Total (¥)</th>
+            <th>Original Unit Price</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for product in purchased_products %}
+            <tr>
+                <td>{{ product.code }}</td>
+                <td><a href="{{ product.url }}" target="_blank">{{ product.product_name }}</a></td>
+                <td>{{ product.quantity }}</td>
+                <td>{{ product.unit_price }}</td>
+                <td>{{ product.total }}</td>
+                <td>{{ product.original_price }} {{ product.currency }}</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+</body>
+</html>
