@@ -7,7 +7,7 @@ from rest_framework.permissions import AllowAny
 from products.models import Product
 from products.serializers import ShortProductSerializer
 from service.filters import SiteFilter
-from service.mixins import CurrencyMixin
+from service.mixins import CurrencyMixin, CachingMixin
 from service.paginations import PagePagination
 
 from .models import Promotion
@@ -23,7 +23,7 @@ class PromotionListView(generics.ListAPIView):
 
 
 @extend_schema_view(get=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
-class PromotionProductListView(CurrencyMixin, generics.ListAPIView):
+class PromotionProductListView(CachingMixin, CurrencyMixin, generics.ListAPIView):
     permission_classes = (AllowAny,)
     promotion_queryset = Promotion.objects.active_promotions().filter(products__isnull=False).distinct()
     serializer_class = ShortProductSerializer
@@ -40,9 +40,13 @@ class PromotionProductListView(CurrencyMixin, generics.ListAPIView):
     def get_queryset(self):
         return self.get_promotion().products.filter(is_active=True)
 
+    @classmethod
+    def get_cache_prefix(cls) -> str:
+        return 'product'
+
 
 @extend_schema_view(get=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
-class DiscountProductListView(CurrencyMixin, generics.ListAPIView):
+class DiscountProductListView(CachingMixin, CurrencyMixin, generics.ListAPIView):
     permission_classes = (AllowAny,)
     queryset = Product.objects.filter(
         is_active=True,
@@ -54,3 +58,7 @@ class DiscountProductListView(CurrencyMixin, generics.ListAPIView):
     pagination_class = PagePagination
     filter_backends = (filters.OrderingFilter, SiteFilter)
     ordering_fields = ('created_at',)
+
+    @classmethod
+    def get_cache_prefix(cls) -> str:
+        return 'product'
