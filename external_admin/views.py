@@ -403,6 +403,8 @@ class ConversionAdminViewSet(
 ):
     queryset = Conversion.objects.all()
     serializer_class = ConversionAdminSerializer
+    filter_backends = (OrderingFilter,)
+    ordering_fields = ('currency_from',)
     lookup_url_kwarg = 'conversion_id'
     lookup_field = 'id'
 
