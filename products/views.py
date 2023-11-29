@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db.models import Subquery, Q
+from django.db.models import Subquery
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from drf_spectacular.utils import extend_schema
