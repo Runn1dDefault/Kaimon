@@ -1,12 +1,13 @@
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.http import HttpResponseNotFound
 from django.shortcuts import get_object_or_404, render
+from drf_spectacular.utils import extend_schema_view, extend_schema
 from rest_framework import viewsets, generics, mixins, parsers, permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from products.serializers import ShortProductSerializer
 from service.filters import ListFilter
 from service.mixins import CurrencyMixin
 from service.models import Currencies
@@ -47,12 +48,15 @@ class OrderViewSet(
 ):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-    product_serializer_class = ShortProductSerializer
     permission_classes = (IsAuthenticated, EmailConfirmedPermission, RegistrationPayedPermission, OrderPermission)
     parser_classes = (parsers.JSONParser,)
     pagination_class = PagePagination
     filter_backends = (ListFilter,)
     list_filter_fields = {'status': 'status'}
+
+    @extend_schema_view(get=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         with transaction.atomic():
