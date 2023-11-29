@@ -420,10 +420,14 @@ class OrderConversionSerializer(serializers.ModelSerializer):
 class BaseOrderAdminSerializer(serializers.ModelSerializer):
     customer = OrderCustomerAdminSerializer(read_only=True)
     total_price = serializers.SerializerMethodField(read_only=True)
+    country_code = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Order
-        fields = ("id", "customer", "comment", "status", "customer", "total_price")
+        fields = ("id", "customer", "comment", "status", "customer", "total_price", "created_at", "country_code")
+
+    def get_country_code(self, instance):
+        return instance.delivery_address.country_code
 
     def get_total_price(self, instance):
         total_price = 0.0
@@ -455,7 +459,7 @@ class OrderAdminSerializer(BaseOrderAdminSerializer):
     class Meta:
         model = Order
         fields = ('id', 'status', 'comment', 'customer', 'receipts', 'delivery_address', 'shipping_detail',
-                  "conversions", "total_price")
+                  "conversions", "total_price", "created_at")
 
 
 # ------------------------------------------------- Analytics ----------------------------------------------------------
