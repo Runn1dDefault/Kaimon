@@ -91,9 +91,3 @@ class ProductTagFilter(BaseFilterBackend):
                 }
             }
         ]
-
-
-class ProductOrdering(OrderingFilter):
-    def filter_queryset(self, request, queryset, view):
-        queryset = super().filter_queryset(request, queryset, view)
-        return queryset.filter(inventories__isnull=False, images__isnull=False).distinct()

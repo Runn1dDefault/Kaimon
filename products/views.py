@@ -79,7 +79,7 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
     retrieve_serializer_class = ProductDetailSerializer
     lookup_url_kwarg = "product_id"
     lookup_field = "id"
-    filter_backends = (SiteFilter, ListFilter, ProductTagFilter, ProductReferenceFilter, SearchFilter, ProductOrdering)
+    filter_backends = (SiteFilter, ListFilter, ProductTagFilter, ProductReferenceFilter, SearchFilter, OrderingFilter)
     list_filter_fields = {"product_ids": "id", "category_ids": "categories__id"}
     search_fields = ("name", "categories__name", "inventories__name")
     ordering_fields = ("created_at",)
