@@ -47,13 +47,7 @@ class UserAdminViewSet(DirectorViewMixin, viewsets.ModelViewSet):
 
 
 # ------------------------------------------------ Categories ----------------------------------------------------------
-class CategoryAdminViewSet(
-    StaffViewMixin,
-    mixins.UpdateModelMixin,
-    mixins.ListModelMixin,
-    mixins.RetrieveModelMixin,
-    viewsets.GenericViewSet
-):
+class CategoryAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     queryset = Category.objects.filter(level__gt=0)
     serializer_class = CategoryAdminSerializer
     pagination_class = AdminPagePagination
