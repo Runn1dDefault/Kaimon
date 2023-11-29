@@ -356,7 +356,7 @@ class PromotionAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     parser_classes = (MultiPartParser, FormParser, JSONParser)
     lookup_field = 'id'
     lookup_url_kwarg = 'promotion_id'
-    filter_backends = (SearchFilter, OrderingFilter)
+    filter_backends = (SearchFilter, SiteFilter, OrderingFilter)
     search_fields = ('id', 'banner__name',)
     ordering_fields = ('id', 'created_at',)
 
