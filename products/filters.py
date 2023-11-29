@@ -94,12 +94,3 @@ class ProductTagFilter(BaseFilterBackend):
                 }
             }
         ]
-
-
-class ProductOrdering(OrderingFilter):
-    def filter_queryset(self, request, queryset, view):
-        ordering = self.get_ordering(request, queryset, view)
-
-        if ordering:
-            return queryset.filter(inventories__isnull=False, images__isnull=False).order_by(*ordering)
-        return queryset
