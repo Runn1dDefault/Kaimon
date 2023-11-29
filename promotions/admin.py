@@ -23,6 +23,6 @@ class PromotionAdmin(admin.ModelAdmin):
     autocomplete_fields = ("products",)
     list_display = ('id', 'banner', 'deactivated', 'created_at')
     list_display_links = ('id', 'banner')
-    list_filter = ('deactivated', 'created_at')
+    list_filter = ('site', 'deactivated', 'created_at')
     search_fields = ('id',)
     search_help_text = _('Search By ID')
