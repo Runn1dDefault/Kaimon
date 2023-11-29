@@ -16,7 +16,7 @@ from service.mixins import CurrencyMixin, CachingMixin
 from service.filters import ListFilter, SiteFilter
 from service.utils import recursive_single_tree
 
-from .filters import CategoryLevelFilter, ProductReferenceFilter, ProductTagFilter
+from .filters import CategoryLevelFilter, ProductReferenceFilter, ProductTagFilter, ProductOrdering
 from .models import Category, Product, Tag, ProductReview, ProductInventory
 from .paginations import CategoryPagination, ProductReviewPagination, ProductPagination
 from .serializers import (
@@ -79,7 +79,7 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
     retrieve_serializer_class = ProductDetailSerializer
     lookup_url_kwarg = "product_id"
     lookup_field = "id"
-    filter_backends = (SiteFilter, ListFilter, ProductTagFilter, ProductReferenceFilter, SearchFilter, OrderingFilter)
+    filter_backends = (SiteFilter, ListFilter, ProductTagFilter, ProductReferenceFilter, SearchFilter, ProductOrdering)
     list_filter_fields = {"product_ids": "id", "category_ids": "categories__id"}
     search_fields = ("name", "categories__name", "inventories__name")
     ordering_fields = ("created_at",)

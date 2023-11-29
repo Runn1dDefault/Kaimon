@@ -1,7 +1,7 @@
 from django.db.models import Subquery, Q
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
-from rest_framework.filters import BaseFilterBackend
+from rest_framework.filters import BaseFilterBackend, OrderingFilter
 
 from .models import Category
 
@@ -91,3 +91,10 @@ class ProductTagFilter(BaseFilterBackend):
                 }
             }
         ]
+
+
+class ProductOrdering(OrderingFilter):
+    def filter_queryset(self, request, queryset, view):
+        queryset = super().filter_queryset(request, queryset, view)
+        return queryset.filter(inventories__isnull=False, images__isnull=False)
+
