@@ -64,10 +64,9 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
     @method_decorator(cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache',
                                  key_prefix='category_tags'))
     @action(methods=['GET'], detail=True, url_path='tags')
-    def tags(self, request, **kwargs):
-        category = self.get_object()
+    def tags(self, request, category_id):
         return Response(
-            Tag.collections.filter(products__in=category.products.all()).grouped_tags()
+            Tag.collections.filter(products__categories__id=category_id).grouped_tags()
         )
 
 
