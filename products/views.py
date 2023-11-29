@@ -64,13 +64,11 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
     @method_decorator(cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache',
                                  key_prefix='category_tags'))
     @action(methods=['GET'], detail=True, url_path='tags')
-    def tags(self, request, category_id):
-        return Response(
-            Tag.collections.filter(
-                Q(products__categories__id=category_id) |
-                Q(product_inventories__product__categories__id=category_id)
-            ).grouped_tags()
-        )
+    def tags(self, request, **kwargs):
+        category = self.get_object()
+        product_ids = category.products.values_list('id', flat=True)
+        inventory_ids = ProductInventory.objects.filter(product_id__in=product_ids).values_list('id', flat=True)
+        return Response(Tag.collections.filter(product_inventories__in=inventory_ids).grouped_tags())
 
 
 class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
