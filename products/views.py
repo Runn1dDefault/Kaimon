@@ -73,7 +73,7 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
 
 class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
     permission_classes = (AllowAny,)
-    queryset = Product.objects.filter(is_active=True, inventories__isnull=False, images__isnull=False)
+    queryset = Product.objects.filter(is_active=True)
     pagination_class = ProductPagination
     serializer_class = ShortProductSerializer
     retrieve_serializer_class = ProductDetailSerializer
