@@ -37,12 +37,6 @@ class ShortProductSerializer(serializers.ModelSerializer):
         if image:
             return image.url
 
-    def update(self, instance, validated_data):
-        raise NotImplementedError('`update()` not implemented.')
-
-    def create(self, validated_data):
-        raise NotImplementedError('`create()` not implemented.')
-
 
 class ProductInventorySerializer(serializers.ModelSerializer):
     price = ConversionField()
