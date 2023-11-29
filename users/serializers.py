@@ -17,11 +17,10 @@ from .utils import smp_cache_key_for_email
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('email', 'full_name', 'role', 'image', 'email_confirmed', 'registration_payed')
+        fields = ('email', 'full_name', 'role', 'image', 'email_confirmed')
         extra_kwargs = {
             'role': {'read_only': True},
-            'email_confirmed': {'read_only': True},
-            'registration_payed': {'read_only': True},
+            'email_confirmed': {'read_only': True}
         }
 
     def __init__(self, instance=None, data=empty, show_fields: Iterable[str] = None, **kwargs):
@@ -91,7 +90,7 @@ class RegistrationSerializer(PasswordSerializer):
             email=email,
             password=validated_data['password'],
             full_name=validated_data['full_name'],
-            registration_payed=False,
+            registration_payed=True,
             email_confirmed=False,
             image=validated_data.get('image', None)
         )
