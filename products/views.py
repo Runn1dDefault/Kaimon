@@ -83,6 +83,7 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
     list_filter_fields = {"product_ids": "id", "category_ids": "categories__id"}
     search_fields = ("name", "categories__name", "inventories__name")
     ordering_fields = ("created_at",)
+    cache_timeout = 3600
 
     @classmethod
     def get_cache_prefix(cls) -> str:
