@@ -77,7 +77,10 @@ class ProductTagFilter(BaseFilterBackend):
             return queryset
 
         tag_ids = [tag_id for tag_id in tag_ids.split(',') if tag_id.strip()]
-        return queryset.filter(Q(tags__id__in=tag_ids) | Q(inventories__tags__id__in=tag_ids))
+        ids = queryset.filter(
+            Q(tags__id__in=tag_ids) | Q(inventories__tags__id__in=tag_ids)
+        ).values_list('id', flat=True)
+        return queryset.filter(id__in=ids)
 
     def get_schema_operation_parameters(self, view):
         return [
