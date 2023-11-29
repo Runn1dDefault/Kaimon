@@ -119,10 +119,8 @@ class ProductImage(models.Model):
     objects = models.Manager()
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
-    url = models.URLField(max_length=700)
-
-    class Meta:
-        indexes = (models.Index(fields=('product', 'url')),)
+    image = models.ImageField(upload_to='products/', blank=True, null=True)
+    url = models.URLField(max_length=700, blank=True, null=True)
 
 
 class ProductInventory(BaseModel):

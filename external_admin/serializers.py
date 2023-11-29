@@ -52,11 +52,11 @@ class TagAdminSerializer(serializers.ModelSerializer):
 
 class ProductImageAdminSerializer(serializers.ModelSerializer):
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), write_only=True, required=True)
-    url = serializers.URLField(required=True)
+    url = serializers.URLField(required=False)
 
     class Meta:
         model = ProductImage
-        fields = ('id', 'product', 'url')
+        fields = ('id', 'product', 'url', 'image')
 
 
 class CategoryAdminSerializer(serializers.ModelSerializer):
@@ -86,9 +86,10 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             return inventory.sale_price
 
     def get_image(self, instance):
-        image = instance.images.first()
-        if image:
-            return image.url
+        obj = instance.images.first()
+        if obj:
+            request = self.context['request']
+            return request.build_absolute_uri(obj.image.url) if obj.image else obj.url
 
 
 class ProductInventorySerializer(serializers.ModelSerializer):
@@ -150,8 +151,8 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
-    images = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
-    image_urls = serializers.ListField(child=serializers.URLField(), write_only=True, required=False)
+    images = serializers.SerializerMethodField(read_only=True)
+    set_images = serializers.ListField(child=serializers.ImageField(), write_only=True, required=True)
     discount = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -159,7 +160,7 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'name', 'description', 'site_avg_rating', 'site_reviews_count', 'avg_rating', 'reviews_count',
             'is_active', 'created_at', 'modified_at', 'category', 'tags', 'images', "discount", "categories",
-            "image_urls", 'can_choose_tags'
+            "set_images", 'can_choose_tags'
         )
         extra_kwargs = {
             'id': {'read_only': True},
@@ -170,6 +171,13 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
             'created_at': {'read_only': True},
             'modified_at': {'read_only': True}
         }
+
+    def get_images(self, instance) -> list[str]:
+        request = self.context['request']
+        return [
+            request.build_absolute_uri(obj.image.url) if obj.image else obj.url
+            for obj in instance.images.all()
+        ]
 
     def get_discount(self, instance):
         promotion = instance.promotions.active_promotions().first()
@@ -195,7 +203,7 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         category = validated_data.pop('category', None)
-        images = validated_data.pop('image_urls', None)
+        images = validated_data.pop('set_images', None)
         tags = validated_data.pop('tags', None)
         product = super().create(validated_data)
         if category:
@@ -204,12 +212,12 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
         if tags:
             product.tags.add(*tags)
         if images:
-            ProductImage.objects.bulk_create([ProductImage(product=product, url=url) for url in images])
+            ProductImage.objects.bulk_create([ProductImage(product=product, image=image) for image in images])
         return product
 
     def update(self, instance, validated_data):
         category = validated_data.pop('category', None)
-        images = validated_data.pop('image_urls', None)
+        images = validated_data.pop('set_images', None)
         tags = validated_data.pop('tags', None)
         if category:
             category_tree = recursive_single_tree(category, "parent")
@@ -220,7 +228,7 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
             instance.tags.add(*tags)
         if images:
             ProductImage.objects.filter(product=instance).delete()
-            ProductImage.objects.bulk_create([ProductImage(product=instance, url=url) for url in images])
+            ProductImage.objects.bulk_create([ProductImage(product=instance, image=image) for image in images])
         return super().update(instance, validated_data)
 
 

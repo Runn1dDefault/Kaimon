@@ -115,7 +115,7 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     list_serializer_class = ProductAdminSerializer
     serializer_class = ProductDetailAdminSerializer
     pagination_class = AdminPagePagination
-    parser_classes = (parsers.JSONParser,)
+    parser_classes = (parsers.JSONParser, parsers.FormParser, parsers.MultiPartParser)
     lookup_url_kwarg = 'product_id'
     lookup_field = 'id'
     filter_backends = (filters.SearchFilter, SiteFilter, ListFilter)

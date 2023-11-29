@@ -3,7 +3,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.http import HttpResponseNotFound
 from django.shortcuts import get_object_or_404, render
-from drf_spectacular.utils import extend_schema_view, extend_schema
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, generics, mixins, parsers, permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -54,7 +54,7 @@ class OrderViewSet(
     filter_backends = (ListFilter,)
     list_filter_fields = {'status': 'status'}
 
-    @extend_schema_view(get=extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM]))
+    @extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM])
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 

@@ -33,9 +33,10 @@ class ShortProductSerializer(serializers.ModelSerializer):
             return inventory.sale_price
 
     def get_image(self, instance):
-        image = instance.images.first()
-        if image:
-            return image.url
+        obj = instance.images.first()
+        if obj:
+            request = self.context['request']
+            return request.build_absolute_uri(obj.image.url) if obj.image else obj.url
 
 
 class ProductInventorySerializer(serializers.ModelSerializer):
@@ -85,7 +86,7 @@ class ProductInventorySerializer(serializers.ModelSerializer):
 
 
 class ProductDetailSerializer(serializers.ModelSerializer):
-    images = serializers.SlugRelatedField(many=True, read_only=True, slug_field='url')
+    images = serializers.SerializerMethodField(read_only=True)
     tags = serializers.SerializerMethodField(read_only=True)
     inventories = ProductInventorySerializer(many=True, read_only=True)
 
@@ -98,6 +99,13 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         return Tag.collections.filter(
             Q(products__id=instance.id) | Q(product_inventories__product_id=instance.id)
         ).grouped_tags()
+
+    def get_images(self, instance) -> list[str]:
+        request = self.context['request']
+        return [
+            request.build_absolute_uri(obj.image.url) if obj.image else obj.url
+            for obj in instance.images.all()
+        ]
 
 
 class ProductReviewSerializer(serializers.ModelSerializer):
