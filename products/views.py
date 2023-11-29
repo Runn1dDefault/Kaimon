@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db.models import Subquery
+from django.db.models import Subquery, Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from drf_spectacular.utils import extend_schema
@@ -66,7 +66,10 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
     @action(methods=['GET'], detail=True, url_path='tags')
     def tags(self, request, category_id):
         return Response(
-            Tag.collections.filter(products__categories__id=category_id).grouped_tags()
+            Tag.collections.filter(
+                Q(products__categories__id=category_id) |
+                Q(product_inventories__product__categories__id=category_id)
+            ).grouped_tags()
         )
 
 
