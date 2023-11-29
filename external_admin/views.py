@@ -356,7 +356,8 @@ class PromotionAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
     parser_classes = (MultiPartParser, FormParser, JSONParser)
     lookup_field = 'id'
     lookup_url_kwarg = 'promotion_id'
-    filter_backends = (SearchFilter, SiteFilter, OrderingFilter)
+    filter_backends = (FilterByFields, SearchFilter, SiteFilter, OrderingFilter)
+    filter_fields = {'deactivated': {'db_field': 'deactivated', 'type': 'boolean'}}
     search_fields = ('id', 'banner__name',)
     ordering_fields = ('id', 'created_at',)
 
