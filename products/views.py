@@ -16,7 +16,7 @@ from service.mixins import CurrencyMixin, CachingMixin
 from service.filters import ListFilter, SiteFilter
 from service.utils import recursive_single_tree
 
-from .filters import CategoryLevelFilter, ProductReferenceFilter, ProductTagFilter, ProductOrdering
+from .filters import CategoryLevelFilter, ProductReferenceFilter, ProductTagFilter
 from .models import Category, Product, Tag, ProductReview, ProductInventory
 from .paginations import CategoryPagination, ProductReviewPagination, ProductPagination
 from .serializers import (
