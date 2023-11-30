@@ -52,6 +52,10 @@ class Category(BaseModel):
 
     class Meta:
         verbose_name_plural = _('Categories')
+        indexes = (
+            models.Index(fields=("id", "name")),
+            models.Index(fields=("id", "level")),
+        )
 
     @property
     def short_name(self):
@@ -84,6 +88,11 @@ class Tag(BaseModel):
     name = models.CharField(max_length=100)
     group = models.ForeignKey('self', on_delete=models.CASCADE, related_name='children', null=True, blank=True)
 
+    class Meta:
+        indexes = (
+            models.Index(fields=("id", "name")),
+        )
+
     def __str__(self):
         if self.group:
             return f"{self.name} ({self.group.name})"
@@ -114,6 +123,13 @@ class Product(BaseModel):
     def __str__(self):
         return self.id
 
+    class Meta:
+        indexes = (
+            models.Index(fields=("id", "name")),
+            models.Index(fields=("id", "description")),
+
+        )
+
 
 class ProductImage(models.Model):
     objects = models.Manager()
@@ -128,7 +144,7 @@ class ProductInventory(BaseModel):
     item_code = models.CharField(max_length=100)
     site_price = models.DecimalField(max_digits=20, decimal_places=10)
     product_url = models.URLField(max_length=700)
-    name = models.CharField(max_length=255, blank=True, null=True)
+    name = models.CharField(max_length=255)
     tags = models.ManyToManyField(Tag, blank=True, related_name='product_inventories')
     quantity = models.PositiveIntegerField(null=True, blank=True)
     status_code = models.CharField(max_length=100, blank=True, null=True)
@@ -144,7 +160,14 @@ class ProductInventory(BaseModel):
 
     @property
     def price(self):
+        if self.increase_per <= 0:
+            return self.sale_price
         return increase_price(self.site_price, self.increase_per)
+
+    class Meta:
+        indexes = (
+            models.Index(fields=("id", "name")),
+        )
 
 
 class ReviewAnalyticsQuerySet(BaseAnalyticsQuerySet):
