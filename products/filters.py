@@ -94,12 +94,9 @@ class ProductSearchFilter(BaseFilterBackend):
             sql = Product.objects.raw(
                 """
                 SELECT DISTINCT ON (p.id) p.id, p.name, p.avg_rating, p.reviews_count FROM products_product as p
-                LEFT OUTER JOIN products_productinventory as pi ON (p.id = pi.product_id)
-                    WHERE p.is_active = true
-                    AND p.id LIKE %s
-                    AND (p.name ILIKE %s OR pi.name ILIKE %s) 
+                    WHERE p.id LIKE %s AND p.is_active AND p.name ILIKE %s
                     LIMIT %s OFFSET %s;
-                """, [site + "%", search_term, search_term, limit, offset]
+                """, [site + "%", search_term, limit, offset]
             )
             return sql
         return queryset
