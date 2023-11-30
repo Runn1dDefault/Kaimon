@@ -151,10 +151,14 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
         )
 
 
-class ProductSearchView(CurrencyMixin, ListAPIView):
+class ProductSearchView(CachingMixin, CurrencyMixin, ListAPIView):
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ShortProductSerializer
     filter_backends = (SiteFilter, ProductSearchFilter,)
+
+    @classmethod
+    def get_cache_prefix(cls) -> str:
+        return 'product'
 
 
 class ProductReviewsAPIView(ListAPIView):
