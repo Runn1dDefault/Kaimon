@@ -3,7 +3,6 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, mixins, viewsets, status, filters, parsers
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -146,19 +145,14 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
-    @extend_schema(responses={status.HTTP_204_NO_CONTENT: None}, request=ProductImageAdminSerializer)
+    @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
     @action(
         methods=['DELETE'],
-        detail=False,
-        url_path='remove-image'
+        detail=True,
+        url_path='remove-image/(?P<image_id>.+)'
     )
-    def remove_image(self, request, **kwargs):
-        serializer = ProductImageAdminSerializer(data=request.data, many=False, context=self.get_serializer_context())
-        serializer.is_valid(raise_exception=True)
-        product = serializer.validated_data['product']
-        image = product.images.filter(url=serializer.validated_data['url']).first()
-        if not image:
-            raise ValidationError({'url': _('Image url does not exists!')})
+    def remove_image(self, request, product_id, image_id):
+        image = get_object_or_404(ProductImage.objects.filter(product_id=product_id), id=image_id)
         image.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

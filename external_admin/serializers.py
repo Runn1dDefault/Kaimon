@@ -155,7 +155,7 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
-    images = serializers.SerializerMethodField(read_only=True)
+    images = ProductImageAdminSerializer(many=True, read_only=True)
     set_images = serializers.ListField(child=serializers.ImageField(), write_only=True, required=True)
     discount = serializers.SerializerMethodField(read_only=True)
 
@@ -175,13 +175,6 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
             'created_at': {'read_only': True},
             'modified_at': {'read_only': True}
         }
-
-    def get_images(self, instance) -> list[str]:
-        request = self.context['request']
-        return [
-            request.build_absolute_uri(obj.image.url) if obj.image else obj.url
-            for obj in instance.images.all()
-        ]
 
     def get_discount(self, instance):
         promotion = instance.promotions.active_promotions().first()
