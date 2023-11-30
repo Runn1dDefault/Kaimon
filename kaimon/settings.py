@@ -103,6 +103,7 @@ DATABASES = {
     }
 }
 
+CONN_MAX_AGE = 300
 DATABASE_ROUTERS = ["kaimon.routers.PrimaryReplicaRouter"]
 
 # Password validation
@@ -270,3 +271,21 @@ DEFAULT_INCREASE_PRICE_PER = 15
 CRAWLER_URL = config("CRAWLER_URL")
 QR_URL_TEMPLATE = config("QR_URL_TEMPLATE")
 PRODUCT_URL_TEMPLATE = config("PRODUCT_URL_TEMPLATE")
+
+
+LOGGING = {
+    'version': 1,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django.db.backends': {
+            'level': 'DEBUG',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+    }
+}
