@@ -11,7 +11,7 @@ from rest_framework.response import Response
 
 from products.filters import CategoryLevelFilter
 from service.models import Conversion
-from products.models import Product, ProductReview, Tag, Category, ProductInventory
+from products.models import Product, ProductReview, Tag, Category, ProductInventory, ProductImage
 from promotions.models import Promotion
 from service.utils import recursive_single_tree
 from users.models import User
@@ -27,7 +27,7 @@ from .serializers import (
     ProductImageAdminSerializer, UserAdminSerializer, TagAdminSerializer,
     ProductReviewAdminSerializer, OrderAnalyticsSerializer, UserAnalyticsSerializer, ReviewAnalyticsSerializer,
     OrderAdminSerializer, CategoryAdminSerializer, ReceiptAdminSerializer, ProductInventorySerializer,
-    BaseOrderAdminSerializer
+    BaseOrderAdminSerializer, ProductImageLoaderSerializer
 )
 
 
@@ -132,13 +132,19 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         genre.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @extend_schema(responses={status.HTTP_200_OK: None}, request=ProductImageAdminSerializer)
-    @action(methods=['POST'], detail=False, url_path='add-image')
+    @extend_schema(responses={status.HTTP_200_OK: None}, request=ProductImageLoaderSerializer)
+    @action(methods=['POST'], detail=True, url_path='add-images')
     def add_new_image(self, request, **kwargs):
-        serializer = ProductImageAdminSerializer(data=request.data, many=False, context=self.get_serializer_context())
+        product = self.get_object()
+        serializer = ProductImageLoaderSerializer(data=request.data, many=False, context=self.get_serializer_context())
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        images = ProductImage.objects.bulk_create(
+            [ProductImage(product=product, image=image) for image in serializer.data['images']]
+        )
+        return Response(
+            ProductImageAdminSerializer(instance=images, many=True).data,
+            status=status.HTTP_200_OK
+        )
 
     @extend_schema(responses={status.HTTP_204_NO_CONTENT: None}, request=ProductImageAdminSerializer)
     @action(

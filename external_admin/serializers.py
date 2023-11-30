@@ -50,6 +50,10 @@ class TagAdminSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', "group", "group_id")
 
 
+class ProductImageLoaderSerializer(serializers.Serializer):
+    images = serializers.ListField(child=serializers.ImageField(), write_only=True, required=True)
+
+
 class ProductImageAdminSerializer(serializers.ModelSerializer):
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), write_only=True, required=True)
     url = serializers.URLField(required=False)
