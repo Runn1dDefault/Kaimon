@@ -1,9 +1,10 @@
 from django.db.models import Subquery, Q
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
-from rest_framework.filters import BaseFilterBackend, OrderingFilter
+from rest_framework.exceptions import ValidationError
+from rest_framework.filters import BaseFilterBackend
 
-from .models import Category
+from .models import Category, Product
 
 
 class CategoryLevelFilter(BaseFilterBackend):
@@ -62,6 +63,76 @@ class ProductReferenceFilter(BaseFilterBackend):
                 'schema': {
                     'type': 'string',
                     'default': '0'
+                }
+            }
+        ]
+
+
+class ProductSearchFilter(BaseFilterBackend):
+    def filter_queryset(self, request, queryset, view):
+        search_term = request.query_params.get('search')
+        if not search_term:
+            raise ValidationError({'detail': "search is required!"})
+
+        site = request.query_params.get('site', 'rakuten')
+        try:
+            page = abs(int(request.query_params.get('page', 1)))
+        except ValueError:
+            page = 1
+
+        try:
+            limit = abs(int(request.query_params.get('page_size', 10)))
+        except ValueError:
+            limit = 20
+        else:
+            if limit > 20:
+                limit = 20
+
+        if search_term:
+            offset = limit * page if page > 1 else 0
+            search_term = f"%{search_term}%"
+            sql = Product.objects.raw(
+                """
+                SELECT DISTINCT ON (p.id) p.id, p.name, p.avg_rating, p.reviews_count FROM products_product as p
+                LEFT OUTER JOIN products_productinventory as pi ON (p.id = pi.product_id)
+                    WHERE p.is_active = true
+                    AND p.id LIKE %s
+                    AND (p.name ILIKE %s OR pi.name ILIKE %s) 
+                    LIMIT %s OFFSET %s;
+                """, [site + "%", search_term, search_term, limit, offset]
+            )
+            return sql
+        return queryset
+
+    def get_schema_operation_parameters(self, view):
+        return [
+            {
+                'name': 'search',
+                'required': True,
+                'in': 'query',
+                'description': '',
+                'schema': {
+                    'type': 'string'
+                }
+            },
+            {
+                'name': 'page',
+                'required': False,
+                'in': 'query',
+                'description': '',
+                'schema': {
+                    'type': 'number',
+                    'default': 1
+                }
+            },
+            {
+                'name': 'page_size',
+                'required': False,
+                'in': 'query',
+                'description': '',
+                'schema': {
+                    'type': 'string',
+                    'default': 10
                 }
             }
         ]

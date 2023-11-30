@@ -2,6 +2,7 @@ from django.db.models import Q
 from rest_framework import serializers
 
 from service.serializers import ConversionField
+from service.utils import get_currency_by_id, get_currencies_price_per, convert_price
 
 from .models import Category, Product, ProductInventory, ProductReview, Tag
 
@@ -13,27 +14,34 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ShortProductSerializer(serializers.ModelSerializer):
-    price = ConversionField(method_name='get_price')
-    sale_price = ConversionField(method_name='get_sale_price')
+    prices = serializers.SerializerMethodField(read_only=True)
     image = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'sale_price', 'image', 'avg_rating',
-                  'reviews_count', 'site_avg_rating', 'site_reviews_count')
+        fields = ('id', 'name', 'prices', 'image', 'avg_rating', 'reviews_count')
 
-    def get_price(self, instance):
-        inventory = instance.inventories.first()
-        if inventory:
-            return inventory.price
+    def get_prices(self, instance):
+        inventory = instance.inventories.only("sale_price", "site_price", "increase_per").first()
+        if not inventory:
+            return
 
-    def get_sale_price(self, instance):
-        inventory = instance.inventories.first()
-        if inventory:
-            return inventory.sale_price
+        inst_currency = get_currency_by_id(instance.id)
+        currency = self.context['currency']
+        if currency != inst_currency:
+            price_per = get_currencies_price_per(currency_from=inst_currency, currency_to=currency)
+            return {
+                "price": convert_price(inventory.price, price_per) if price_per else None,
+                "sale_price": convert_price(inventory.sale_price, price_per)
+                if price_per and inventory.sale_price else None
+            }
+        return {
+            "price": inventory.price,
+            "sale_price": inventory.sale_price,
+        }
 
     def get_image(self, instance):
-        obj = instance.images.first()
+        obj = instance.images.only("image", "url").first()
         if obj:
             request = self.context['request']
             return request.build_absolute_uri(obj.image.url) if obj.image else obj.url
@@ -56,7 +64,7 @@ class ProductInventorySerializer(serializers.ModelSerializer):
         if 'uniqlo' not in instance.id:
             return
 
-        size = instance.tags.filter(group_id="uniqlo_s1izes").first()
+        size = instance.tags.filter(group_id="uniqlo_s1izes").only("id").first()
         if size:
             return size.id
 
@@ -64,7 +72,7 @@ class ProductInventorySerializer(serializers.ModelSerializer):
         if 'uniqlo' not in instance.id:
             return
 
-        size = instance.tags.filter(group_id="uniqlo_s1izes").first()
+        size = instance.tags.filter(group_id="uniqlo_s1izes").only("name").first()
         if size:
             return size.name
 
@@ -72,7 +80,7 @@ class ProductInventorySerializer(serializers.ModelSerializer):
         if 'uniqlo' not in instance.id:
             return
 
-        color = instance.tags.filter(group_id="uniqlo_c1olors").first()
+        color = instance.tags.filter(group_id="uniqlo_c1olors").only("name").first()
         if color:
             return color.name
 
@@ -80,7 +88,7 @@ class ProductInventorySerializer(serializers.ModelSerializer):
         if 'uniqlo' not in instance.id:
             return
 
-        color = instance.tags.filter(group_id="uniqlo_c1olors").first()
+        color = instance.tags.filter(group_id="uniqlo_c1olors").only("id").first()
         if color:
             return color.id
 
@@ -93,7 +101,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = ('id', 'name',  'description',  'avg_rating', 'reviews_count', 'can_choose_tags',
-                  'site_avg_rating', 'site_reviews_count', 'images', 'tags', 'inventories')
+                  'images', 'inventories', 'tags')
 
     def get_tags(self, instance):
         return Tag.collections.filter(
@@ -104,7 +112,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         request = self.context['request']
         return [
             request.build_absolute_uri(obj.image.url) if obj.image else obj.url
-            for obj in instance.images.all()
+            for obj in instance.images.all().only("url", "image")
         ]
 
 

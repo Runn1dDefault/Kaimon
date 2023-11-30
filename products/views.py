@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db.models import Subquery
+from django.db.models import Subquery, Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from drf_spectacular.utils import extend_schema
@@ -16,7 +16,7 @@ from service.mixins import CurrencyMixin, CachingMixin
 from service.filters import ListFilter, SiteFilter
 from service.utils import recursive_single_tree
 
-from .filters import CategoryLevelFilter, ProductReferenceFilter, ProductTagFilter
+from .filters import CategoryLevelFilter, ProductReferenceFilter, ProductTagFilter, ProductSearchFilter
 from .models import Category, Product, Tag, ProductReview, ProductInventory
 from .paginations import CategoryPagination, ProductReviewPagination, ProductPagination
 from .serializers import (
@@ -81,9 +81,15 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
     lookup_field = "id"
     filter_backends = (SiteFilter, ListFilter, ProductTagFilter, ProductReferenceFilter, SearchFilter, OrderingFilter)
     list_filter_fields = {"product_ids": "id", "category_ids": "categories__id"}
-    search_fields = ("name", "categories__name", "inventories__name")
+    search_fields = ("name", "inventories__name")
     ordering_fields = ("created_at",)
     cache_timeout = 3600
+
+    def get_queryset(self):
+        base_queryset = super().get_queryset()
+        if self.detail is False:
+            return base_queryset.only('id', 'name', 'avg_rating', 'reviews_count')
+        return base_queryset.only('id', 'name', 'description', 'avg_rating', 'reviews_count', 'can_choose_tags')
 
     @classmethod
     def get_cache_prefix(cls) -> str:
@@ -104,10 +110,13 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
 
     @method_decorator(cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache',
                                  key_prefix='product_tags'))
-    @action(methods=['GET'], detail=True, url_path='tags')
-    def tags(self, request, product_id):
+    @action(methods=['GET'], detail=True, url_path='tags/(?P<inventory_id>.+)')
+    def tags(self, request, product_id, inventory_id):
         return Response(
-            Tag.collections.filter(products__id=product_id).grouped_tags()
+            Tag.collections.filter(
+                Q(products__id=product_id) |
+                Q(product_inventories__id=inventory_id)
+            ).grouped_tags()
         )
 
     @extend_schema(request=ProductReferenceSerializer)
@@ -132,18 +141,20 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
     @method_decorator(cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache',
                                  key_prefix='product_inventories'))
     @action(methods=['GET'], detail=True, url_path="inventories")
-    def get_inventories(self, request, product_id):
-        inventories = ProductInventory.objects.filter(product_id=product_id, product__is_active=True)
-        serializer = ProductInventorySerializer(instance=inventories, many=True, context=self.get_serializer_context())
-        return Response(serializer.data)
-
-    @method_decorator(cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache',
-                                 key_prefix='product_inventories_tags'))
-    @action(methods=['GET'], detail=True, url_path='inventories_tags')
-    def get_inventories_tags(self, request, product_id):
+    def get_inventories(self, request, **kwargs):
         return Response(
-            Tag.collections.filter(product_inventories__product_id=product_id).grouped_tags()
+            ProductInventorySerializer(
+                instance=self.get_object().inventories.all(),
+                many=True,
+                context=self.get_serializer_context()
+            ).data
         )
+
+
+class ProductSearchView(CurrencyMixin, ListAPIView):
+    queryset = Product.objects.filter(is_active=True)
+    serializer_class = ShortProductSerializer
+    filter_backends = (SiteFilter, ProductSearchFilter,)
 
 
 class ProductReviewsAPIView(ListAPIView):
@@ -174,7 +185,7 @@ class UserReviewViewSet(
     GenericViewSet
 ):
     permission_classes = (IsAuthenticated, EmailConfirmedPermission, RegistrationPayedPermission, IsAuthor)
-    queryset = ProductReview.objects.filter(moderated=True)
+    queryset = ProductReview.objects.filter(moderated=True).only("id", "rating", "comment", "created_at")
     serializer_class = ProductReviewSerializer
     pagination_class = ProductReviewPagination
 
