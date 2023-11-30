@@ -53,5 +53,5 @@ def create_order_shipping_details(order_id: str):
         generate_qrcode(qr_filepath, url=settings.QR_URL_TEMPLATE.format(order_id=order_id, code=shipping_code))
 
         shipping_detail = OrderShipping(order_id=order_id, shipping_code=shipping_code)
-        shipping_detail.qrcode_image.name = qr_filepath
+        shipping_detail.qrcode_image.name = f'qrcodes/{qr_filename}'
         shipping_detail.save()
