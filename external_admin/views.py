@@ -138,10 +138,10 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         serializer = ProductImageLoaderSerializer(data=request.data, many=False, context=self.get_serializer_context())
         serializer.is_valid(raise_exception=True)
         images = ProductImage.objects.bulk_create(
-            [ProductImage(product=product, image=image) for image in serializer.data['images']]
+            [ProductImage(product=product, image=image) for image in serializer.validated_data['images']]
         )
         return Response(
-            ProductImageAdminSerializer(instance=images, many=True).data,
+            ProductImageAdminSerializer(instance=images, many=True, context=self.get_serializer_context()).data,
             status=status.HTTP_200_OK
         )
 
