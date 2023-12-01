@@ -15,7 +15,7 @@ def on_save_product(sender, instance, created, **kwargs):
 def on_save_category(sender, instance, created, **kwargs):
     CategoryViewSet.cache_clear()
     if not created:
-        update_category_products_activity.delay()
+        update_category_products_activity.delay(instance.id)
 
 
 @receiver(post_delete, sender=Product)
