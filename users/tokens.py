@@ -156,7 +156,7 @@ class RestoreToken(BaseRestore):
     def for_user(cls, user_id: int, code: str) -> Self:
         restore_code = RestoreCode(sub=user_id)
         if not restore_code.verify(code):
-            raise InvalidRestoreCode("code %s invalid or expired!" % code)
+            raise InvalidRestoreCode("incorrect!")
         token = cls(sub=user_id)
         token._generate(payload={"user_id": user_id})
         return token
