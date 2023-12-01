@@ -125,10 +125,6 @@ class RestoreToken(BaseRestore):
         return settings["TOKEN_LIVE_SECONDS"]
 
     @cached_property
-    def algorithm(self):
-        return settings["TOKEN_ALGORITHM"]
-
-    @cached_property
     def cache_key(self) -> str:
         return '%s%s' % (settings["TOKEN_PREFIX"], self.sub)
 
@@ -147,14 +143,14 @@ class RestoreToken(BaseRestore):
         token = jwt.encode(
             payload,
             server_settings.SECRET_KEY,
-            algorithm=self.algorithm
+            algorithm="HS256"
         )
         self._cache.set(self.cache_key, token, timeout=self.live_seconds)
         return token
 
     @classmethod
     def _decode(cls, raw_token):
-        return jwt.decode(raw_token, server_settings.SECRET_KEY, algorithms=[cls.algorithm])
+        return jwt.decode(raw_token, server_settings.SECRET_KEY, algorithms=["HS256"])
 
     @classmethod
     def for_user(cls, user_id: int, code: str) -> Self:
