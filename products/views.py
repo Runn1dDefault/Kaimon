@@ -1,12 +1,13 @@
 from django.conf import settings
-from django.db.models import Subquery, Q
+from django.db.models import Subquery
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import mixins
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, GenericAPIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet, GenericViewSet
@@ -16,13 +17,12 @@ from service.mixins import CurrencyMixin, CachingMixin
 from service.filters import ListFilter, SiteFilter
 from service.utils import recursive_single_tree
 
-from .filters import CategoryLevelFilter, ProductReferenceFilter, ProductTagFilter, ProductSearchFilter
-from .models import Category, Product, Tag, ProductReview, ProductInventory
+from .filters import CategoryLevelFilter, ProductPopularFilter, ProductTagFilter, ProductSearchFilter, ProductFilter
+from .models import Category, Product, Tag, ProductReview
 from .paginations import CategoryPagination, ProductReviewPagination, ProductPagination
 from .serializers import (
     CategorySerializer,
-    ShortProductSerializer, ProductDetailSerializer, ProductReferenceSerializer, ProductReviewSerializer,
-    ProductInventorySerializer
+    ShortProductSerializer, ProductDetailSerializer, ProductReferenceSerializer, ProductReviewSerializer
 )
 
 
@@ -64,36 +64,35 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
     @method_decorator(cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache',
                                  key_prefix='category_tags'))
     @action(methods=['GET'], detail=True, url_path='tags')
-    def tags(self, request, **kwargs):
-        category = self.get_object()
-        product_ids = category.products.values_list('id', flat=True)
-        inventory_ids = ProductInventory.objects.filter(product_id__in=product_ids).values_list('id', flat=True)
-        return Response(Tag.collections.filter(product_inventories__in=inventory_ids).grouped_tags())
+    def tags(self, request, category_id):
+        return Response(
+            Tag.collections.filter(
+                product_inventories__product__categories=category_id
+            ).grouped_tags()
+        )
 
 
-class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
-    permission_classes = (AllowAny,)
+class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
     queryset = Product.objects.filter(is_active=True)
-    pagination_class = ProductPagination
     serializer_class = ShortProductSerializer
     retrieve_serializer_class = ProductDetailSerializer
+    pagination_class = ProductPagination
+    permission_classes = (AllowAny,)
     lookup_url_kwarg = "product_id"
     lookup_field = "id"
-    filter_backends = (SiteFilter, ListFilter, ProductTagFilter, ProductReferenceFilter, SearchFilter, OrderingFilter)
+    filter_backends = (SiteFilter, ListFilter, ProductTagFilter, ProductPopularFilter, OrderingFilter, ProductFilter)
     list_filter_fields = {"product_ids": "id", "category_ids": "categories__id"}
-    search_fields = ("name", "inventories__name")
     ordering_fields = ("created_at",)
     cache_timeout = 3600
-
-    def get_queryset(self):
-        base_queryset = super().get_queryset()
-        if self.detail is False:
-            return base_queryset.only('id', 'name', 'avg_rating', 'reviews_count')
-        return base_queryset.only('id', 'name', 'description', 'avg_rating', 'reviews_count', 'can_choose_tags')
 
     @classmethod
     def get_cache_prefix(cls) -> str:
         return "product"
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET' and self.lookup_url_kwarg in self.kwargs:
+            return self.retrieve_serializer_class
+        return self.serializer_class
 
     @extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM])
     def list(self, request, *args, **kwargs):
@@ -103,58 +102,71 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
 
-    def get_serializer_class(self):
-        if self.detail:
-            return self.retrieve_serializer_class
-        return self.serializer_class
-
     @method_decorator(cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache',
                                  key_prefix='product_tags'))
-    @action(methods=['GET'], detail=True, url_path='tags/(?P<inventory_id>.+)')
-    def tags(self, request, product_id, inventory_id):
-        return Response(
-            Tag.collections.filter(
-                Q(products__id=product_id) |
-                Q(product_inventories__id=inventory_id)
-            ).grouped_tags()
-        )
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="inventory_id",
+                type=OpenApiTypes.STR,
+                required=False
+            )
+        ]
+    )
+    @action(methods=['GET'], detail=True, url_path='tags')
+    def get_tags(self, request, product_id):
+        inventory_id = request.query_params.get("inventory_id")
 
-    @extend_schema(request=ProductReferenceSerializer)
-    @method_decorator(cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache',
-                                 key_prefix='product_reference'))
-    @action(methods=['POST'], detail=True, url_path='reference')
-    def get_reference(self, request, product_id):
-        reference_serializer = ProductReferenceSerializer(data=request.data, many=False)
-        reference_serializer.is_valid(raise_exception=True)
-        req_data = reference_serializer.validated_data
-        category = Subquery(Category.objects.filter(products__id=product_id).order_by('-level').values('id')[:1])
-        queryset = self.filter_queryset(self.get_queryset())
-        exclude_ids = (product_id, *req_data.get('exclude', []))
-        reference_queryset = (
-            queryset.exclude(id__in=exclude_ids).filter(categories__id=category)
-                    .order_by('-site_reviews_count', '-site_avg_rating')
-        )
-        page = self.paginate_queryset(reference_queryset)
-        data = self.serializer_class(instance=page, many=True, context=self.get_serializer_context()).data
-        return self.get_paginated_response(data)
-
-    @method_decorator(cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache',
-                                 key_prefix='product_inventories'))
-    @action(methods=['GET'], detail=True, url_path="inventories")
-    def get_inventories(self, request, **kwargs):
-        return Response(
-            ProductInventorySerializer(
-                instance=self.get_object().inventories.all(),
-                many=True,
-                context=self.get_serializer_context()
-            ).data
-        )
+        if inventory_id:
+            return Response(
+                Tag.collections.filter(product_inventories__id=inventory_id).grouped_tags()
+            )
+        return Response(Tag.collections.filter(product_inventories__product_id=product_id).grouped_tags())
 
 
-class ProductSearchView(CachingMixin, CurrencyMixin, ListAPIView):
+class ProductReferenceView(CachingMixin, CurrencyMixin, GenericAPIView):
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ShortProductSerializer
-    filter_backends = (SiteFilter, ProductSearchFilter,)
+    reference_serializer_class = ProductReferenceSerializer
+    pagination_class = ProductPagination
+    permission_classes = (AllowAny,)
+    lookup_url_kwarg = "product_id"
+    lookup_field = "id"
+    filter_backends = (SiteFilter, ProductFilter)
+
+    @classmethod
+    def get_cache_prefix(cls) -> str:
+        return 'product'
+
+    def get_reference_serializer(self, *args, **kwargs):
+        kwargs.setdefault('context', self.get_serializer_context())
+        return self.reference_serializer_class(*args, **kwargs)
+
+    def get_reference_data(self):
+        reference_serializer = self.get_reference_serializer(data=self.request.data)
+        reference_serializer.is_valid(raise_exception=True)
+        return reference_serializer.validated_data
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        reference_data = self.get_reference_data()
+        product_id = self.kwargs[self.lookup_url_kwarg]
+        exclude_ids = (product_id, *reference_data.get('exclude', []))
+        category = Subquery(Category.objects.filter(products__id=product_id).order_by('-level').values('id')[:1])
+        return queryset.exclude(id__in=exclude_ids).filter(categories__id=category)
+
+    def post(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class ProductsSearchView(CachingMixin, CurrencyMixin, ListAPIView):
+    queryset = Product.objects.filter(is_active=True)
+    serializer_class = ShortProductSerializer
+    permission_classes = (AllowAny,)
+    filter_backends = (ProductSearchFilter,)
 
     @classmethod
     def get_cache_prefix(cls) -> str:

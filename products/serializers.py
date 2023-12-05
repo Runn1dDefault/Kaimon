@@ -1,10 +1,12 @@
+import json
+
 from django.db.models import Q
 from rest_framework import serializers
 
 from service.serializers import ConversionField
-from service.utils import get_currency_by_id, get_currencies_price_per, convert_price
+from service.utils import get_currency_by_id, get_currencies_price_per, convert_price, increase_price
 
-from .models import Category, Product, ProductInventory, ProductReview, Tag
+from .models import Category, Product, ProductInventory, ProductReview, Tag, ProductImage
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -19,32 +21,69 @@ class ShortProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ('id', 'name', 'prices', 'image', 'avg_rating', 'reviews_count')
+        fields = ('id', 'name', 'avg_rating', 'reviews_count', 'prices', "image")
 
     def get_prices(self, instance):
-        inventory = instance.inventories.only("sale_price", "site_price", "increase_per").first()
-        if not inventory:
-            return
+        prices_template = {"price": 0.0, "sale_price": 0.0}
+        if isinstance(instance, dict):
+            inventory_info = instance.get("inventory_info", {})
+            if isinstance(inventory_info, str):
+                inventory_info = json.loads(inventory_info)
 
-        inst_currency = get_currency_by_id(instance.id)
+            if not inventory_info:
+                return prices_template
+
+            obj_id = instance.get('id')
+            site_price = inventory_info.get("site_price") or 0.0
+            increase_per = inventory_info.get("increase_per") or 0.0
+            sale_price = inventory_info.get("sale_price")
+        else:
+            inventory = instance.inventories.first()
+            if not inventory:
+                return prices_template
+
+            obj_id = instance.id
+            site_price = inventory.site_price
+            increase_per = inventory.increase_per
+            sale_price = inventory.sale_price
+
+        price = site_price if increase_per <= 0 else increase_price(site_price, increase_per)
         currency = self.context['currency']
-        if currency != inst_currency:
-            price_per = get_currencies_price_per(currency_from=inst_currency, currency_to=currency)
-            return {
-                "price": convert_price(inventory.price, price_per) if price_per else None,
-                "sale_price": convert_price(inventory.sale_price, price_per)
-                if price_per and inventory.sale_price else None
-            }
-        return {
-            "price": inventory.price,
-            "sale_price": inventory.sale_price,
-        }
+        obj_currency = get_currency_by_id(obj_id)
+
+        if currency != obj_currency:
+            price_per = get_currencies_price_per(currency_from=obj_currency, currency_to=currency)
+            prices_template['price'] = convert_price(price, price_per) if price_per else 0.0
+            prices_template['sale_price'] = convert_price(sale_price, price_per) if sale_price and price_per else None
+        else:
+            prices_template['price'] = price
+            prices_template['sale_price'] = sale_price
+
+        return prices_template
 
     def get_image(self, instance):
-        obj = instance.images.only("image", "url").first()
-        if obj:
+        if isinstance(instance, dict):
+            image_info = instance.get('image_info')
+            if not image_info:
+                return
+
+            if isinstance(image_info, str):
+                image_info = json.loads(image_info)
+
+            image = image_info.get("image")
+            url = image_info.get("url")
+        else:
+            image_obj = instance.images.only("url", "image").first()
+            if not image_obj:
+                return
+
+            image = image_obj.image
+            url = image_obj.url
+
+        if image:
             request = self.context['request']
-            return request.build_absolute_uri(obj.image.url) if obj.image else obj.url
+            return request.build_absolute_uri(image)
+        return url
 
 
 class ProductInventorySerializer(serializers.ModelSerializer):
@@ -93,27 +132,20 @@ class ProductInventorySerializer(serializers.ModelSerializer):
             return color.id
 
 
+class ProductImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductImage
+        fields = ('image', 'url')
+
+
 class ProductDetailSerializer(serializers.ModelSerializer):
-    images = serializers.SerializerMethodField(read_only=True)
-    tags = serializers.SerializerMethodField(read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True)
     inventories = ProductInventorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
         fields = ('id', 'name',  'description',  'avg_rating', 'reviews_count', 'can_choose_tags',
-                  'images', 'inventories', 'tags')
-
-    def get_tags(self, instance):
-        return Tag.collections.filter(
-            Q(products__id=instance.id) | Q(product_inventories__product_id=instance.id)
-        ).grouped_tags()
-
-    def get_images(self, instance) -> list[str]:
-        request = self.context['request']
-        return [
-            request.build_absolute_uri(obj.image.url) if obj.image else obj.url
-            for obj in instance.images.all().only("url", "image")
-        ]
+                  'images', 'inventories')
 
 
 class ProductReviewSerializer(serializers.ModelSerializer):

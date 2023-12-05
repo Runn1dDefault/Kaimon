@@ -9,7 +9,7 @@ class PrimaryReplicaRouter:
         """
         Reads go to a randomly-chosen replica.
         """
-        return random.choice(self.replicates)
+        return random.choice([self.primary, *self.replicates])
 
     def db_for_write(self, model, **hints):
         """

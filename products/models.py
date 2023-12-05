@@ -6,7 +6,6 @@ from django.db.models.functions import JSONObject, Round
 from django.template.defaultfilters import truncatechars
 from django.utils.translation import gettext_lazy as _
 
-from service.enums import Site
 from service.querysets import BaseAnalyticsQuerySet, AnalyticsFilterBy
 from service.utils import increase_price, uid_generate
 
@@ -16,26 +15,8 @@ class QuerySet(models.QuerySet):
         return self.filter(id__startswith=site)
 
 
-class SiteManager(models.Manager):
-    def get_queryset(self):
-        return QuerySet(self.model, using=self._db)
-
-    def queryset_by_site(self, site: str):
-        return self.get_queryset().filter_by_site(site)
-
-    @staticmethod
-    def _concat_id(site: Site, site_id: int | str):
-        return f"{site.value}:{site_id}"
-
-    def create_for_site(self, site: str, site_id: int | str, **extra_fields):
-        instance = self.model(**extra_fields)
-        instance.id = self._concat_id(Site.from_string(site), site_id)
-        instance.save(using=self._db)
-        return instance
-
-
 class BaseModel(models.Model):
-    objects = SiteManager()
+    objects = QuerySet.as_manager()
 
     id = models.CharField(primary_key=True, max_length=100, default=uid_generate)
 
@@ -107,6 +88,7 @@ class Product(BaseModel):
     can_choose_tags = models.BooleanField(default=False)
 
     categories = models.ManyToManyField(Category, related_name='products')
+    # TODO: category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
     tags = models.ManyToManyField(Tag, blank=True, related_name='products')
 
     avg_rating = models.FloatField(default=0)
@@ -126,8 +108,10 @@ class Product(BaseModel):
     class Meta:
         indexes = (
             models.Index(fields=("id", "name")),
-            models.Index(fields=("id", "description")),
-
+            models.Index(fields=("id", "is_active")),
+            models.Index(fields=("id", "is_active", "name")),
+            models.Index(fields=("id", "site_avg_rating", "site_reviews_count")),
+            models.Index(fields=("id", "created_at"))
         )
 
 
