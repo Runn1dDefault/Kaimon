@@ -8,6 +8,17 @@ from kaimon.celery import app
 from service.utils import get_translated_text, is_japanese_char
 
 from .models import Product, ProductInventory, Tag, Category
+from .views import CategoryViewSet, ProductsViewSet
+
+
+@app.task()
+def category_cache_clear():
+    CategoryViewSet.cache_clear()
+
+
+@app.task()
+def products_cache_clear():
+    ProductsViewSet.cache_clear()
 
 
 @app.task()

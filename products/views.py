@@ -14,10 +14,13 @@ from rest_framework.viewsets import ReadOnlyModelViewSet, GenericViewSet
 
 from users.permissions import EmailConfirmedPermission, RegistrationPayedPermission, IsAuthor
 from service.mixins import CurrencyMixin, CachingMixin
-from service.filters import ListFilter, SiteFilter
+from service.filters import SiteFilter
 from service.utils import recursive_single_tree
 
-from .filters import CategoryLevelFilter, ProductPopularFilter, ProductTagFilter, ProductSearchFilter, ProductFilter
+from .filters import (
+    CategoryLevelFilter, ProductFilter,
+    ProductSQLPopularFilter, ProductSQLSearchFilter, ProductSQLNewFilter
+)
 from .models import Category, Product, Tag, ProductReview
 from .paginations import CategoryPagination, ProductReviewPagination, ProductPagination
 from .serializers import (
@@ -72,7 +75,7 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
         )
 
 
-class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
+class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ShortProductSerializer
     retrieve_serializer_class = ProductDetailSerializer
@@ -80,10 +83,8 @@ class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
     permission_classes = (AllowAny,)
     lookup_url_kwarg = "product_id"
     lookup_field = "id"
-    filter_backends = (SiteFilter, ListFilter, ProductTagFilter, ProductPopularFilter, OrderingFilter, ProductFilter)
-    list_filter_fields = {"product_ids": "id", "category_ids": "categories__id"}
+    filter_backends = (SiteFilter, OrderingFilter, ProductFilter)
     ordering_fields = ("created_at",)
-    cache_timeout = 3600
 
     @classmethod
     def get_cache_prefix(cls) -> str:
@@ -166,7 +167,29 @@ class ProductsSearchView(CachingMixin, CurrencyMixin, ListAPIView):
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ShortProductSerializer
     permission_classes = (AllowAny,)
-    filter_backends = (ProductSearchFilter,)
+    filter_backends = (ProductSQLSearchFilter,)
+
+    @classmethod
+    def get_cache_prefix(cls) -> str:
+        return 'product'
+
+
+class NewProductsView(CachingMixin, CurrencyMixin, ListAPIView):
+    queryset = Product.objects.filter(is_active=True)
+    serializer_class = ShortProductSerializer
+    permission_classes = (AllowAny,)
+    filter_backends = (ProductSQLNewFilter,)
+
+    @classmethod
+    def get_cache_prefix(cls) -> str:
+        return 'product'
+
+
+class PopularProductsView(CachingMixin, CurrencyMixin, ListAPIView):
+    queryset = Product.objects.filter(is_active=True)
+    serializer_class = ShortProductSerializer
+    permission_classes = (AllowAny,)
+    filter_backends = (ProductSQLPopularFilter,)
 
     @classmethod
     def get_cache_prefix(cls) -> str:
