@@ -121,7 +121,7 @@ class ProductFilter(BaseFilterBackend):
 
         tag_ids = request.query_params.get(self.tag_ids_param)
         if tag_ids:
-            filters["tags__id__in"] = [tag_id for tag_id in tag_ids.split() if tag_id.strip()]
+            filters["tags__in"] = [tag_id for tag_id in tag_ids.split() if tag_id.strip()]
         return filters
 
     def filter_queryset(self, request, queryset, view):
@@ -345,3 +345,198 @@ class ProductSQLPopularFilter(BaseSQLProductsFilter):
         p.site_avg_rating desc
     LIMIT %s OFFSET %s;
     """
+
+
+class ProductsByCategorySQLFilter(BaseSQLProductsFilter):
+    sql = """
+    SELECT 
+        p.id,
+        p.name, 
+        p.avg_rating, 
+        p.reviews_count, 
+        (SELECT JSONB_BUILD_OBJECT(
+            ('site_price')::text, inv.site_price, 
+            ('sale_price')::text, inv.sale_price, 
+            ('increase_per')::text, inv.increase_per) AS inventory_info
+            FROM products_productinventory as inv WHERE inv.product_id = (p.id) LIMIT 1
+        ) AS inventory_info,
+        (SELECT JSONB_BUILD_OBJECT(
+            ('image')::text, img.image, 
+            ('url')::text, img.url) AS image_info 
+            FROM products_productimage as img WHERE img.product_id = (p.id) LIMIT 1
+        ) AS image_info 
+    FROM 
+        products_product as p
+    JOIN 
+        products_product_categories as pc ON p.id = pc.product_id
+    WHERE 
+        p.id LIKE %s 
+        AND p.is_active 
+        AND pc.category_id = %s
+    LIMIT %s OFFSET %s;
+    """
+    tags_filter_sql = """
+    SELECT 
+        p.id
+    FROM 
+        products_product as p
+    LEFT JOIN 
+        products_product_tags pt ON p.id = pt.product_id
+    LEFT JOIN 
+        products_productinventory pi ON p.id = pi.product_id
+    INNER JOIN
+        products_productinventory_tags pit ON pi.id = pit.productinventory_id
+    WHERE
+        pit.tag_id IN %s OR pt.tag_id IN %s
+    """
+    products_by_ids_sql = """
+    SELECT 
+        p.id,
+        p.name, 
+        p.avg_rating, 
+        p.reviews_count, 
+        (SELECT JSONB_BUILD_OBJECT(
+            ('site_price')::text, inv.site_price, 
+            ('sale_price')::text, inv.sale_price, 
+            ('increase_per')::text, inv.increase_per) AS inventory_info
+            FROM products_productinventory as inv WHERE inv.product_id = (p.id) LIMIT 1
+        ) AS inventory_info,
+        (SELECT JSONB_BUILD_OBJECT(
+            ('image')::text, img.image, 
+            ('url')::text, img.url) AS image_info 
+            FROM products_productimage as img WHERE img.product_id = (p.id) LIMIT 1
+        ) AS image_info 
+    FROM 
+        products_product as p
+    JOIN 
+        products_product_categories as pc ON p.id = pc.product_id
+    WHERE 
+        p.is_active 
+        AND pc.category_id = %s
+        AND p.id IN %s
+    LIMIT %s OFFSET %s;
+    """
+
+    def filter_queryset(self, request, queryset, view):
+        category_id = view.kwargs[view.lookup_url_kwarg]
+        tag_ids = tuple(
+            tag_id for tag_id in request.query_params.get("tag_ids", "").split(",") if tag_id.strip()
+        )
+        filters = self.get_filters(request)
+        site, limit, offset = filters['site'], filters['limit'], filters['offset']
+
+        with connection.cursor() as cursor:
+            if tag_ids:
+                cursor.execute(self.tags_filter_sql, [tag_ids, tag_ids])
+                product_ids = tuple(row[0] for row in cursor.fetchall())
+                cursor.execute(self.products_by_ids_sql, [category_id, product_ids, limit, offset])
+            else:
+                cursor.execute(self.sql, [site + "%", category_id, limit, offset])
+
+            columns = [col[0] for col in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+
+class ProductsByIdsSQlFilter(BaseSQLProductsFilter):
+    sql = """
+    SELECT 
+        p.id,
+        p.name, 
+        p.avg_rating, 
+        p.reviews_count, 
+        (SELECT JSONB_BUILD_OBJECT(
+            ('site_price')::text, inv.site_price, 
+            ('sale_price')::text, inv.sale_price, 
+            ('increase_per')::text, inv.increase_per) AS inventory_info
+            FROM products_productinventory as inv WHERE inv.product_id = (p.id) LIMIT 1
+        ) AS inventory_info,
+        (SELECT JSONB_BUILD_OBJECT(
+            ('image')::text, img.image, 
+            ('url')::text, img.url) AS image_info 
+            FROM products_productimage as img WHERE img.product_id = (p.id) LIMIT 1
+        ) AS image_info 
+    FROM 
+        products_product as p
+    WHERE 
+         p.is_active AND p.id IN %s 
+    LIMIT %s OFFSET %s;
+    """
+
+    def filter_queryset(self, request, queryset, view):
+        product_ids = tuple(
+            product_id for product_id in request.query_params.get("product_ids", "").split() if product_id.strip()
+        )
+        filters = self.get_filters(request)
+        limit, offset = filters['limit'], filters['offset']
+        with connection.cursor() as cursor:
+            cursor.execute(self.sql, [product_ids, limit, offset])
+            columns = [col[0] for col in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def get_schema_operation_parameters(self, view):
+        return [
+            {
+                'name': 'product_ids',
+                'required': True,
+                'in': 'query',
+                'description': '',
+                'schema': {
+                    'type': 'string'
+                }
+            }
+        ]
+
+
+class CategoryTagsFilter(BaseSQLProductsFilter):
+    sql = """
+    WITH TagWithRowNumber AS (
+        SELECT
+            pt.id AS tag_group_id,
+            pt.name AS tag_group_name,
+            COALESCE(
+                ARRAY_AGG(
+                    DISTINCT 
+                    JSONB_BUILD_OBJECT(
+                        ('id')::text, ptg.id,
+                        ('name')::text, ptg.name
+                    )
+                ),
+                '{}'
+            ) AS tags
+             AS tag_object,
+            ROW_NUMBER() OVER (PARTITION BY pt.id ORDER BY ptg.id) AS row_num
+        FROM
+            products_tag pt
+        INNER JOIN
+            products_tag ptg ON (pt.id = ptg.group_id)
+        INNER JOIN
+            products_productinventory_tags pit ON (ptg.id = pit.tag_id)
+        INNER JOIN
+            products_productinventory pi ON (pit.productinventory_id = pi.id)
+        INNER JOIN
+            products_product AS p ON (pi.product_id = p.id)
+        INNER JOIN
+            products_product_categories p_c ON (p.id = p_c.product_id)
+        WHERE
+            p.is_active 
+            AND p_c.category_id = %s
+            AND pt.group_id IS NULL
+        )
+        SELECT
+            tag_group_id,
+            tag_group_name,
+            COALESCE(
+                ARRAY_AGG(DISTINCT tag_object) FILTER (WHERE row_num <= 5),
+                '{}'
+            ) AS tags
+    """
+
+    def filter_queryset(self, request, queryset, view):
+        category_id = view.kwargs[view.lookup_url_kwarg]
+        with connection.cursor() as cursor:
+            cursor.execute(self.sql, [category_id])
+            columns = [col[0] for col in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def get_schema_operation_parameters(self, view):
+        return []

@@ -2,7 +2,8 @@ from django.contrib import admin
 from django.template.defaultfilters import truncatechars
 from django.utils.translation import gettext_lazy as _
 
-from .models import Site, Category, Tag, Product, ProductImage, ProductInventory, ProductReview
+from service.enums import Site
+from .models import Category, Tag, Product, ProductImage, ProductInventory, ProductReview
 
 
 class SiteFilter(admin.SimpleListFilter):

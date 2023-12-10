@@ -19,7 +19,8 @@ from service.utils import recursive_single_tree
 
 from .filters import (
     CategoryLevelFilter, ProductFilter,
-    ProductSQLPopularFilter, ProductSQLSearchFilter, ProductSQLNewFilter
+    ProductSQLPopularFilter, ProductSQLSearchFilter, ProductSQLNewFilter, ProductsByCategorySQLFilter,
+    ProductsByIdsSQlFilter
 )
 from .models import Category, Product, Tag, ProductReview
 from .paginations import CategoryPagination, ProductReviewPagination, ProductPagination
@@ -29,7 +30,7 @@ from .serializers import (
 )
 
 
-class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
+class CategoryViewSet(ReadOnlyModelViewSet):
     permission_classes = (AllowAny,)
     queryset = Category.objects.filter(level__gt=0, deactivated=False)
     serializer_class = CategorySerializer
@@ -64,18 +65,8 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
         serializer = self.get_serializer(instance=category_tree, many=True)
         return Response(serializer.data)
 
-    @method_decorator(cache_page(timeout=settings.PAGE_CACHED_SECONDS, cache='pages_cache',
-                                 key_prefix='category_tags'))
-    @action(methods=['GET'], detail=True, url_path='tags')
-    def tags(self, request, category_id):
-        return Response(
-            Tag.collections.filter(
-                product_inventories__product__categories=category_id
-            ).grouped_tags()
-        )
 
-
-class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
+class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ShortProductSerializer
     retrieve_serializer_class = ProductDetailSerializer
@@ -123,6 +114,25 @@ class ProductsViewSet(CachingMixin, CurrencyMixin, ReadOnlyModelViewSet):
                 Tag.collections.filter(product_inventories__id=inventory_id).grouped_tags()
             )
         return Response(Tag.collections.filter(product_inventories__product_id=product_id).grouped_tags())
+
+
+class ProductByCategoryView(CurrencyMixin, ListAPIView):
+    queryset = Product.objects.filter(is_active=True)
+    serializer_class = ShortProductSerializer
+    permission_classes = (AllowAny,)
+    filter_backends = (ProductsByCategorySQLFilter,)
+    lookup_url_kwarg = 'category_id'
+
+    @classmethod
+    def get_cache_prefix(cls) -> str:
+        return 'product'
+
+
+class ProductByIdsView(CurrencyMixin, ListAPIView):
+    queryset = Product.objects.filter(is_active=True)
+    serializer_class = ShortProductSerializer
+    permission_classes = (AllowAny,)
+    filter_backends = (ProductsByIdsSQlFilter,)
 
 
 class ProductReferenceView(CachingMixin, CurrencyMixin, GenericAPIView):
