@@ -12,8 +12,9 @@ from service.clients import fedex
 from service.serializers import ConversionField
 from service.utils import get_currency_by_id, convert_price
 
-from .models import DeliveryAddress, Order, Receipt
-from .utils import duplicate_delivery_address, get_product_yen_price, order_currencies_price_per, create_customer
+from .models import DeliveryAddress, Order, Receipt, PaymentTransactionReceipt
+from .utils import duplicate_delivery_address, get_product_yen_price, order_currencies_price_per, create_customer, \
+    init_paybox_transaction, get_receipt_usd_price
 
 
 class DeliveryAddressSerializer(serializers.ModelSerializer):
@@ -261,3 +262,35 @@ class FedexQuoteRateSerializer(serializers.Serializer):
             for rate in rate_details['ratedShipmentDetails']
         ]
         return data
+
+
+class InitPaymentSerializer(serializers.ModelSerializer):
+    order_id = serializers.PrimaryKeyRelatedField(
+        queryset=Order.objects.prefetch_related('receipts').filter(status=Order.Status.wait_payment),
+        write_only=True,
+        required=True
+    )
+
+    class Meta:
+        model = PaymentTransactionReceipt
+        fields = ("order", "send_amount", "redirect_url")
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        order = attrs['order_id']
+        if not user.orders.filter(id=order.id).exists():
+            raise serializers.ValidationError({"order_id": "request rejected"})
+
+        amount = sum([
+            get_receipt_usd_price(receipt) or 0
+            for receipt in order.receipts.only('discount', 'unit_price', 'quantity', 'site_currency').all()
+        ])
+
+        if amount <= 0:
+            raise serializers.ValidationError({"order_id": "request rejected"})
+
+        return {
+            "order": order,
+            "send_amount": amount,
+            **init_paybox_transaction(order, amount)
+        }

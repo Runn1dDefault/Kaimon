@@ -1,10 +1,13 @@
+from decimal import Decimal
+
+import xmltodict
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.http import HttpResponseNotFound
 from django.shortcuts import get_object_or_404, render
 from drf_spectacular.utils import extend_schema
-from rest_framework import viewsets, generics, mixins, parsers, permissions
+from rest_framework import views, viewsets, generics, mixins, parsers, permissions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -16,9 +19,9 @@ from service.utils import convert_price
 from users.permissions import RegistrationPayedPermission, EmailConfirmedPermission
 from users.utils import get_sentinel_user
 
-from .models import DeliveryAddress, Order
+from .models import DeliveryAddress, Order, PaymentTransactionReceipt
 from .permissions import OrderPermission
-from .serializers import DeliveryAddressSerializer, OrderSerializer, FedexQuoteRateSerializer
+from .serializers import DeliveryAddressSerializer, OrderSerializer, FedexQuoteRateSerializer, InitPaymentSerializer
 from .utils import order_currencies_price_per
 
 
@@ -138,3 +141,115 @@ def order_info(request, order_id):
             "currency": "¥"
         }
     )
+
+
+class InitPaymentView(generics.CreateAPIView):
+    serializer_class = InitPaymentSerializer
+    permission_classes = (IsAuthenticated, EmailConfirmedPermission, RegistrationPayedPermission)
+
+
+class PayboxResultView(views.APIView):
+    transaction_receipt_model = PaymentTransactionReceipt
+
+    def post(self, request):
+        payload = request.data
+        salt = payload.get("pg_salt")
+        signature = payload.get("pg_sig")
+
+        if not salt or salt != settings.PAYBOX_SALT or not signature:
+            return Response(
+                xmltodict.unparse(
+                    {
+                        'response': {
+                            'pg_status': 'error',
+                            'pg_description': ''
+                        }
+                    }
+                ),
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        payment_id = payload.get('pg_payment_id')
+        payment_status = payload.get("pg_result", "")
+        can_reject = payload.get("pg_can_reject", "")
+
+        if (
+            not payment_id
+            or not self.transaction_receipt_model.objects.filter(payment_id=payment_id).exists()
+            or payment_status not in ("0", "1")
+            or can_reject not in ("0", "1")
+        ):
+            return Response(
+                xmltodict.unparse(
+                    {
+                        'response': {
+                            'pg_status': 'error',
+                            'pg_description': 'Ошибка в интерпретации данных',
+                            'pg_salt': salt,
+                            'pg_sig': signature
+                        }
+                    }
+                ),
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        receipt = self.transaction_receipt_model.objects.filter(payment_id=payment_id).first()
+        order = receipt.order
+
+        if can_reject == "1":
+            order.status = Order.Status.payment_rejected
+            order.save()
+            return Response(
+                xmltodict.unparse(
+                    {
+                        'response': {
+                            'pg_status': 'rejected',
+                            'pg_description': 'Платеж отменен',
+                            'pg_salt': salt,
+                            'pg_sig': signature
+                        }
+                    }
+                ),
+                status=status.HTTP_200_OK
+            )
+
+        if payment_status == "0":
+            return Response(
+                xmltodict.unparse(
+                    {
+                        'response': {
+                            'pg_status': 'rejected',
+                            'pg_description': 'Ожидание успешного статуса оплаты',
+                            'pg_salt': salt,
+                            'pg_sig': signature
+                        }
+                    }
+                ),
+                status=status.HTTP_200_OK
+            )
+
+        payment_receipt = get_object_or_404(self.transaction_receipt_model, payment_id=payment_id)
+        payment_receipt.receive_amount = payload.get("pg_amount")
+        payment_receipt.receive_currency = payload.get("pg_currency")
+        payment_receipt.clearing_amount = Decimal(payload.get("pg_clearing_amount", 0))
+        payment_receipt.card_name = payload.get("pg_card_name")
+        payment_receipt.card_pan = payload.get("card_pan")
+        payment_receipt.auth_code = payload.get("auth_code")
+        payment_receipt.reference = payload.get("pg_reference")
+        payment_receipt.payment_status = payment_status
+        payment_receipt.save()
+        order.status = Order.Status.pending
+        order.save()
+        return Response(
+            xmltodict.unparse(
+                {
+                    'response': {
+                        'pg_status': 'ok',
+                        'pg_description': 'Заказ оплачен',
+                        'pg_salt': salt,
+                        'pg_sig': signature
+                    }
+                }
+            ),
+            status=status.HTTP_200_OK
+        )

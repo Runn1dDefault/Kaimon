@@ -65,6 +65,7 @@ class Order(BaseModel):
 
     class Status(models.TextChoices):
         wait_payment = 'wait_payment', _('Wait Payment')
+        payment_rejected = "payment_rejected", _("Payment Rejected")
         pending = 'pending', _('Pending')
         in_process = 'in_process', _('In Process')
         in_delivering = 'in_delivering', _('In Delivering')
@@ -74,6 +75,7 @@ class Order(BaseModel):
     delivery_address = models.ForeignKey(DeliveryAddress, on_delete=models.RESTRICT, related_name='orders')
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.wait_payment)
     comment = models.TextField(null=True, blank=True)
+    payment_amount = models.DecimalField(max_digits=20, decimal_places=10, null=True)
 
     @property
     def bayer_code(self):
@@ -131,3 +133,21 @@ class Receipt(BaseModel):
         if discount <= 0:
             return unit_price
         return unit_price - (unit_price * discount) / 100
+
+
+class PaymentTransactionReceipt(models.Model):
+    objects = models.Manager()
+
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, primary_key=True)
+    payment_id = models.CharField(max_length=100, unique=True)
+    redirect_url = models.URLField(max_length=700, blank=True, null=True)
+    send_amount = models.DecimalField(max_digits=20, decimal_places=10)
+    receive_amount = models.DecimalField(max_digits=20, decimal_places=10)
+    receive_currency = models.CharField(max_length=10, blank=True, null=True)
+    clearing_amount = models.DecimalField(max_digits=20, decimal_places=10, null=True)
+    card_name = models.CharField(max_length=255, blank=True, null=True)
+    card_pan = models.CharField(max_length=20, blank=True, null=True)
+    auth_code = models.CharField(max_length=100, blank=True, null=True)
+    reference = models.CharField(max_length=100, blank=True, null=True)
+    initialized_at = models.DateTimeField(auto_now_add=True)
+

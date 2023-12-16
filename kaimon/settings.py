@@ -165,7 +165,7 @@ CACHES = {
         "LOCATION": REDIS_CONNECTION_URL + '/3'
     },
 }
-PAGE_CACHED_SECONDS = 10800
+PAGE_CACHED_SECONDS = 21600
 
 # Celery settings
 CELERY_BROKER_URL = REDIS_CONNECTION_URL + '/0'
@@ -275,19 +275,26 @@ QR_URL_TEMPLATE = config("QR_URL_TEMPLATE")
 PRODUCT_URL_TEMPLATE = config("PRODUCT_URL_TEMPLATE")
 
 
-LOGGING = {
-    'version': 1,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'loggers': {
-        'django.db.backends': {
-            'level': 'DEBUG',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-    }
-}
+# LOGGING = {
+#     'version': 1,
+#     'handlers': {
+#         'console': {
+#             'class': 'logging.StreamHandler',
+#         },
+#     },
+#     'loggers': {
+#         'django.db.backends': {
+#             'level': 'DEBUG',
+#         },
+#     },
+#     'root': {
+#         'handlers': ['console'],
+#     }
+# }
+
+PAYBOX_ID = config("PAYBOX_ID")
+PAYBOX_SECRET_KEY = config("PAYBOX_SECRET_KEY")
+PAYBOX_SALT = config("PAYBOX_SALT")
+PAYBOX_RESULT_URL = config("PAYBOX_RESULT_URL")
+PAYBOX_SUCCESS_URL = config("PAYBOX_SUCCESS_URL")
+PAYBOX_FAILURE_URL = config("PAYBOX_FAILURE_URL")
