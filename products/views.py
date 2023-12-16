@@ -30,7 +30,7 @@ from .serializers import (
 )
 
 
-class CategoryViewSet(ReadOnlyModelViewSet):
+class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
     permission_classes = (AllowAny,)
     queryset = Category.objects.filter(level__gt=0, deactivated=False)
     serializer_class = CategorySerializer
@@ -116,7 +116,7 @@ class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
         return Response(Tag.collections.filter(product_inventories__product_id=product_id).grouped_tags())
 
 
-class ProductByCategoryView(CurrencyMixin, ListAPIView):
+class ProductByCategoryView(CachingMixin, CurrencyMixin, ListAPIView):
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ShortProductSerializer
     permission_classes = (AllowAny,)
