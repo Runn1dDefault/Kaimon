@@ -3,6 +3,7 @@ from typing import Iterable
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.cache import caches
+from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.fields import empty
@@ -16,18 +17,40 @@ from .utils import smp_cache_key_for_email
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('email', 'full_name', 'role', 'image', 'email_confirmed', 'registration_payed')
-        extra_kwargs = {'role': {'read_only': True}}
+        fields = ('email', 'full_name', 'role', 'image', 'email_confirmed')
+        extra_kwargs = {
+            'role': {'read_only': True},
+            'email_confirmed': {'read_only': True}
+        }
 
-    def __init__(self, instance=None, data=empty, hide_fields: Iterable[str] = None, **kwargs):
-        self.hide_fields = hide_fields or []
+    def __init__(self, instance=None, data=empty, show_fields: Iterable[str] = None, **kwargs):
+        self.show_fields = show_fields or []
         super().__init__(instance=instance, data=data, **kwargs)
+
+    def validate(self, attrs):
+        email = attrs.get('email')
+        if email and User.objects.filter(email=email).exists():
+            raise serializers.ValidationError({'email': _('Already exists!')})
+        return attrs
+    
+    def update(self, instance, validated_data):
+        email = validated_data.get('email')
+        if email and (email != instance.email or instance.email_confirmed is False):
+            new_code = generate_confirm_code(
+                user_id=instance.id,
+                raise_on_exist=True,
+                live_seconds=settings.EMAIL_CONFIRM_CODE_LIVE
+            )
+            send_code_template.delay(email=email, code=str(new_code))
+            validated_data['email_confirmed'] = False
+            validated_data['username'] = slugify(email)
+        return super().update(instance, validated_data)
 
     @property
     def _readable_fields(self):
         for field_name, field_ins in self.fields.items():
             # this will prevent a representation field from appearing
-            if field_name in self.hide_fields:
+            if self.show_fields and field_name not in self.show_fields:
                 continue
 
             if not field_ins.write_only:
@@ -67,7 +90,7 @@ class RegistrationSerializer(PasswordSerializer):
             email=email,
             password=validated_data['password'],
             full_name=validated_data['full_name'],
-            registration_payed=False,
+            registration_payed=True,
             email_confirmed=False,
             image=validated_data.get('image', None)
         )
