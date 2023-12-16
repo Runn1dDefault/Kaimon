@@ -2,10 +2,10 @@ from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import Count, F
 from django.db.models.functions import JSONObject, TruncDate
 
-from utils.querysets import AnalyticsQuerySet
+from service.querysets import BaseAnalyticsQuerySet
 
 
-class UserAnalyticsQuerySet(AnalyticsQuerySet):
+class UserAnalyticsQuerySet(BaseAnalyticsQuerySet):
     def by_dates(self, by):
         return self.values(date=by.value('date_joined')).annotate(
             users=ArrayAgg(

@@ -8,14 +8,16 @@ from drf_spectacular.utils import OpenApiParameter
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY')
-DEBUG = True
+DEBUG = config('DEBUG', cast=bool)
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [
+    "kaimono.vip",
+    "109.123.237.209"
+]
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",  # JS for testing
-    "http://176.126.166.140:9010",
-    "http://176.126.166.140",
-    "http://localhost:9010",
+    "https://kaimono.vip",
+    "http://109.123.237.209:9010",
+    "http://localhost:9010"
 ]
 # Application definition
 
@@ -30,16 +32,14 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
-    'django_filters',
     'django_celery_beat',
     'drf_spectacular',
 
-    'users',  # ready
-    'product',  # ready
-    'rakuten_scraping',  # ready
-    'currencies',
+    'service',
+    'users',
+    'products',
     'promotions',
-    'order',
+    'orders',
     'external_admin'
 ]
 
@@ -49,10 +49,14 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.gzip.GZipMiddleware',
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+GZIP_COMPRESS_CONTENT_TYPES = ['application/json']
 
 ROOT_URLCONF = 'kaimon.urls'
 
@@ -74,18 +78,35 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'kaimon.wsgi.application'
 
-# Database
 DATABASES = {
-    'default': {
+    "default": {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('POSTGRES_DB'),
-        'USER': config('POSTGRES_USER'),
-        'PASSWORD': config('POSTGRES_PASSWORD'),
-        'HOST': config('POSTGRES_HOST'),
-        'PORT': config('POSTGRES_PORT', cast=int, default=5432)
+        'NAME': config('PRIMARY_DB'),
+        'USER': config('PRIMARY_USER'),
+        'PASSWORD': config('PRIMARY_PASSWORD'),
+        'HOST': config('PRIMARY_HOST'),
+        'PORT': config('PRIMARY_PORT', cast=int)
+    },
+    "replica1": {
+        "ENGINE": 'django.db.backends.postgresql',
+        "NAME": config('REPLICATION1_DB'),
+        "USER": config('REPLICATION1_USER'),
+        "PASSWORD": config('REPLICATION1_PASSWORD'),
+        'HOST': config('REPLICATION1_HOST'),
+        'PORT': config('REPLICATION1_PORT', cast=int)
+    },
+    "replica2": {
+        "ENGINE": 'django.db.backends.postgresql',
+        "NAME": config('REPLICATION2_DB'),
+        "USER": config('REPLICATION2_USER'),
+        "PASSWORD": config('REPLICATION2_PASSWORD'),
+        'HOST': config('REPLICATION2_HOST'),
+        'PORT': config('REPLICATION2_PORT', cast=int)
     }
 }
 
+CONN_MAX_AGE = 300
+DATABASE_ROUTERS = ["kaimon.routers.PrimaryReplicaRouter"]
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -129,7 +150,7 @@ REDIS_CONNECTION_URL = config("REDIS_URL")
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": REDIS_CONNECTION_URL + '/3'
+        "LOCATION": REDIS_CONNECTION_URL + '/0'
     },
     "users": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -138,6 +159,10 @@ CACHES = {
     "scraping": {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": REDIS_CONNECTION_URL + '/2'
+    },
+    "pages_cache": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": REDIS_CONNECTION_URL + '/3'
     },
 }
 PAGE_CACHED_SECONDS = 21600
@@ -150,7 +175,7 @@ CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
-CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers.DatabaseScheduler"
+CELERY_BEAT_SCHEDULER = "kaimon.schedulers.MyDatabaseScheduler"
 
 # Jwt
 SIMPLE_JWT = {
@@ -171,11 +196,14 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "COERCE_DECIMAL_TO_STRING": False,
-    'TEST_REQUEST_DEFAULT_FORMAT': 'json',
+    'TEST_REQUEST_DEFAULT_FORMAT': 'json'
 }
 
-CORS_ALLOW_ALL_ORIGINS = True  # TODO: off after testing
-
+CORS_ALLOWED_ORIGINS = [
+    "https://kaimono.vip",
+    "http://localhost:3000",  # TODO: delete after testing
+    "http://109.123.237.209:9010"
+]
 # swagger
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Kaimono Project API',
@@ -223,23 +251,50 @@ RESTORE_SETTINGS = {
     "TOKEN_ALGORITHM": "HS256",
     "MAIL_SUBJECT": ""
 }
-EMAIL_CONFIRM_CODE_LIVE = 43200
+EMAIL_CONFIRM_CODE_LIVE = 1200
 
-PARSING_SETTINGS = {'CACHE_NAME': "scraping"}
-INCREASE_PRICE_PERCENTAGE = 10
-
-SUPPORTED_LANG = ('ru', 'en', 'ja', 'tr', 'ky', 'kz')
-LANGUAGE_QUERY_PARAM = 'lang'
 CURRENCY_QUERY_PARAM = 'currency'
-LANGUAGE_QUERY_SCHEMA_PARAM = OpenApiParameter(
-    name=LANGUAGE_QUERY_PARAM,
-    type=OpenApiTypes.STR,
-    required=False,
-    default='ja'
-)
 CURRENCY_QUERY_SCHEMA_PARAM = OpenApiParameter(
     name=CURRENCY_QUERY_PARAM,
     type=OpenApiTypes.STR,
     required=False,
     default='yen'
 )
+
+FEDEX_CLIENT_ID = 'l7766482a2061f4738b06386df74defc41'
+FEDEX_SECRET = 'a6e57a4975074e5da35d01873355c3bc'
+FEDEX_ACCOUNT_NUMBER = '515281100'
+SHIPPER_POSTAL_CODE = "658-0032"
+SHIPPER_CITY = "Kobe"
+SHIPPER_COUNTRY_CODE = "JP"
+FEDEX_DEFAULT_AVG_WEIGHT = 0.300
+
+DEFAULT_INCREASE_PRICE_PER = 15
+CRAWLER_URL = config("CRAWLER_URL")
+QR_URL_TEMPLATE = config("QR_URL_TEMPLATE")
+PRODUCT_URL_TEMPLATE = config("PRODUCT_URL_TEMPLATE")
+
+
+# LOGGING = {
+#     'version': 1,
+#     'handlers': {
+#         'console': {
+#             'class': 'logging.StreamHandler',
+#         },
+#     },
+#     'loggers': {
+#         'django.db.backends': {
+#             'level': 'DEBUG',
+#         },
+#     },
+#     'root': {
+#         'handlers': ['console'],
+#     }
+# }
+
+PAYBOX_ID = config("PAYBOX_ID")
+PAYBOX_SECRET_KEY = config("PAYBOX_SECRET_KEY")
+PAYBOX_SALT = config("PAYBOX_SALT")
+PAYBOX_RESULT_URL = config("PAYBOX_RESULT_URL")
+PAYBOX_SUCCESS_URL = config("PAYBOX_SUCCESS_URL")
+PAYBOX_FAILURE_URL = config("PAYBOX_FAILURE_URL")
