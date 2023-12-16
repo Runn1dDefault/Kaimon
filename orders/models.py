@@ -75,7 +75,6 @@ class Order(BaseModel):
     delivery_address = models.ForeignKey(DeliveryAddress, on_delete=models.RESTRICT, related_name='orders')
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.wait_payment)
     comment = models.TextField(null=True, blank=True)
-    payment_amount = models.DecimalField(max_digits=20, decimal_places=10, null=True)
 
     @property
     def bayer_code(self):
