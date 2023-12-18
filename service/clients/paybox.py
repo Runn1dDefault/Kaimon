@@ -15,7 +15,7 @@ class ReceiptPosition:
     name: str
     count: int
     price: float | Decimal
-    tax_type: str = '0'
+    tax_type: str = "0"
 
     def payload(self):
         return {
@@ -36,9 +36,10 @@ class PayboxAPI(BaseAPIClient):
 
     def _make_signature(self, path_name: str, payload: dict[str, Any]):
         values = [path_name]
-        values += [v for k, v in sorted(payload.items())]
+        values += [payload[key] for key in sorted(payload)]
         values.append(self._secret)
-        return hashlib.md5(';'.join(values).encode()).hexdigest()
+        print(values)
+        return hashlib.md5(";".join(values).encode()).hexdigest()
 
     def process_response(self, response: Response) -> Any:
         return xmltodict.parse(response.content)
@@ -59,28 +60,29 @@ class PayboxAPI(BaseAPIClient):
         assert all(isinstance(v, str) for v in custom_params.values())
 
         payload = {
-            'pg_merchant_id': self._merchant_id,
-            'pg_order_id': str(order_id),
-            'pg_amount': str(amount),
-            'pg_currency': currency,
-            'pg_salt': salt,
-            'pg_description': description,
-            'pg_request_method': 'POST',
-            'pg_success_url_method': 'GET',
-            'pg_failure_url_method': 'GET',
+            "pg_merchant_id": self._merchant_id,
+            "pg_order_id": str(order_id),
+            "pg_amount": str(amount),
+            "pg_currency": currency,
+            "pg_salt": salt,
+            "pg_description": description,
             **custom_params
         }
         if result_url:
             payload["pg_result_url"] = result_url
+            payload["pg_request_method"] = "POST"
+
         if success_url:
             payload["pg_success_url"] = success_url
+            payload["pg_success_url_method"] = "GET"
         if failure_url:
             payload["pg_failure_url"] = failure_url
+            payload["pg_failure_url_method"] = "GET"
         if receipt_positions:
             payload["pg_receipt_positions"] = list(map(lambda x: x.payload(), receipt_positions))
 
-        payload["pg_sig"] = self._make_signature('init_payment.php', payload)
-        return self.post('/init_payment.php', json=payload)
+        payload["pg_sig"] = self._make_signature("init_payment.php", payload)
+        return self.post("/init_payment.php", json=payload)
 
     def get_transaction_status(self, payment_id, order_id, salt: str):
         payload = {
@@ -89,20 +91,27 @@ class PayboxAPI(BaseAPIClient):
             "pg_order_id": order_id,
             "pg_salt": salt
         }
-        payload["pg_sig"] = self._make_signature("get_status.php", payload)
-        return self.post('/get_status3.php', json=payload)
+        payload["pg_sig"] = self._make_signature("get_status3.php", payload)
+        return self.post("/get_status3.php", json=payload)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from pprint import pprint
 
-    paybox = PayboxAPI(merchant_id='', secret_key='')
-    resp_data = paybox.init_transaction(
-        order_id="1",
-        amount="10",
-        description="Оплата заказа №1",
-        currency="USD",
-        salt="kaimono",
-        transaction_uuid='999d7d41-c5ea-46a4-9c4a-e620410ff43b'
-    )
-    pprint(resp_data)
+    paybox = PayboxAPI(merchant_id="", secret_key="")
+    # resp_data = paybox.init_transaction(
+    #     order_id="2",
+    #     amount="10",
+    #     description="Оплата заказа №1",
+    #     currency="USD",
+    #     salt="kaimono.vip",
+    #     transaction_uuid="999d7d41-c5ea-46a4-9c4a-e620410ff43b"
+    # )
+    # pprint(resp_data)
+
+    # resp_data = paybox.get_transaction_status(
+    #     payment_id="1066603760",
+    #     order_id="24",
+    #     salt="kaimono.vip"
+    # )
+    # pprint(resp_data)
