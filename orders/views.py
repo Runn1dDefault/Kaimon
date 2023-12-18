@@ -149,7 +149,6 @@ class PayboxResultView(views.APIView):
 
     def post(self, request):
         payload = request.data
-        pprint(payload)
         salt = payload.get("pg_salt")
         signature = payload.get("pg_sig")
 
@@ -209,25 +208,9 @@ class PayboxResultView(views.APIView):
             )
 
         order = receipt.order
-
-        if can_reject == "1":
+        if payment_status == "0":
             order.status = Order.Status.payment_rejected
             order.save()
-            return Response(
-                xmltodict.unparse(
-                    {
-                        'response': {
-                            'pg_status': 'rejected',
-                            'pg_description': 'Платеж отменен',
-                            'pg_salt': salt,
-                            'pg_sig': signature
-                        }
-                    }
-                ),
-                status=status.HTTP_200_OK
-            )
-
-        if payment_status == "0":
             return Response(
                 xmltodict.unparse(
                     {
