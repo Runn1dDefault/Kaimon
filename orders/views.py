@@ -70,7 +70,7 @@ class OrderViewSet(
     def get_queryset(self):
         return super().get_queryset().filter(delivery_address__user=self.request.user)
 
-    @extend_schema(responses={status.HTTP_200_OK: PaymentTransactionReceipt(many=False),
+    @extend_schema(responses={status.HTTP_200_OK: PaymentTransactionSerializer(many=False),
                               status.HTTP_404_NOT_FOUND: None})
     @action(methods=['GET'], detail=True, url_path="paybox-transaction")
     def get_paybox_transaction(self, request, **kwargs):
