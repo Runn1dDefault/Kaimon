@@ -23,7 +23,6 @@ class Migration(migrations.Migration):
                 ('name', models.CharField(max_length=100)),
                 ('bayer_code', models.CharField(max_length=50, unique=True)),
                 ('email', models.EmailField(max_length=254)),
-                ('phone', models.CharField(max_length=20, validators=[orders.validators.only_digit_validator])),
             ],
             options={
                 'abstract': False,
@@ -68,7 +67,6 @@ class Migration(migrations.Migration):
                 ('shipping_code', models.CharField(max_length=100)),
                 ('shipping_carrier', models.CharField(default='FedEx', max_length=50)),
                 ('qrcode_image', models.ImageField(blank=True, null=True, upload_to='qrcodes/')),
-                ('total_price', models.DecimalField(decimal_places=10, max_digits=20)),
             ],
         ),
         migrations.CreateModel(
