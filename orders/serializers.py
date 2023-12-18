@@ -1,8 +1,11 @@
 from collections import OrderedDict
+from datetime import timedelta
+from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
+from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from requests import HTTPError
 from rest_framework import serializers
@@ -13,6 +16,7 @@ from service.serializers import ConversionField
 from service.utils import get_currency_by_id, convert_price
 
 from .models import DeliveryAddress, Order, Receipt, PaymentTransactionReceipt
+from .tasks import check_paybox_status_for_order
 from .utils import duplicate_delivery_address, get_product_yen_price, order_currencies_price_per, create_customer, \
     init_paybox_transaction, get_receipt_usd_price
 
@@ -117,6 +121,33 @@ class ReceiptSerializer(serializers.ModelSerializer):
         return receipt
 
 
+class PaymentTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentTransactionReceipt
+        fields = ("order", "send_amount", "redirect_url")
+        read_only_fields = ("send_amount", "redirect_url")
+
+    def validate(self, attrs):
+        order = attrs['order']
+        amount = sum([
+            get_receipt_usd_price(receipt) or 0
+            for receipt in order.receipts.only('discount', 'unit_price', 'quantity', 'site_currency').all()
+        ])
+
+        if amount <= 0:
+            raise serializers.ValidationError({"order_id": "request rejected"})
+
+        transaction_uuid = uuid4()
+        paybox_transaction_data = init_paybox_transaction(order, amount, transaction_uuid)
+        check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=20), args=(order.id, 1))
+        return {
+            "order": order,
+            "send_amount": amount,
+            "uuid": transaction_uuid,
+            **paybox_transaction_data
+        }
+
+
 class OrderSerializer(serializers.ModelSerializer):
     address_id = serializers.PrimaryKeyRelatedField(
         queryset=DeliveryAddress.objects.all(),
@@ -128,8 +159,13 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ('id', 'status', 'delivery_address', 'receipts', 'address_id', 'comment', 'created_at')
+        fields = ('id', 'status', 'delivery_address', 'receipts', 'address_id', 'comment',
+                  'created_at')
         extra_kwargs = {'status': {'read_only': True}}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._transaction_data = None
 
     def validate(self, attrs):
         address = attrs.get('address_id')
@@ -154,7 +190,21 @@ class OrderSerializer(serializers.ModelSerializer):
 
         if receipts:
             Receipt.objects.bulk_create(receipts)
+
+        self.create_transaction(order_id=order.id)
         return order
+
+    def create_transaction(self, order_id):
+        serializer = PaymentTransactionSerializer(data={"order": order_id}, context=self.context)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        self._transaction_data = serializer.data
+
+    def to_representation(self, instance):
+        represent = super().to_representation(instance)
+        if self._transaction_data:
+            represent["transaction"] = self._transaction_data
+        return represent
 
 
 class ProductQuantitySerializer(serializers.Serializer):
@@ -262,35 +312,3 @@ class FedexQuoteRateSerializer(serializers.Serializer):
             for rate in rate_details['ratedShipmentDetails']
         ]
         return data
-
-
-class InitPaymentSerializer(serializers.ModelSerializer):
-    order_id = serializers.PrimaryKeyRelatedField(
-        queryset=Order.objects.prefetch_related('receipts').filter(status=Order.Status.wait_payment),
-        write_only=True,
-        required=True
-    )
-
-    class Meta:
-        model = PaymentTransactionReceipt
-        fields = ("order", "send_amount", "redirect_url")
-
-    def validate(self, attrs):
-        user = self.context['request'].user
-        order = attrs['order_id']
-        if not user.orders.filter(id=order.id).exists():
-            raise serializers.ValidationError({"order_id": "request rejected"})
-
-        amount = sum([
-            get_receipt_usd_price(receipt) or 0
-            for receipt in order.receipts.only('discount', 'unit_price', 'quantity', 'site_currency').all()
-        ])
-
-        if amount <= 0:
-            raise serializers.ValidationError({"order_id": "request rejected"})
-
-        return {
-            "order": order,
-            "send_amount": amount,
-            **init_paybox_transaction(order, amount)
-        }

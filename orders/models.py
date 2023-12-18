@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
@@ -137,8 +139,9 @@ class Receipt(BaseModel):
 class PaymentTransactionReceipt(models.Model):
     objects = models.Manager()
 
-    order = models.OneToOneField(Order, on_delete=models.CASCADE, primary_key=True)
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, primary_key=True, related_name='payment_transaction')
     payment_id = models.CharField(max_length=100, unique=True)
+    uuid = models.UUIDField(default=uuid4, unique=True)
     redirect_url = models.URLField(max_length=700, blank=True, null=True)
     send_amount = models.DecimalField(max_digits=20, decimal_places=10)
     receive_amount = models.DecimalField(max_digits=20, decimal_places=10)

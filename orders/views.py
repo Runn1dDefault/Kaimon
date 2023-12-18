@@ -1,4 +1,5 @@
 from decimal import Decimal
+from pprint import pprint
 
 import xmltodict
 from django.conf import settings
@@ -21,7 +22,7 @@ from users.utils import get_sentinel_user
 
 from .models import DeliveryAddress, Order, PaymentTransactionReceipt
 from .permissions import OrderPermission
-from .serializers import DeliveryAddressSerializer, OrderSerializer, FedexQuoteRateSerializer, InitPaymentSerializer
+from .serializers import DeliveryAddressSerializer, OrderSerializer, FedexQuoteRateSerializer
 from .utils import order_currencies_price_per
 
 
@@ -143,16 +144,12 @@ def order_info(request, order_id):
     )
 
 
-class InitPaymentView(generics.CreateAPIView):
-    serializer_class = InitPaymentSerializer
-    permission_classes = (IsAuthenticated, EmailConfirmedPermission, RegistrationPayedPermission)
-
-
 class PayboxResultView(views.APIView):
     transaction_receipt_model = PaymentTransactionReceipt
 
     def post(self, request):
         payload = request.data
+        pprint(payload)
         salt = payload.get("pg_salt")
         signature = payload.get("pg_sig")
 
@@ -194,6 +191,23 @@ class PayboxResultView(views.APIView):
             )
 
         receipt = self.transaction_receipt_model.objects.filter(payment_id=payment_id).first()
+        transaction_uuid = payload.get("transaction_uuid", "")
+
+        if transaction_uuid != str(receipt.uuid):
+            return Response(
+                xmltodict.unparse(
+                    {
+                        'response': {
+                            'pg_status': 'error',
+                            'pg_description': 'Ошибка в интерпретации данных',
+                            'pg_salt': salt,
+                            'pg_sig': signature
+                        }
+                    }
+                ),
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         order = receipt.order
 
         if can_reject == "1":

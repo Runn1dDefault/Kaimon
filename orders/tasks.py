@@ -1,11 +1,13 @@
 import os.path
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils.timezone import now
 
 from kaimon.celery import app
 from orders.models import Order, OrderConversion, OrderShipping
-from orders.utils import generate_shipping_code
+from orders.utils import generate_shipping_code, is_success_transaction
 from service.models import Currencies
 from service.utils import get_currencies_price_per, generate_qrcode
 
@@ -55,3 +57,24 @@ def create_order_shipping_details(order_id: str):
         shipping_detail = OrderShipping(order_id=order_id, shipping_code=shipping_code)
         shipping_detail.qrcode_image.name = f'qrcodes/{qr_filename}'
         shipping_detail.save()
+
+
+@app.task()
+def check_paybox_status_for_order(order_id, tries: int = 0):
+    order = Order.objects.get(id=order_id)
+    if order.status != Order.Status.wait_payment:
+        return
+
+    transaction = order.payment_transaction
+
+    if is_success_transaction(transaction):
+        order.status = Order.Status.pending
+        order.save()
+    else:
+        if tries < 3:
+            tries += 1
+            check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=15), args=(order_id, tries))
+            return
+
+        order.status = Order.Status.payment_rejected
+        order.save()

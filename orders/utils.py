@@ -12,7 +12,7 @@ from service.clients.paybox import PayboxAPI
 from service.models import Currencies
 from service.utils import get_currency_by_id, get_currencies_price_per, convert_price
 
-from .models import DeliveryAddress, OrderConversion, Customer
+from .models import DeliveryAddress, OrderConversion, Customer, PaymentTransactionReceipt
 
 
 def duplicate_delivery_address(delivery_address, updates: dict[str, Any]):
@@ -86,9 +86,10 @@ def create_customer(user):
     return customer
 
 
-def init_paybox_transaction(order, amount) -> dict[str, str]:
+def init_paybox_transaction(order, amount, uuid) -> dict[str, str]:
+    payment_client = PayboxAPI(settings.PAYBOX_ID, secret_key=settings.PAYBOX_SECRET_KEY)
+
     try:
-        payment_client = PayboxAPI(settings.PAYBOX_ID, secret_key=settings.PAYBOX_SECRET_KEY)
         response_data = payment_client.init_transaction(
             order_id=str(order.id),
             amount=str(amount),
@@ -97,10 +98,11 @@ def init_paybox_transaction(order, amount) -> dict[str, str]:
             currency="USD",
             result_url=settings.PAYBOX_RESULT_URL,
             success_url=settings.PAYBOX_SUCCESS_URL,
-            failure_url=settings.PAYBOX_FAILURE_URL
+            failure_url=settings.PAYBOX_FAILURE_URL,
+            transaction_uuid=str(uuid)
         )
     except Exception as e:
-        logging.error("Paybox request error: %s" % e)
+        logging.exception("Paybox init error: %s" % e)
         raise ValidationError({"detail": "Something went wrong, please try another time."})
     else:
         data = response_data.get('response', {})
@@ -112,3 +114,19 @@ def init_paybox_transaction(order, amount) -> dict[str, str]:
             "payment_id": payment_id,
             "redirect_url": url
         }
+
+
+def is_success_transaction(transaction: PaymentTransactionReceipt) -> bool:
+    payment_client = PayboxAPI(settings.PAYBOX_ID, secret_key=settings.PAYBOX_SECRET_KEY)
+
+    try:
+        response_data = payment_client.get_transaction_status(
+            payment_id=transaction.payment_id,
+            order_id=getattr(transaction, 'order_id'),
+            salt=settings.PAYBOX_SALT
+        )
+    except Exception as e:
+        logging.error("Paybox status error: ", e)
+        return False
+    else:
+        return response_data.get("response", {}).get("pg_status", "") == "ok"

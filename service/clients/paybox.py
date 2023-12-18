@@ -27,15 +27,15 @@ class ReceiptPosition:
 
 
 class PayboxAPI(BaseAPIClient):
-    BASE_URL = "https://api.freedompay.money"
+    BASE_URL = "https://api.paybox.money"
 
     def __init__(self, merchant_id, secret_key):
         self._merchant_id = merchant_id
         self._secret = secret_key
         super().__init__()
 
-    def _make_signature(self, payload: dict[str, Any]):
-        values = ['init_payment.php']
+    def _make_signature(self, path_name: str, payload: dict[str, Any]):
+        values = [path_name]
         values += [v for k, v in sorted(payload.items())]
         values.append(self._secret)
         return hashlib.md5(';'.join(values).encode()).hexdigest()
@@ -53,7 +53,8 @@ class PayboxAPI(BaseAPIClient):
         result_url: str,
         success_url: str,
         failure_url: str,
-        receipt_positions: list[ReceiptPosition] = None
+        receipt_positions: list[ReceiptPosition] = None,
+        **custom_params
     ):
         payload = {
             'pg_merchant_id': self._merchant_id,
@@ -68,9 +69,20 @@ class PayboxAPI(BaseAPIClient):
             'pg_failure_url': failure_url,
             'pg_success_url_method': 'GET',
             'pg_failure_url_method': 'GET',
+            **custom_params
         }
         if receipt_positions:
             payload['pg_receipt_positions'] = list(map(lambda x: x.payload(), receipt_positions))
 
-        payload['pg_sig'] = self._make_signature(payload)
-        return self.post('/init_payment.php', payload)
+        payload['pg_sig'] = self._make_signature('init_payment.php', payload)
+        return self.post('/init_payment.php', json=payload)
+
+    def get_transaction_status(self, payment_id, order_id, salt: str):
+        payload = {
+            "pg_merchant_id": self._merchant_id,
+            "pg_payment_id": payment_id,
+            "pg_order_id": order_id,
+            "pg_salt": salt
+        }
+        payload["pg_sig"] = self._make_signature("get_status.php", payload)
+        return self.post('/get_status3.php', json=payload)
