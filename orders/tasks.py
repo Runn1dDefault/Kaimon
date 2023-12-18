@@ -1,4 +1,6 @@
+import logging
 import os.path
+import time
 from datetime import timedelta
 
 from django.conf import settings
@@ -12,9 +14,24 @@ from service.models import Currencies
 from service.utils import get_currencies_price_per, generate_qrcode
 
 
+def get_order(order_id):
+    for _ in range(3):
+        try:
+            order = Order.objects.get(id=order_id)
+        except ObjectDoesNotExist:
+            time.sleep(1)
+        else:
+            return order
+
+
 @app.task()
-def create_order_conversions(order_id: str):
-    order = Order.objects.get(id=order_id)
+def create_order_conversions(order_id):
+    order = get_order(order_id)
+
+    if not order:
+        logging.error("Not found order with id %s" % order_id)
+        return
+
     new_conversions = []
 
     for conversion_from in Currencies:
@@ -41,7 +58,11 @@ def create_order_conversions(order_id: str):
 
 @app.task()
 def create_order_shipping_details(order_id: str):
-    order = Order.objects.get(id=order_id)
+    order = get_order(order_id)
+    if not order:
+        logging.error("Not found order with id %s" % order_id)
+        return
+
     try:
         order.shipping_detail
     except ObjectDoesNotExist:
@@ -71,7 +92,7 @@ def check_paybox_status_for_order(order_id, tries: int = 0):
         order.status = Order.Status.pending
         order.save()
     else:
-        if tries < 3:
+        if tries <= 3:
             tries += 1
             check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=15), args=(order_id, tries))
             return
