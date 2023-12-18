@@ -1,5 +1,4 @@
 from decimal import Decimal
-from pprint import pprint
 
 import xmltodict
 from django.conf import settings
@@ -9,6 +8,7 @@ from django.http import HttpResponseNotFound
 from django.shortcuts import get_object_or_404, render
 from drf_spectacular.utils import extend_schema
 from rest_framework import views, viewsets, generics, mixins, parsers, permissions, status
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -22,7 +22,8 @@ from users.utils import get_sentinel_user
 
 from .models import DeliveryAddress, Order, PaymentTransactionReceipt
 from .permissions import OrderPermission
-from .serializers import DeliveryAddressSerializer, OrderSerializer, FedexQuoteRateSerializer
+from .serializers import DeliveryAddressSerializer, OrderSerializer, FedexQuoteRateSerializer, \
+    PaymentTransactionSerializer
 from .utils import order_currencies_price_per
 
 
@@ -68,6 +69,23 @@ class OrderViewSet(
 
     def get_queryset(self):
         return super().get_queryset().filter(delivery_address__user=self.request.user)
+
+    @extend_schema(responses={status.HTTP_200_OK: PaymentTransactionReceipt(many=False),
+                              status.HTTP_404_NOT_FOUND: None})
+    @action(methods=['GET'], detail=True, url_path="paybox-transaction")
+    def get_paybox_transaction(self, request, **kwargs):
+        order = self.get_object()
+        try:
+            payment_tsx = order.payment_transaction
+        except ObjectDoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        serializer = PaymentTransactionSerializer(
+            instance=payment_tsx,
+            many=False,
+            context=self.get_serializer_context()
+        )
+        return Response(serializer.data)
 
 
 class FedexQuoteRateView(generics.GenericAPIView):

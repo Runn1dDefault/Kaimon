@@ -2,14 +2,15 @@ import logging
 import os.path
 import time
 from datetime import timedelta
+from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import now
 
 from kaimon.celery import app
-from orders.models import Order, OrderConversion, OrderShipping
-from orders.utils import generate_shipping_code, is_success_transaction
+from orders.models import Order, OrderConversion, OrderShipping, PaymentTransactionReceipt
+from orders.utils import generate_shipping_code, is_success_transaction, get_receipt_usd_price, init_paybox_transaction
 from service.models import Currencies
 from service.utils import get_currencies_price_per, generate_qrcode
 
@@ -99,3 +100,28 @@ def check_paybox_status_for_order(order_id, tries: int = 0):
 
         order.status = Order.Status.payment_rejected
         order.save()
+
+
+@app.task()
+def create_order_payment_transaction(order_id):
+    order = get_order(order_id=order_id)
+
+    amount = sum([
+        get_receipt_usd_price(receipt) or 0
+        for receipt in order.receipts.only('discount', 'unit_price', 'quantity', 'site_currency').all()
+    ])
+
+    if amount <= 0:
+        return
+
+    transaction_uuid = uuid4()
+    paybox_transaction_data = init_paybox_transaction(order, amount, transaction_uuid)
+    check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=15), args=(order.id, 1))
+    PaymentTransactionReceipt.objects.create(
+        **{
+            "order": order,
+            "send_amount": amount,
+            "uuid": transaction_uuid,
+            **paybox_transaction_data
+        }
+    )

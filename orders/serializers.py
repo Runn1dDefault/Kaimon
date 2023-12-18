@@ -1,11 +1,8 @@
 from collections import OrderedDict
-from datetime import timedelta
-from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
-from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from requests import HTTPError
 from rest_framework import serializers
@@ -16,9 +13,8 @@ from service.serializers import ConversionField
 from service.utils import get_currency_by_id, convert_price
 
 from .models import DeliveryAddress, Order, Receipt, PaymentTransactionReceipt
-from .tasks import check_paybox_status_for_order
-from .utils import duplicate_delivery_address, get_product_yen_price, order_currencies_price_per, create_customer, \
-    init_paybox_transaction, get_receipt_usd_price
+from .tasks import create_order_payment_transaction
+from .utils import duplicate_delivery_address, get_product_yen_price, order_currencies_price_per, create_customer
 
 
 class DeliveryAddressSerializer(serializers.ModelSerializer):
@@ -125,27 +121,7 @@ class PaymentTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentTransactionReceipt
         fields = ("order", "send_amount", "redirect_url")
-        read_only_fields = ("send_amount", "redirect_url")
-
-    def validate(self, attrs):
-        order = attrs['order']
-        amount = sum([
-            get_receipt_usd_price(receipt) or 0
-            for receipt in order.receipts.only('discount', 'unit_price', 'quantity', 'site_currency').all()
-        ])
-
-        if amount <= 0:
-            raise serializers.ValidationError({"order_id": "request rejected"})
-
-        transaction_uuid = uuid4()
-        paybox_transaction_data = init_paybox_transaction(order, amount, transaction_uuid)
-        check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=20), args=(order.id, 1))
-        return {
-            "order": order,
-            "send_amount": amount,
-            "uuid": transaction_uuid,
-            **paybox_transaction_data
-        }
+        read_only_fields = ("order", "send_amount", "redirect_url")
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -190,21 +166,8 @@ class OrderSerializer(serializers.ModelSerializer):
 
         if receipts:
             Receipt.objects.bulk_create(receipts)
-
-        self.create_transaction(order_id=order.id)
+            create_order_payment_transaction.delay(order.id)
         return order
-
-    def create_transaction(self, order_id):
-        serializer = PaymentTransactionSerializer(data={"order": order_id}, context=self.context)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        self._transaction_data = serializer.data
-
-    def to_representation(self, instance):
-        represent = super().to_representation(instance)
-        if self._transaction_data:
-            represent["transaction"] = self._transaction_data
-        return represent
 
 
 class ProductQuantitySerializer(serializers.Serializer):
