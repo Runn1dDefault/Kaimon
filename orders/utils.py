@@ -88,32 +88,26 @@ def create_customer(user):
 
 def init_paybox_transaction(order, amount, uuid) -> dict[str, str]:
     payment_client = PayboxAPI(settings.PAYBOX_ID, secret_key=settings.PAYBOX_SECRET_KEY)
-
-    try:
-        response_data = payment_client.init_transaction(
-            order_id=str(order.id),
-            amount=str(amount),
-            description="Payment for order No.%s via Paybox" % order.id,
-            salt=settings.PAYBOX_SALT,
-            currency="USD",
-            result_url=settings.PAYBOX_RESULT_URL,
-            success_url=settings.PAYBOX_SUCCESS_URL,
-            failure_url=settings.PAYBOX_FAILURE_URL,
-            transaction_uuid=str(uuid)
-        )
-    except Exception as e:
-        logging.exception("Paybox init error: %s" % e)
+    response_data = payment_client.init_transaction(
+        order_id=str(order.id),
+        amount=str(amount),
+        description="Payment for order No.%s via Paybox" % order.id,
+        salt=settings.PAYBOX_SALT,
+        currency="USD",
+        result_url=settings.PAYBOX_RESULT_URL,
+        success_url=settings.PAYBOX_SUCCESS_URL,
+        failure_url=settings.PAYBOX_FAILURE_URL,
+        transaction_uuid=str(uuid)
+    )
+    data = response_data.get('response', {})
+    url = data.get('pg_redirect_url')
+    payment_id = data.get('payment_id')
+    if not url or not payment_id:
         raise ValidationError({"detail": "Something went wrong, please try another time."})
-    else:
-        data = response_data.get('response', {})
-        url = data.get('pg_redirect_url')
-        payment_id = data.get('payment_id')
-        if not url or not payment_id:
-            raise ValidationError({"detail": "Something went wrong, please try another time."})
-        return {
-            "payment_id": payment_id,
-            "redirect_url": url
-        }
+    return {
+        "payment_id": payment_id,
+        "redirect_url": url
+    }
 
 
 def is_success_transaction(transaction: PaymentTransactionReceipt) -> bool:
