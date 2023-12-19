@@ -103,8 +103,15 @@ def check_paybox_status_for_order(order_id, tries: int = 0):
 
 
 @app.task()
-def create_order_payment_transaction(order_id):
+def create_order_payment_transaction(order_id, tries: int = 1):
     order = get_order(order_id=order_id)
+
+    if not order and tries <= 3:
+        tries += 1
+        create_order_payment_transaction.apply_async(eta=now() + timedelta(seconds=3), args=(order_id, tries))
+        return
+    elif not order:
+        raise ValueError("Sync error of order %s" % order_id)
 
     amount = sum([
         get_receipt_usd_price(receipt) or 0

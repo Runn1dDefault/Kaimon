@@ -104,7 +104,7 @@ def init_paybox_transaction(order, amount, transaction_uuid) -> dict[str, str]:
     payment_id = data.get('pg_payment_id')
 
     if not url or not payment_id:
-        raise ValueError(response_data)
+        raise ValueError("Not found keys pg_redirect_url, pg_payment_id in %s" % response_data)
 
     return {
         "payment_id": payment_id,
