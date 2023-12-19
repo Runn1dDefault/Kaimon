@@ -86,7 +86,7 @@ def create_customer(user):
     return customer
 
 
-def init_paybox_transaction(order, amount, uuid) -> dict[str, str]:
+def init_paybox_transaction(order, amount, transaction_uuid) -> dict[str, str]:
     payment_client = PayboxAPI(settings.PAYBOX_ID, secret_key=settings.PAYBOX_SECRET_KEY)
     response_data = payment_client.init_transaction(
         order_id=order.id,
@@ -97,11 +97,15 @@ def init_paybox_transaction(order, amount, uuid) -> dict[str, str]:
         result_url=settings.PAYBOX_RESULT_URL,
         success_url=settings.PAYBOX_SUCCESS_URL,
         failure_url=settings.PAYBOX_FAILURE_URL,
-        transaction_uuid=str(uuid)
+        transaction_uuid=str(transaction_uuid)
     )
     data = response_data.get('response', {})
     url = data.get('pg_redirect_url')
     payment_id = data.get('pg_payment_id')
+
+    if not url or not payment_id:
+        raise ValueError(response_data)
+
     return {
         "payment_id": payment_id,
         "redirect_url": url

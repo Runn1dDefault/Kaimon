@@ -115,7 +115,11 @@ def create_order_payment_transaction(order_id):
         return
 
     transaction_uuid = uuid4()
-    paybox_transaction_data = init_paybox_transaction(order, amount, transaction_uuid)
+    paybox_transaction_data = init_paybox_transaction(
+        order=order,
+        amount=amount,
+        transaction_uuid=transaction_uuid
+    )
     check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=15), args=(order.id, 1))
     PaymentTransactionReceipt.objects.create(
         **{
