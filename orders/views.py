@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404, render
 from drf_spectacular.utils import extend_schema
 from rest_framework import views, viewsets, generics, mixins, parsers, permissions, status
 from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -56,7 +57,8 @@ class OrderViewSet(
     permission_classes = (IsAuthenticated, EmailConfirmedPermission, RegistrationPayedPermission, OrderPermission)
     parser_classes = (parsers.JSONParser,)
     pagination_class = PagePagination
-    filter_backends = (ListFilter,)
+    filter_backends = (ListFilter, OrderingFilter)
+    ordering_fields = ("created_at",)
     list_filter_fields = {'status': 'status'}
 
     @extend_schema(parameters=[settings.CURRENCY_QUERY_SCHEMA_PARAM])
