@@ -101,9 +101,7 @@ def init_paybox_transaction(order, amount, uuid) -> dict[str, str]:
     )
     data = response_data.get('response', {})
     url = data.get('pg_redirect_url')
-    payment_id = data.get('payment_id')
-    if not url or not payment_id:
-        raise ValidationError({"detail": "Something went wrong, please try another time."})
+    payment_id = data.get('pg_payment_id')
     return {
         "payment_id": payment_id,
         "redirect_url": url
