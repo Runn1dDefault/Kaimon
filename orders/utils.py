@@ -89,8 +89,8 @@ def create_customer(user):
 def init_paybox_transaction(order, amount, uuid) -> dict[str, str]:
     payment_client = PayboxAPI(settings.PAYBOX_ID, secret_key=settings.PAYBOX_SECRET_KEY)
     response_data = payment_client.init_transaction(
-        order_id=str(order.id),
-        amount=str(amount),
+        order_id=order.id,
+        amount=amount,
         description="Payment for order No.%s via Paybox" % order.id,
         salt=settings.PAYBOX_SALT,
         currency="USD",
