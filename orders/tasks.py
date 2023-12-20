@@ -105,12 +105,19 @@ def create_order_payment_transaction(order_id, tries: int = 1):
         logging.error("Sync error of order %s" % order_id)
         return
 
+    if not order.receipts.exists():
+        logging.error("order(%s).receipts not found!" % order_id)
+        tries += 1
+        create_order_payment_transaction.apply_async(eta=now() + timedelta(seconds=3), args=(order_id, tries))
+        return
+
     amount = sum([
         get_receipt_usd_price(receipt) or 0
         for receipt in order.receipts.only('discount', 'unit_price', 'quantity', 'site_currency').all()
     ])
 
     if amount <= 0:
+        logging.error("order %s amount equal to zero!" % order_id)
         return
 
     transaction_uuid = uuid4()
