@@ -130,7 +130,7 @@ def is_success_transaction(transaction: PaymentTransactionReceipt) -> bool:
             salt=settings.PAYBOX_SALT
         )
     except Exception as e:
-        logging.error("Paybox status error: ", e)
+        logging.error("Paybox status error: %s" % e)
         return False
     else:
         return response_data.get("response", {}).get("pg_status", "") == "ok"
