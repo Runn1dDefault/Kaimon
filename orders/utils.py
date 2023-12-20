@@ -125,8 +125,8 @@ def is_success_transaction(transaction: PaymentTransactionReceipt) -> bool:
 
     try:
         response_data = payment_client.get_transaction_status(
-            payment_id=transaction.payment_id,
-            order_id=getattr(transaction, 'order_id'),
+            payment_id=str(transaction.payment_id),
+            order_id=str(getattr(transaction, 'order_id')),
             salt=settings.PAYBOX_SALT
         )
     except Exception as e:
