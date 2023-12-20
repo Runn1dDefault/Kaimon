@@ -144,7 +144,7 @@ class PaymentTransactionReceipt(models.Model):
     uuid = models.UUIDField(default=uuid4, unique=True)
     redirect_url = models.URLField(max_length=700, blank=True, null=True)
     send_amount = models.DecimalField(max_digits=20, decimal_places=10)
-    receive_amount = models.DecimalField(max_digits=20, decimal_places=10)
+    receive_amount = models.DecimalField(max_digits=20, decimal_places=10, null=True)
     receive_currency = models.CharField(max_length=10, blank=True, null=True)
     clearing_amount = models.DecimalField(max_digits=20, decimal_places=10, null=True)
     card_name = models.CharField(max_length=255, blank=True, null=True)
