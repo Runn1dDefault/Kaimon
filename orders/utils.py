@@ -1,18 +1,29 @@
 import logging
+import time
 from functools import lru_cache
 from typing import Any
 import hashlib
 from uuid import uuid4
 
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import now
-from rest_framework.exceptions import ValidationError
 
 from service.clients.paybox import PayboxAPI
 from service.models import Currencies
 from service.utils import get_currency_by_id, get_currencies_price_per, convert_price
 
-from .models import DeliveryAddress, OrderConversion, Customer, PaymentTransactionReceipt
+from .models import DeliveryAddress, OrderConversion, Customer, PaymentTransactionReceipt, Order
+
+
+def get_order(order_id):
+    for _ in range(3):
+        try:
+            order = Order.objects.get(id=order_id)
+        except ObjectDoesNotExist:
+            time.sleep(1)
+        else:
+            return order
 
 
 def duplicate_delivery_address(delivery_address, updates: dict[str, Any]):
@@ -86,29 +97,26 @@ def create_customer(user):
     return customer
 
 
-def init_paybox_transaction(order, amount, transaction_uuid) -> dict[str, str]:
-    payment_client = PayboxAPI(settings.PAYBOX_ID, secret_key=settings.PAYBOX_SECRET_KEY)
+def init_paybox_transaction(order_id, amount, transaction_uuid) -> dict[str, str]:
+    payment_client = PayboxAPI(
+        merchant_id=settings.PAYBOX_ID,
+        secret_key=settings.PAYBOX_SECRET_KEY
+    )
     response_data = payment_client.init_transaction(
-        order_id=order.id,
+        order_id=order_id,
         amount=amount,
-        description="Payment for order No.%s via Paybox" % order.id,
-        salt=settings.PAYBOX_SALT,
+        description="Payment for order No.%s via Paybox" % order_id,
         currency="USD",
+        transaction_uuid=str(transaction_uuid),
+        salt=settings.PAYBOX_SALT,
         result_url=settings.PAYBOX_RESULT_URL,
         success_url=settings.PAYBOX_SUCCESS_URL,
-        failure_url=settings.PAYBOX_FAILURE_URL,
-        transaction_uuid=str(transaction_uuid)
-    )
-    data = response_data.get('response', {})
-    url = data.get('pg_redirect_url')
-    payment_id = data.get('pg_payment_id')
-
-    if not url or not payment_id:
-        raise ValueError("Not found keys pg_redirect_url, pg_payment_id in %s" % response_data)
-
+        failure_url=settings.PAYBOX_FAILURE_URL
+    )['response']
+    payment_client.session.close()
     return {
-        "payment_id": payment_id,
-        "redirect_url": url
+        "payment_id": response_data['pg_payment_id'],
+        "redirect_url": response_data['pg_redirect_url']
     }
 
 

@@ -1,6 +1,5 @@
 import logging
 import os.path
-import time
 from datetime import timedelta
 from uuid import uuid4
 
@@ -10,19 +9,10 @@ from django.utils.timezone import now
 
 from kaimon.celery import app
 from orders.models import Order, OrderConversion, OrderShipping, PaymentTransactionReceipt
-from orders.utils import generate_shipping_code, is_success_transaction, get_receipt_usd_price, init_paybox_transaction
+from orders.utils import generate_shipping_code, is_success_transaction, get_receipt_usd_price, init_paybox_transaction, \
+    get_order
 from service.models import Currencies
 from service.utils import get_currencies_price_per, generate_qrcode
-
-
-def get_order(order_id):
-    for _ in range(3):
-        try:
-            order = Order.objects.get(id=order_id)
-        except ObjectDoesNotExist:
-            time.sleep(1)
-        else:
-            return order
 
 
 @app.task()
@@ -109,9 +99,11 @@ def create_order_payment_transaction(order_id, tries: int = 1):
     if not order and tries <= 3:
         tries += 1
         create_order_payment_transaction.apply_async(eta=now() + timedelta(seconds=3), args=(order_id, tries))
+        logging.error("Not found order with id %s try num %s" % (order_id, tries))
         return
-    elif not order:
-        raise ValueError("Sync error of order %s" % order_id)
+    elif not order and tries > 3:
+        logging.error("Sync error of order %s" % order_id)
+        return
 
     amount = sum([
         get_receipt_usd_price(receipt) or 0
@@ -123,7 +115,7 @@ def create_order_payment_transaction(order_id, tries: int = 1):
 
     transaction_uuid = uuid4()
     paybox_transaction_data = init_paybox_transaction(
-        order=order,
+        order_id=order_id,
         amount=amount,
         transaction_uuid=transaction_uuid
     )
