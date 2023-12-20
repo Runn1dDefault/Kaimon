@@ -96,12 +96,12 @@ def check_paybox_status_for_order(order_id, tries: int = 0):
 def create_order_payment_transaction(order_id, tries: int = 1):
     order = get_order(order_id=order_id)
 
-    if not order and tries <= 3:
+    if not order and tries <= 5:
         tries += 1
         create_order_payment_transaction.apply_async(eta=now() + timedelta(seconds=3), args=(order_id, tries))
         logging.error("Not found order with id %s try num %s" % (order_id, tries))
         return
-    elif not order and tries > 3:
+    elif not order and tries > 5:
         logging.error("Sync error of order %s" % order_id)
         return
 
@@ -111,11 +111,18 @@ def create_order_payment_transaction(order_id, tries: int = 1):
         create_order_payment_transaction.apply_async(eta=now() + timedelta(seconds=3), args=(order_id, tries))
         return
 
-    amount = sum([
-        get_receipt_usd_price(receipt) or 0
+    receipts_usd_prices = [
+        get_receipt_usd_price(receipt)
         for receipt in order.receipts.only('discount', 'unit_price', 'quantity', 'site_currency').all()
-    ])
+    ]
 
+    if None in receipts_usd_prices:
+        logging.error("not all conversions found for order %s!" % order_id)
+        tries += 1
+        create_order_payment_transaction.apply_async(eta=now() + timedelta(seconds=3), args=(order_id, tries))
+        return
+
+    amount = sum(receipts_usd_prices)
     if amount <= 0:
         logging.error("order %s amount equal to zero!" % order_id)
         tries += 1
