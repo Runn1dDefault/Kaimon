@@ -83,9 +83,9 @@ def check_paybox_status_for_order(order_id, tries: int = 0):
         order.status = Order.Status.pending
         order.save()
     else:
-        if tries <= 3:
+        if tries <= 7:
             tries += 1
-            check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=15), args=(order_id, tries))
+            check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=10), args=(order_id, tries))
             return
 
         order.status = Order.Status.payment_rejected
@@ -135,7 +135,7 @@ def create_order_payment_transaction(order_id, tries: int = 1):
         amount=amount,
         transaction_uuid=transaction_uuid
     )
-    check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=15), args=(order.id, 1))
+    check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=30), args=(order.id,))
     PaymentTransactionReceipt.objects.create(
         **{
             "order": order,
