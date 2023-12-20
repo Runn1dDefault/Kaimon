@@ -118,6 +118,8 @@ def create_order_payment_transaction(order_id, tries: int = 1):
 
     if amount <= 0:
         logging.error("order %s amount equal to zero!" % order_id)
+        tries += 1
+        create_order_payment_transaction.apply_async(eta=now() + timedelta(seconds=3), args=(order_id, tries))
         return
 
     transaction_uuid = uuid4()
