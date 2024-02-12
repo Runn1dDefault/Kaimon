@@ -8,6 +8,7 @@ class Currencies(models.TextChoices):
     usd = 'usd', _('Dollar')
     som = 'som', _('Som')
     yen = 'yen', _('Yen')
+    moneta = 'moneta', _('Moneta')
 
     @classmethod
     def from_string(cls, currency: str):
@@ -18,6 +19,8 @@ class Currencies(models.TextChoices):
                 return cls.yen
             case cls.som.value:
                 return cls.som
+            case cls.moneta.value:
+                return cls.moneta
 
     @classmethod
     def to_symbol(cls, currency: str) -> str:

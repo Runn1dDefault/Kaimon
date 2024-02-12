@@ -86,26 +86,26 @@ DATABASES = {
         'HOST': config('PRIMARY_HOST'),
         'PORT': config('PRIMARY_PORT', cast=int)
     },
-    "replica1": {
-        "ENGINE": 'django.db.backends.postgresql',
-        "NAME": config('REPLICATION1_DB'),
-        "USER": config('REPLICATION1_USER'),
-        "PASSWORD": config('REPLICATION1_PASSWORD'),
-        'HOST': config('REPLICATION1_HOST'),
-        'PORT': config('REPLICATION1_PORT', cast=int)
-    },
-    "replica2": {
-        "ENGINE": 'django.db.backends.postgresql',
-        "NAME": config('REPLICATION2_DB'),
-        "USER": config('REPLICATION2_USER'),
-        "PASSWORD": config('REPLICATION2_PASSWORD'),
-        'HOST': config('REPLICATION2_HOST'),
-        'PORT': config('REPLICATION2_PORT', cast=int)
-    }
+    # "replica1": {
+    #     "ENGINE": 'django.db.backends.postgresql',
+    #     "NAME": config('REPLICATION1_DB'),
+    #     "USER": config('REPLICATION1_USER'),
+    #     "PASSWORD": config('REPLICATION1_PASSWORD'),
+    #     'HOST': config('REPLICATION1_HOST'),
+    #     'PORT': config('REPLICATION1_PORT', cast=int)
+    # },
+    # "replica2": {
+    #     "ENGINE": 'django.db.backends.postgresql',
+    #     "NAME": config('REPLICATION2_DB'),
+    #     "USER": config('REPLICATION2_USER'),
+    #     "PASSWORD": config('REPLICATION2_PASSWORD'),
+    #     'HOST': config('REPLICATION2_HOST'),
+    #     'PORT': config('REPLICATION2_PORT', cast=int)
+    # }
 }
 
-CONN_MAX_AGE = 300
-DATABASE_ROUTERS = ["kaimon.routers.PrimaryReplicaRouter"]
+# CONN_MAX_AGE = 300
+# DATABASE_ROUTERS = ["kaimon.routers.PrimaryReplicaRouter"]
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -297,3 +297,7 @@ PAYBOX_SALT = config("PAYBOX_SALT")
 PAYBOX_RESULT_URL = config("PAYBOX_RESULT_URL")
 PAYBOX_SUCCESS_URL = config("PAYBOX_SUCCESS_URL")
 PAYBOX_FAILURE_URL = config("PAYBOX_FAILURE_URL")
+
+
+MONETA_MERCHANT_ID = config("MONETA_MERCHANT_ID")
+MONETA_PRIVATE_KEY = config("MONETA_PRIVATE_KEY")

@@ -12,8 +12,8 @@ from service.clients import fedex
 from service.serializers import ConversionField
 from service.utils import get_currency_by_id, convert_price
 
-from .models import DeliveryAddress, Order, Receipt, PaymentTransactionReceipt
-from .tasks import create_order_payment_transaction
+from .models import DeliveryAddress, Order, Receipt, PaymentTransactionReceipt, MonetaInvoice
+from .tasks import create_order_payment_transaction, create_moneta_invoice
 from .utils import duplicate_delivery_address, get_product_yen_price, order_currencies_price_per, create_customer
 
 
@@ -124,7 +124,14 @@ class PaymentTransactionSerializer(serializers.ModelSerializer):
         read_only_fields = ("order", "send_amount", "redirect_url")
 
 
+class MonetaInvoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MonetaInvoice
+        fields = ("order", "amount", "payment_link")
+
+
 class OrderSerializer(serializers.ModelSerializer):
+    payment_type = serializers.ChoiceField(choices=("paybox", "moneta"), default="paybox", write_only=True)
     address_id = serializers.PrimaryKeyRelatedField(
         queryset=DeliveryAddress.objects.all(),
         write_only=True,
@@ -136,7 +143,7 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = ('id', 'status', 'delivery_address', 'receipts', 'address_id', 'comment',
-                  'created_at')
+                  'created_at', "payment_type")
         extra_kwargs = {'status': {'read_only': True}}
 
     def __init__(self, *args, **kwargs):
@@ -152,6 +159,8 @@ class OrderSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        payment_type = validated_data.pop("payment_type")
+
         user = self.context['request'].user
         validated_data['customer'] = create_customer(user)
         validated_data['delivery_address'] = validated_data.pop('address_id')
@@ -166,7 +175,12 @@ class OrderSerializer(serializers.ModelSerializer):
 
         if receipts:
             Receipt.objects.bulk_create(receipts)
-            create_order_payment_transaction.delay(order.id)
+
+            match payment_type:
+                case "paybox":
+                    create_order_payment_transaction.delay(order.id)
+                case "moneta":
+                    create_moneta_invoice.delay(order.id)
         return order
 
 

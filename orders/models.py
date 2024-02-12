@@ -153,3 +153,15 @@ class PaymentTransactionReceipt(models.Model):
     reference = models.CharField(max_length=100, blank=True, null=True)
     initialized_at = models.DateTimeField(auto_now_add=True)
 
+
+class MonetaInvoice(models.Model):
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, primary_key=True, related_name="moneta_invoice")
+    invoice_id = models.CharField(max_length=100)
+    address = models.CharField(max_length=100)
+    signer = models.CharField(max_length=100)
+    currency = models.CharField(max_length=20)
+    payment_link = models.URLField(max_length=700)
+    amount = models.DateTimeField(max_length=20, decimal_places=10)
+    expired = models.DateTimeField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
