@@ -146,10 +146,6 @@ class OrderSerializer(serializers.ModelSerializer):
                   'created_at', "payment_type")
         extra_kwargs = {'status': {'read_only': True}}
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._transaction_data = None
-
     def validate(self, attrs):
         address = attrs.get('address_id')
         if address and not self.context['request'].user.delivery_addresses.filter(id=address.id).exists():
