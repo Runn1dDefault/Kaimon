@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import datetime
 from functools import lru_cache
 from typing import Any
 import hashlib
@@ -9,11 +10,12 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import now
 
+from service.clients.moneta import MonetaAPI
 from service.clients.paybox import PayboxAPI
 from service.models import Currencies
 from service.utils import get_currency_by_id, get_currencies_price_per, convert_price
 
-from .models import DeliveryAddress, OrderConversion, Customer, PaymentTransactionReceipt, Order
+from .models import DeliveryAddress, OrderConversion, Customer, PaymentTransactionReceipt, Order, MonetaInvoice
 
 
 def get_order(order_id):
@@ -83,6 +85,43 @@ def get_receipt_usd_price(receipt):
         return convert_price(receipt.total_price, price_per)
 
 
+def get_receipt_moneta_price(receipt):
+    if receipt.site_currency == Currencies.moneta:
+        return receipt.total_price
+
+    price_per = order_currencies_price_per(
+        receipt.order_id,
+        currency_from=receipt.site_currency,
+        currency_to=Currencies.moneta
+    )
+    if price_per:
+        return convert_price(receipt.total_price, price_per)
+
+
+def real_receipt_usd_price(receipt):
+    if receipt.site_currency == Currencies.usd:
+        return receipt.total_price
+
+    price_per = get_currencies_price_per(
+        currency_from=receipt.site_currency,
+        currency_to=Currencies.usd
+    )
+    if price_per:
+        return convert_price(receipt.total_price, price_per)
+
+
+def real_receipt_moneta_price(receipt):
+    if receipt.site_currency == Currencies.moneta:
+        return receipt.total_price
+
+    price_per = get_currencies_price_per(
+        currency_from=receipt.site_currency,
+        currency_to=Currencies.moneta
+    )
+    if price_per:
+        return convert_price(receipt.total_price, price_per)
+
+
 def get_bayer_code(user):
     name = user.full_name or user.email
     return f"{''.join([i[0].title() for i in name.split()])}{user.id}"
@@ -134,3 +173,27 @@ def is_success_transaction(transaction: PaymentTransactionReceipt) -> bool:
         return False
     else:
         return response_data.get("response", {}).get("pg_status", "") == "ok"
+
+
+def init_moneta_invoice(order, title: str, amount: int | float) -> MonetaInvoice:
+    client = MonetaAPI(merchant_id=settings.MONETA_MERCHANT_ID, private_key=settings.MONETA_PRIVATE_KEY)
+    data = client.invoice(amount=amount, meta={"title": title})
+    result = data.get("result", {})
+
+    return MonetaInvoice.objects.create(
+        order=order,
+        invoice_id=result["invoice_id"],
+        address=result["address"],
+        signer=result["signer"],
+        currency=result["currency"],
+        amount=result["amount"],
+        expired=datetime.strptime(result["expiredBy"], "%Y-%m-%d %H:%M:%S"),
+        payment_link=result["paymentLink"]
+    )
+
+
+def get_invoice_status(invoice: MonetaInvoice) -> str:
+    client = MonetaAPI(merchant_id=settings.MONETA_MERCHANT_ID, private_key=settings.MONETA_PRIVATE_KEY)
+    data = client.status(invoice.invoice_id)
+    return data.get("result", {}).get("status", "")
+

@@ -84,7 +84,7 @@ def get_site_from_id(obj_id: str) -> str:
     return obj_id.split('_')[0]
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=9)
 def get_currencies_price_per(currency_from, currency_to) -> Decimal | None:
     if currency_from == currency_to:
         return None

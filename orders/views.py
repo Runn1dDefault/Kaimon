@@ -24,7 +24,7 @@ from users.utils import get_sentinel_user
 from .models import DeliveryAddress, Order, PaymentTransactionReceipt
 from .permissions import OrderPermission
 from .serializers import DeliveryAddressSerializer, OrderSerializer, FedexQuoteRateSerializer, \
-    PaymentTransactionSerializer
+    PaymentTransactionSerializer, MonetaInvoiceSerializer
 from .utils import order_currencies_price_per
 
 
@@ -84,6 +84,23 @@ class OrderViewSet(
 
         serializer = PaymentTransactionSerializer(
             instance=payment_tsx,
+            many=False,
+            context=self.get_serializer_context()
+        )
+        return Response(serializer.data)
+
+    @extend_schema(responses={status.HTTP_200_OK: MonetaInvoiceSerializer(many=False),
+                              status.HTTP_404_NOT_FOUND: None})
+    @action(methods=['GET'], detail=True, url_path="moneta-invoice")
+    def get_moneta_invoice(self, request, **kwargs):
+        order = self.get_object()
+        try:
+            moneta_invoice = order.moneta_invoice
+        except ObjectDoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        serializer = MonetaInvoiceSerializer(
+            instance=moneta_invoice,
             many=False,
             context=self.get_serializer_context()
         )
