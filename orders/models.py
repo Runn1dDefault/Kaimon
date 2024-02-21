@@ -1,5 +1,3 @@
-from uuid import uuid4
-
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
@@ -136,32 +134,18 @@ class Receipt(BaseModel):
         return unit_price - (unit_price * discount) / 100
 
 
-class PaymentTransactionReceipt(models.Model):
+class Payment(models.Model):
     objects = models.Manager()
 
-    order = models.OneToOneField(Order, on_delete=models.CASCADE, primary_key=True, related_name='payment_transaction')
-    payment_id = models.CharField(max_length=100, unique=True)
-    uuid = models.UUIDField(default=uuid4, unique=True)
-    redirect_url = models.URLField(max_length=700, blank=True, null=True)
-    send_amount = models.DecimalField(max_digits=20, decimal_places=2)
-    receive_amount = models.DecimalField(max_digits=20, decimal_places=2, null=True)
-    receive_currency = models.CharField(max_length=10, blank=True, null=True)
-    clearing_amount = models.DecimalField(max_digits=20, decimal_places=2, null=True)
-    card_name = models.CharField(max_length=255, blank=True, null=True)
-    card_pan = models.CharField(max_length=20, blank=True, null=True)
-    auth_code = models.CharField(max_length=100, blank=True, null=True)
-    reference = models.CharField(max_length=100, blank=True, null=True)
-    initialized_at = models.DateTimeField(auto_now_add=True)
+    class PaymentType(models.TextChoices):
+        paybox = "paybox", _("Paybox")
+        moneta = "moneta", _("Moneta")
 
-
-class MonetaInvoice(models.Model):
-    order = models.OneToOneField(Order, on_delete=models.CASCADE, primary_key=True, related_name="moneta_invoice")
-    invoice_id = models.CharField(max_length=100)
-    address = models.CharField(max_length=100)
-    signer = models.CharField(max_length=100)
-    currency = models.CharField(max_length=20)
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, primary_key=True, related_name="payment")
+    payment_id = models.CharField(max_length=100)
+    payment_type = models.CharField(max_length=10, choices=PaymentType.choices, default=PaymentType.paybox)
     payment_link = models.URLField(max_length=700)
-    amount = models.DecimalField(max_digits=20, decimal_places=2)
-    expired = models.DateTimeField()
-
+    qrcode = models.ImageField(upload_to='qrcodes/', blank=True, null=True)
+    payment_meta = models.JSONField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)

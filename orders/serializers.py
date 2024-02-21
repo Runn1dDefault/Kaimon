@@ -2,19 +2,23 @@ from collections import OrderedDict
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from requests import HTTPError
-from rest_framework import serializers
+from rest_framework import serializers, status
 
 from products.models import Product, ProductInventory
-from service.clients import fedex
+from service.clients import fedex, PayboxAPI
+from service.clients.moneta import MonetaAPI
+from service.models import Currencies
 from service.serializers import ConversionField
-from service.utils import get_currency_by_id, convert_price
+from service.utils import get_currency_by_id, convert_price, get_currencies_price_per
 
-from .models import DeliveryAddress, Order, Receipt, PaymentTransactionReceipt, MonetaInvoice
-from .tasks import create_order_payment_transaction, create_moneta_invoice
-from .utils import duplicate_delivery_address, get_product_yen_price, order_currencies_price_per, create_customer
+from .models import DeliveryAddress, Order, Receipt, Payment
+from .tasks import check_paybox_status_for_order, check_moneta_status
+from .utils import duplicate_delivery_address, get_product_yen_price, order_currencies_price_per, create_customer, \
+    qrcode_for_url
 
 
 class DeliveryAddressSerializer(serializers.ModelSerializer):
@@ -117,17 +121,10 @@ class ReceiptSerializer(serializers.ModelSerializer):
         return receipt
 
 
-class PaymentTransactionSerializer(serializers.ModelSerializer):
+class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
-        model = PaymentTransactionReceipt
-        fields = ("order", "send_amount", "redirect_url")
-        read_only_fields = ("order", "send_amount", "redirect_url")
-
-
-class MonetaInvoiceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = MonetaInvoice
-        fields = ("order", "amount", "payment_link")
+        model = Payment
+        exclude = ("order",)
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -139,11 +136,12 @@ class OrderSerializer(serializers.ModelSerializer):
     )
     delivery_address = DeliveryAddressSerializer(many=False, read_only=True)
     receipts = ReceiptSerializer(many=True, required=True)
+    payment = PaymentSerializer(read_only=True, many=False)
 
     class Meta:
         model = Order
         fields = ('id', 'status', 'delivery_address', 'receipts', 'address_id', 'comment',
-                  'created_at', "payment_type")
+                  'created_at', "payment_type", "payment")
         extra_kwargs = {'status': {'read_only': True}}
 
     def validate(self, attrs):
@@ -155,31 +153,133 @@ class OrderSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        validated_data.pop("payment_type", None)
-        # payment_type = validated_data.pop("payment_type", "paybox") # TODO: uncomment after testing
+        payment_type = validated_data.pop("payment_type")
 
         user = self.context['request'].user
         validated_data['customer'] = create_customer(user)
         validated_data['delivery_address'] = validated_data.pop('address_id')
 
         products_data = validated_data.pop('receipts')
-        order = super().create(validated_data)
-        receipts = []
-        for product_data in products_data:
-            product_data['order'] = order
-            product_data.pop('inventory_id')
-            receipts.append(Receipt(**product_data))
+        payment = None
 
-        if receipts:
-            Receipt.objects.bulk_create(receipts)
+        with transaction.atomic():
+            order = super().create(validated_data)
+            new_receipts = []
 
-            # TODO: uncomment after testing
-            # match payment_type:
-            #     case "paybox":
-            #         create_order_payment_transaction.delay(order.id)
-            #     case "moneta":
-            #         create_moneta_invoice.delay(order.id)
+            for product_data in products_data:
+                product_data['order'] = order
+                product_data.pop('inventory_id')
+
+                receipt = Receipt(**product_data)
+                new_receipts.append(receipt)
+
+            receipts = Receipt.objects.bulk_create(new_receipts)
+        #     match payment_type:
+        #         case "paybox":
+        #             payment = self._make_paybox(order, receipts)
+        #         case "moneta":
+        #             payment = self._make_moneta(order, receipts)
+        #
+        # if not payment:
+        #     raise serializers.ValidationError(
+        #         {"detail": "Something went wrong. Please try again another time."},
+        #         code=status.HTTP_402_PAYMENT_REQUIRED
+        #     )
         return order
+
+    @staticmethod
+    def _get_receipts_amount(receipts, target_currency: str, intermediate_currency: str = None):
+        if intermediate_currency:
+            assert target_currency != intermediate_currency
+
+        amount = 0
+        for receipt in receipts:
+            if receipt.site_currency == target_currency:
+                amount += receipt.total_price
+                continue
+
+            if not intermediate_currency:
+                amount += convert_price(
+                    receipt.total_price,
+                    get_currencies_price_per(
+                        currency_from=receipt.site_currency,
+                        currency_to=target_currency
+                    )
+                )
+                continue
+
+            # ex: yen -> usd -> moneta
+            if receipt.site_currency != intermediate_currency:
+                main_price_per = get_currencies_price_per(
+                    currency_from=receipt.site_currency,
+                    currency_to=intermediate_currency
+                )
+                price = convert_price(receipt.total_price, main_price_per)
+            else:
+                price = receipt.total_price
+
+            price_per = get_currencies_price_per(
+                currency_from=target_currency,
+                currency_to=intermediate_currency
+            )
+            amount += convert_price(price, price_per, divide=True)
+        return amount
+
+    def _make_paybox(self, order, receipts) -> Payment | None:
+        usd_amount = self._get_receipts_amount(receipts, target_currency=Currencies.usd)
+        if usd_amount <= 0:
+            return
+
+        payment_client = PayboxAPI(
+            merchant_id=settings.PAYBOX_ID,
+            secret_key=settings.PAYBOX_SECRET_KEY
+        )
+        invoice_data = payment_client.init_transaction(
+            order_id=order.id,
+            amount=usd_amount,
+            description="Payment for order No.%s via Paybox" % order.id,
+            currency="USD",
+            salt=settings.PAYBOX_SALT,
+            result_url=settings.PAYBOX_RESULT_URL,
+            success_url=settings.PAYBOX_SUCCESS_URL,
+            failure_url=settings.PAYBOX_FAILURE_URL
+        )['response']
+        payment_client.session.close()
+        payment_link = invoice_data["pg_redirect_url"]
+        payment = Payment.objects.create(
+            order=order,
+            payment_id=invoice_data["pg_payment_id"],
+            payment_type=Payment.PaymentType.paybox,
+            payment_link=payment_link,
+            payment_meta=invoice_data
+        )
+        check_paybox_status_for_order.apply_async(eta=timezone.now() + timezone.timedelta(seconds=15), args=(order.id,))
+        return payment
+
+    def _make_moneta(self, order, receipts) -> Payment | None:
+        amount = self._get_receipts_amount(
+            receipts,
+            target_currency=Currencies.moneta,
+            intermediate_currency=Currencies.usd
+        )
+        if amount <= 0:
+            return
+
+        client = MonetaAPI(merchant_id=settings.MONETA_MERCHANT_ID, private_key=settings.MONETA_PRIVATE_KEY)
+        data = client.invoice(amount=amount, meta={"title": "Payment for order No.%s via Paybox" % order.id})
+        invoice_data = data.get("result", {})
+        payment_link = invoice_data["paymentLink"]
+        payment_id = invoice_data["invoice_id"]
+        payment = Payment.objects.create(
+            order=order,
+            payment_id=payment_id,
+            payment_type=Payment.PaymentType.moneta,
+            payment_link=payment_link,
+            payment_meta=invoice_data,
+            qrcode=qrcode_for_url(f"moneta:{payment_id}", url=payment_link)
+        )
+        check_moneta_status.apply_async(eta=timezone.now() + timezone.timedelta(seconds=15), args=(order.id,))
+        return payment
 
 
 class ProductQuantitySerializer(serializers.Serializer):

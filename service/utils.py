@@ -94,9 +94,12 @@ def get_currencies_price_per(currency_from, currency_to) -> Decimal | None:
         return conversion.price_per
 
 
-def convert_price(current_price: float | Decimal | int, price_per: Decimal):
+def convert_price(current_price: float | Decimal | int, price_per: Decimal, divide: bool = False):
     if not isinstance(current_price, Decimal):
         current_price = Decimal(current_price)
+
+    if divide:
+        return current_price / price_per
     return current_price * price_per
 
 

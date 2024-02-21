@@ -58,3 +58,17 @@ class MonetaAPI(BaseAPIClient):
 
     def status(self, invoice_id: str):
         return self.get("status", params={"invoiceId": invoice_id})
+
+
+if __name__ == "__main__":
+    from pprint import pprint
+    c = MonetaAPI(
+        merchant_id="65aa57d8dfaa362db54f1de5",
+        private_key="6c3d868cdb6792b4b6812f0857fdb26f7885afd47efcd56f4e8a9527777a179d"
+    )
+    data = c.invoice(
+        amount=10,
+        meta={"title": "Test Payment"}
+    )
+    pprint(data)
+

@@ -1,7 +1,9 @@
 import json
 
+from django.core.files.storage import default_storage
 from rest_framework import serializers
 
+from service.models import Currencies
 from service.serializers import ConversionField
 from service.utils import get_currency_by_id, get_currencies_price_per, convert_price, increase_price
 
@@ -49,15 +51,37 @@ class ShortProductSerializer(serializers.ModelSerializer):
         price = site_price if increase_per <= 0 else increase_price(site_price, increase_per)
         currency = self.context['currency']
         obj_currency = get_currency_by_id(obj_id)
+        if currency == obj_currency:
+            prices_template['price'] = price
+            prices_template['sale_price'] = sale_price
+            return prices_template
 
-        if currency != obj_currency:
+        if currency != Currencies.moneta:
             price_per = get_currencies_price_per(currency_from=obj_currency, currency_to=currency)
             prices_template['price'] = convert_price(price, price_per) if price_per else 0.0
             prices_template['sale_price'] = convert_price(sale_price, price_per) if sale_price and price_per else None
-        else:
-            prices_template['price'] = price
-            prices_template['sale_price'] = sale_price
+            return prices_template
 
+        if obj_currency == Currencies.usd:
+            price_per = get_currencies_price_per(currency_from=Currencies.moneta, currency_to=Currencies.usd)
+            prices_template['price'] = convert_price(price, price_per, divide=True) if price_per else 0.0
+            prices_template['sale_price'] = (
+                convert_price(sale_price, price_per, divide=True) if sale_price and price_per else None
+            )
+            return prices_template
+
+        usd_price_per = get_currencies_price_per(currency_from=obj_currency, currency_to=Currencies.usd)
+        if not usd_price_per:
+            return prices_template
+
+        moneta_price_per = get_currencies_price_per(currency_from=Currencies.moneta, currency_to=Currencies.usd)
+        if not moneta_price_per:
+            return prices_template
+
+        usd_price = convert_price(price, usd_price_per)
+        usd_sale = convert_price(sale_price, usd_price_per)
+        prices_template["price"] = convert_price(usd_price, moneta_price_per, divide=True)
+        prices_template['sale_price'] = convert_price(usd_sale, moneta_price_per, divide=True)
         return prices_template
 
     def get_image(self, instance):
@@ -71,7 +95,7 @@ class ShortProductSerializer(serializers.ModelSerializer):
 
             image = image_info.get("image")
             if image:
-                image = ProductImage.image.storage.url(image)
+                image = default_storage.url(image)
                 request = self.context['request']
                 return request.build_absolute_uri(image)
 
