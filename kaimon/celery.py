@@ -25,7 +25,9 @@ MAILING_QUEUE_ROUTE = {'queue': 'mailing', 'routing_key': 'mailing'}
 
 # bind routing with queues
 app.conf.task_routes = {
+    'users.tasks.send_mail_template': MAILING_QUEUE_ROUTE,
     'users.tasks.send_code_template': MAILING_QUEUE_ROUTE,
+    'users.tasks.send_notification_template': MAILING_QUEUE_ROUTE,
     'products.tasks.*': DEFAULT_QUEUE_ROUTE,
     'orders.tasks.*': DEFAULT_QUEUE_ROUTE,
     'service.tasks.*': DEFAULT_QUEUE_ROUTE,

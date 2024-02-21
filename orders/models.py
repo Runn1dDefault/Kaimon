@@ -94,9 +94,9 @@ class OrderConversion(models.Model):
     objects = models.Manager()
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='conversions')
-    currency_from = models.CharField(max_length=5, choices=Currencies.choices)
-    currency_to = models.CharField(max_length=5, choices=Currencies.choices)
-    price_per = models.DecimalField(max_digits=20, decimal_places=10)
+    currency_from = models.CharField(max_length=10, choices=Currencies.choices)
+    currency_to = models.CharField(max_length=10, choices=Currencies.choices)
+    price_per = models.DecimalField(max_digits=20, decimal_places=2)
 
 
 class Receipt(BaseModel):
@@ -107,9 +107,9 @@ class Receipt(BaseModel):
     product_name = models.CharField(max_length=255)
     product_image = models.TextField(blank=True, null=True)
 
-    site_currency = models.CharField(max_length=5, choices=Currencies.choices)
-    site_price = models.DecimalField(max_digits=20, decimal_places=10)
-    unit_price = models.DecimalField(max_digits=20, decimal_places=10)
+    site_currency = models.CharField(max_length=10, choices=Currencies.choices)
+    site_price = models.DecimalField(max_digits=20, decimal_places=2)
+    unit_price = models.DecimalField(max_digits=20, decimal_places=2)
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)], default=1)
     discount = models.DecimalField(
         max_digits=5,
@@ -143,10 +143,10 @@ class PaymentTransactionReceipt(models.Model):
     payment_id = models.CharField(max_length=100, unique=True)
     uuid = models.UUIDField(default=uuid4, unique=True)
     redirect_url = models.URLField(max_length=700, blank=True, null=True)
-    send_amount = models.DecimalField(max_digits=20, decimal_places=10)
-    receive_amount = models.DecimalField(max_digits=20, decimal_places=10, null=True)
+    send_amount = models.DecimalField(max_digits=20, decimal_places=2)
+    receive_amount = models.DecimalField(max_digits=20, decimal_places=2, null=True)
     receive_currency = models.CharField(max_length=10, blank=True, null=True)
-    clearing_amount = models.DecimalField(max_digits=20, decimal_places=10, null=True)
+    clearing_amount = models.DecimalField(max_digits=20, decimal_places=2, null=True)
     card_name = models.CharField(max_length=255, blank=True, null=True)
     card_pan = models.CharField(max_length=20, blank=True, null=True)
     auth_code = models.CharField(max_length=100, blank=True, null=True)
@@ -161,7 +161,7 @@ class MonetaInvoice(models.Model):
     signer = models.CharField(max_length=100)
     currency = models.CharField(max_length=20)
     payment_link = models.URLField(max_length=700)
-    amount = models.DateTimeField(max_length=20, decimal_places=10)
+    amount = models.DecimalField(max_digits=20, decimal_places=2)
     expired = models.DateTimeField()
 
     created_at = models.DateTimeField(auto_now_add=True)

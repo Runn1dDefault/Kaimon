@@ -220,17 +220,18 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-RESTORE_VERIFY_TEMPLATE = {
-    "subject": "Verification code",
-    "code": "",
+MAILING_TEMPLATE = {
+    "preheader": "kaimono.vip",
+    "subject": "Notification",
+    "content": "",
     "warning_text": "if it wasn't you. Please ignore this message and do not share the code with anyone."
 }
-VERIFICATION_PLAIN_TEXT = """
-Verify your email
+
+MAILING_PLAIN_TEXT = """
 *{subject}*
 
 **********
-*{code}*
+*{content}*
 **********
 
 Warning: {warning_text}
