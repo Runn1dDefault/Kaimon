@@ -1,12 +1,11 @@
 import json
 
-from django.db.models import Q
 from rest_framework import serializers
 
 from service.serializers import ConversionField
 from service.utils import get_currency_by_id, get_currencies_price_per, convert_price, increase_price
 
-from .models import Category, Product, ProductInventory, ProductReview, Tag, ProductImage
+from .models import Category, Product, ProductInventory, ProductReview, ProductImage
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -71,19 +70,21 @@ class ShortProductSerializer(serializers.ModelSerializer):
                 image_info = json.loads(image_info)
 
             image = image_info.get("image")
-            url = image_info.get("url")
-        else:
-            image_obj = instance.images.only("url", "image").first()
-            if not image_obj:
-                return
+            if image:
+                image = ProductImage.image.storage.url(image)
+                request = self.context['request']
+                return request.build_absolute_uri(image)
 
-            image = image_obj.image
-            url = image_obj.url
+            return image_info.get("url") or None
 
-        if image:
+        image_obj = instance.images.only("url", "image").first()
+        if not image_obj:
+            return
+
+        if image_obj.image:
             request = self.context['request']
-            return request.build_absolute_uri(image)
-        return url
+            return request.build_absolute_uri(image_obj.image)
+        return image_obj.url or None
 
 
 class ProductInventorySerializer(serializers.ModelSerializer):
