@@ -219,10 +219,10 @@ class OrderSerializer(serializers.ModelSerializer):
                 price = receipt.total_price
 
             price_per = get_currencies_price_per(
-                currency_from=intermediate_currency,
-                currency_to=target_currency
+                currency_from=target_currency,
+                currency_to=intermediate_currency
             )
-            amount += convert_price(price, price_per)
+            amount += convert_price(price, price_per, divide=True)
         return amount
 
     def _make_paybox(self, order, receipts) -> Payment | None:
