@@ -155,7 +155,8 @@ class OrderSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        payment_type = validated_data.pop("payment_type")
+        validated_data.pop("payment_type", None)
+        # payment_type = validated_data.pop("payment_type", "paybox") # TODO: uncomment after testing
 
         user = self.context['request'].user
         validated_data['customer'] = create_customer(user)
@@ -172,11 +173,12 @@ class OrderSerializer(serializers.ModelSerializer):
         if receipts:
             Receipt.objects.bulk_create(receipts)
 
-            match payment_type:
-                case "paybox":
-                    create_order_payment_transaction.delay(order.id)
-                case "moneta":
-                    create_moneta_invoice.delay(order.id)
+            # TODO: uncomment after testing
+            # match payment_type:
+            #     case "paybox":
+            #         create_order_payment_transaction.delay(order.id)
+            #     case "moneta":
+            #         create_moneta_invoice.delay(order.id)
         return order
 
 
