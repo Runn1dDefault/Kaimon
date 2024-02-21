@@ -10,9 +10,15 @@ from service.enums import Site
 class Banner(models.Model):
     objects = models.Manager()
 
-    name = models.CharField(max_length=255, verbose_name=_('Name') + '[ja]')
+    class Type(models.TextChoices):
+        link = "link", _("Link")
+        promotion = "promotion", _("Promotion")
+
+    type = models.CharField(max_length=20, choices=Type.choices, default=Type.promotion)
+    name = models.CharField(max_length=255, verbose_name=_('Name') + '[ja]', blank=True, null=True)
     description = models.TextField(blank=True, null=True, verbose_name=_('Description') + '[ja]')
     image = models.ImageField(upload_to='banners/', null=True, blank=True)
+    link = models.URLField(max_length=700, blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

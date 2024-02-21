@@ -244,6 +244,13 @@ class BannerAdminSerializer(serializers.ModelSerializer):
         model = Banner
         fields = '__all__'
 
+    def validate(self, attrs):
+        banner_type = attrs.get("type", "")
+        link = attrs.get("link")
+        if banner_type == Banner.Type.link and not link:
+            raise serializers.ValidationError({"link": "required if banner type is %s" % Banner.Type.link.value})
+        return attrs
+
 
 class PromotionAdminSerializer(serializers.ModelSerializer):
     name = serializers.CharField(write_only=True, required=True)
@@ -263,7 +270,7 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Promotion
-        banner_fields = ('name', 'description', 'image')
+        banner_fields = ('type', 'name', 'description', 'image', 'link')
         fields = ('id', 'site', 'discount', 'set_discount', 'banner', 'products', 'set_products',
                   'deactivated', 'created_at', *banner_fields)
         extra_kwargs = {"site": {"required": True}}
@@ -298,13 +305,19 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
         banner_serializer = BannerAdminSerializer(data=banner_data, many=False, context=self.context)
         banner_serializer.is_valid(raise_exception=True)
         banner_serializer.save()
+
         validated_data['banner_id'] = banner_serializer.instance.id
         promotion = super().create(validated_data)
-        if discount:
-            Discount.objects.create(promotion=promotion, percentage=discount)
-        if products:
-            promotion.products.add(*products)
-            promotion.save()
+
+        banner_type = banner_data.get("type")
+        match banner_type:
+            case Banner.Type.promotion if products:
+                promotion.products.add(*products)
+                promotion.save()
+
+        match banner_type:
+            case Banner.Type.promotion if discount:
+                Discount.objects.create(promotion=promotion, percentage=discount)
         return promotion
 
     def update(self, instance, validated_data):

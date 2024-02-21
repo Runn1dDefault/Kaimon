@@ -146,6 +146,6 @@ class Payment(models.Model):
     payment_type = models.CharField(max_length=10, choices=PaymentType.choices, default=PaymentType.paybox)
     payment_link = models.URLField(max_length=700)
     qrcode = models.ImageField(upload_to='qrcodes/', blank=True, null=True)
-    payment_meta = models.JSONField(blank=True, null=True)
+    payment_meta = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
