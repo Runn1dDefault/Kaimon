@@ -89,7 +89,7 @@ class Product(BaseModel):
 
     categories = models.ManyToManyField(Category, related_name='products')
     # TODO: category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
-    tags = models.ManyToManyField(Tag, blank=True, related_name='products')
+    # tags = models.ManyToManyField(Tag, blank=True, related_name='products')
 
     avg_rating = models.FloatField(default=0)
     reviews_count = models.PositiveIntegerField(default=0)
