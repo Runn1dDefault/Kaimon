@@ -117,11 +117,17 @@ class ProductFilter(BaseFilterBackend):
 
         product_ids = request.query_params.get(self.product_ids_param)
         if product_ids:
-            filters["id__in"] = [product_id for product_id in product_ids.split() if product_id.strip()]
+            filters["id__in"] = [
+                product_id for product_id in product_ids.replace(" ", "").split(',')
+                if product_id.strip()
+            ]
 
         tag_ids = request.query_params.get(self.tag_ids_param)
         if tag_ids:
-            filters["tags__in"] = [tag_id for tag_id in tag_ids.split() if tag_id.strip()]
+            filters["tags__in"] = [
+                tag_id for tag_id in tag_ids.replace(" ", "").split(",")
+                if tag_id.strip()
+            ]
         return filters
 
     def filter_queryset(self, request, queryset, view):
