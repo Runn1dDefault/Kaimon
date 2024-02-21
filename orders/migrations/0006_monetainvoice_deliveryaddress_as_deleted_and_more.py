@@ -25,11 +25,6 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True)),
             ],
         ),
-        migrations.AddField(
-            model_name='deliveryaddress',
-            name='as_deleted',
-            field=models.BooleanField(default=False),
-        ),
         migrations.AlterField(
             model_name='orderconversion',
             name='currency_from',
