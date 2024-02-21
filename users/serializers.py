@@ -9,7 +9,7 @@ from rest_framework import serializers
 from rest_framework.fields import empty
 
 from .models import User
-from .tasks import send_code_template
+from .tasks import send_code_template, send_notification_template
 from .tokens import get_tokens_for_user, generate_restore_token, generate_confirm_code
 from .utils import smp_cache_key_for_email
 
@@ -165,7 +165,7 @@ class RecoveryCodeSerializer(BaseRecoverySerializer):
 
         # if you need to restrict sending for a user who has already sent, then change raise_on_exist to True
         new_code = generate_confirm_code(user_id=self._user.id, raise_on_exist=False)
-        send_code_template(email=email, code=str(new_code))
+        send_code_template.delay(email=email, code=str(new_code))
         return {'status': 'send'}
 
 
@@ -184,6 +184,7 @@ class UpdatePasswordSerializer(PasswordSerializer):
     def update(self, instance, validated_data):
         instance.set_password(validated_data['password'])
         instance.save()
+        send_notification_template.delay(email=instance.email, msg="Your password has been updated.")
         return instance
 
     def to_representation(self, instance):
