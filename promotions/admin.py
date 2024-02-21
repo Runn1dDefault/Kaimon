@@ -6,8 +6,7 @@ from .models import Banner, Promotion, Discount
 
 @admin.register(Banner)
 class BannerAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'created_at')
-    list_display_links = ('id', 'name',)
+    list_display = ('id', 'name', 'created_at', "type")
     list_filter = ('created_at', )
     search_fields = ('id', 'name',)
     search_help_text = _('Search by field: ID, Name')

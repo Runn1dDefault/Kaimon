@@ -7,7 +7,7 @@ from .models import Banner, Promotion
 class BannerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Banner
-        fields = ('id', 'name', 'description', 'image')
+        fields = ('id', 'type', 'name', 'description', 'image', 'link')
 
 
 class PromotionSerializer(serializers.ModelSerializer):
