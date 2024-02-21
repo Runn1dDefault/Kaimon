@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Customer, DeliveryAddress, Order, OrderConversion, OrderShipping, Receipt, PaymentTransactionReceipt
+from .models import Customer, DeliveryAddress, Order, OrderConversion, OrderShipping, Receipt, Payment
 
 
 @admin.register(Customer)
@@ -47,4 +47,4 @@ class ReceiptAdmin(admin.ModelAdmin):
     readonly_fields = ("id",)
 
 
-admin.site.register(PaymentTransactionReceipt)
+admin.site.register(Payment)

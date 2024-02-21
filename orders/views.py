@@ -1,4 +1,4 @@
-from decimal import Decimal
+from copy import deepcopy
 
 import xmltodict
 from django.conf import settings
@@ -8,7 +8,6 @@ from django.http import HttpResponseNotFound
 from django.shortcuts import get_object_or_404, render
 from drf_spectacular.utils import extend_schema
 from rest_framework import views, viewsets, generics, mixins, parsers, permissions, status
-from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -21,10 +20,9 @@ from service.utils import convert_price
 from users.permissions import RegistrationPayedPermission, EmailConfirmedPermission
 from users.utils import get_sentinel_user
 
-from .models import DeliveryAddress, Order, PaymentTransactionReceipt
+from .models import DeliveryAddress, Order, Payment
 from .permissions import OrderPermission
-from .serializers import DeliveryAddressSerializer, OrderSerializer, FedexQuoteRateSerializer, \
-    PaymentTransactionSerializer, MonetaInvoiceSerializer
+from .serializers import DeliveryAddressSerializer, OrderSerializer, FedexQuoteRateSerializer
 from .utils import order_currencies_price_per
 
 
@@ -65,46 +63,8 @@ class OrderViewSet(
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
-    def perform_create(self, serializer):
-        with transaction.atomic():
-            super().perform_create(serializer)
-
     def get_queryset(self):
         return super().get_queryset().filter(delivery_address__user=self.request.user)
-
-    @extend_schema(responses={status.HTTP_200_OK: PaymentTransactionSerializer(many=False),
-                              status.HTTP_404_NOT_FOUND: None})
-    @action(methods=['GET'], detail=True, url_path="paybox-transaction")
-    def get_paybox_transaction(self, request, **kwargs):
-        order = self.get_object()
-        try:
-            payment_tsx = order.payment_transaction
-        except ObjectDoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
-        serializer = PaymentTransactionSerializer(
-            instance=payment_tsx,
-            many=False,
-            context=self.get_serializer_context()
-        )
-        return Response(serializer.data)
-
-    @extend_schema(responses={status.HTTP_200_OK: MonetaInvoiceSerializer(many=False),
-                              status.HTTP_404_NOT_FOUND: None})
-    @action(methods=['GET'], detail=True, url_path="moneta-invoice")
-    def get_moneta_invoice(self, request, **kwargs):
-        order = self.get_object()
-        try:
-            moneta_invoice = order.moneta_invoice
-        except ObjectDoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
-        serializer = MonetaInvoiceSerializer(
-            instance=moneta_invoice,
-            many=False,
-            context=self.get_serializer_context()
-        )
-        return Response(serializer.data)
 
 
 class FedexQuoteRateView(generics.GenericAPIView):
@@ -182,108 +142,48 @@ def order_info(request, order_id):
 
 
 class PayboxResultView(views.APIView):
-    transaction_receipt_model = PaymentTransactionReceipt
+    queryset = Payment.objects.filter(payment_type=Payment.PaymentType.paybox)
+    MESSAGES = {
+        "empty": {'pg_status': 'error', 'pg_description': ''},
+        "interpretation": {'pg_status': 'error','pg_description': 'Ошибка в интерпретации данных'},
+        "rejected": {'pg_status': 'rejected', 'pg_description': 'Ожидание успешного статуса оплаты'},
+        "success": {'pg_status': 'ok', 'pg_description': 'Заказ оплачен'}
+    }
+
+    def _xml_response(self, key: str, sig=None, salt=None, **kwargs) -> Response:
+        resp_data = deepcopy(self.MESSAGES[key])
+        if sig:
+            resp_data["pg_sig"] = sig
+        if salt:
+            resp_data["pg_salt"] = salt
+        return Response(xmltodict.unparse({"response": resp_data}), **kwargs)
 
     def post(self, request):
-        payload = request.data
+        payload = request.data or {}
         salt = payload.get("pg_salt")
         signature = payload.get("pg_sig")
 
         if not salt or salt != settings.PAYBOX_SALT or not signature:
-            return Response(
-                xmltodict.unparse(
-                    {
-                        'response': {
-                            'pg_status': 'error',
-                            'pg_description': ''
-                        }
-                    }
-                ),
-                status=status.HTTP_403_FORBIDDEN
-            )
+            return self._xml_response("empty", status=status.HTTP_403_FORBIDDEN)
 
-        payment_id = payload.get('pg_payment_id')
-        payment_status = payload.get("pg_result", "")
-        can_reject = payload.get("pg_can_reject", "")
-
+        payment_id, payment_status = payload.get('pg_payment_id'), payload.get("pg_result", "")
         if (
             not payment_id
-            or not self.transaction_receipt_model.objects.filter(payment_id=payment_id).exists()
+            or not self.queryset.filter(payment_id=payment_id).exists()
             or payment_status not in ("0", "1")
-            or can_reject not in ("0", "1")
         ):
-            return Response(
-                xmltodict.unparse(
-                    {
-                        'response': {
-                            'pg_status': 'error',
-                            'pg_description': 'Ошибка в интерпретации данных',
-                            'pg_salt': salt,
-                            'pg_sig': signature
-                        }
-                    }
-                ),
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return self._xml_response("interpretation", salt=salt, sig=signature,
+                                      status=status.HTTP_400_BAD_REQUEST)
 
-        receipt = self.transaction_receipt_model.objects.filter(payment_id=payment_id).first()
-        transaction_uuid = payload.get("transaction_uuid", "")
-
-        if transaction_uuid != str(receipt.uuid):
-            return Response(
-                xmltodict.unparse(
-                    {
-                        'response': {
-                            'pg_status': 'error',
-                            'pg_description': 'Ошибка в интерпретации данных',
-                            'pg_salt': salt,
-                            'pg_sig': signature
-                        }
-                    }
-                ),
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        order = receipt.order
+        payment = self.queryset.filter(payment_id=payment_id).first()
+        order = payment.order
         if payment_status == "0":
             order.status = Order.Status.payment_rejected
             order.save()
-            return Response(
-                xmltodict.unparse(
-                    {
-                        'response': {
-                            'pg_status': 'rejected',
-                            'pg_description': 'Ожидание успешного статуса оплаты',
-                            'pg_salt': salt,
-                            'pg_sig': signature
-                        }
-                    }
-                ),
-                status=status.HTTP_200_OK
-            )
+            return self._xml_response("rejected", sig=signature, salt=salt)
 
-        payment_receipt = get_object_or_404(self.transaction_receipt_model, payment_id=payment_id)
-        payment_receipt.receive_amount = payload.get("pg_amount")
-        payment_receipt.receive_currency = payload.get("pg_currency")
-        payment_receipt.clearing_amount = Decimal(payload.get("pg_clearing_amount", 0))
-        payment_receipt.card_name = payload.get("pg_card_name")
-        payment_receipt.card_pan = payload.get("card_pan")
-        payment_receipt.auth_code = payload.get("auth_code")
-        payment_receipt.reference = payload.get("pg_reference")
-        payment_receipt.payment_status = payment_status
-        payment_receipt.save()
+        payment.payment_meta = payload
+        payment.save()
         order.status = Order.Status.pending
         order.save()
-        return Response(
-            xmltodict.unparse(
-                {
-                    'response': {
-                        'pg_status': 'ok',
-                        'pg_description': 'Заказ оплачен',
-                        'pg_salt': salt,
-                        'pg_sig': signature
-                    }
-                }
-            ),
-            status=status.HTTP_200_OK
-        )
+        return self._xml_response("success", sig=signature, salt=salt)
