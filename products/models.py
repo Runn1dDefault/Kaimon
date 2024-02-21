@@ -126,7 +126,7 @@ class ProductImage(models.Model):
 class ProductInventory(BaseModel):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='inventories')
     item_code = models.CharField(max_length=100)
-    site_price = models.DecimalField(max_digits=20, decimal_places=10)
+    site_price = models.DecimalField(max_digits=20, decimal_places=2)
     product_url = models.URLField(max_length=700)
     name = models.CharField(max_length=255)
     tags = models.ManyToManyField(Tag, blank=True, related_name='product_inventories')
@@ -139,7 +139,7 @@ class ProductInventory(BaseModel):
             MaxValueValidator(limit_value=100)
         ]
     )
-    sale_price = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True)
+    sale_price = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
     color_image = models.URLField(max_length=700, blank=True, null=True)
 
     @property
