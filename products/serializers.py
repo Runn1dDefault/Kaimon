@@ -1,5 +1,6 @@
 import json
 
+from django.core.files.storage import default_storage
 from rest_framework import serializers
 
 from service.serializers import ConversionField
@@ -71,7 +72,7 @@ class ShortProductSerializer(serializers.ModelSerializer):
 
             image = image_info.get("image")
             if image:
-                image = ProductImage.image.storage.url(image)
+                image = default_storage.url(image)
                 request = self.context['request']
                 return request.build_absolute_uri(image)
 
