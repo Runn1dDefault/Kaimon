@@ -126,7 +126,7 @@ class HasReviewFilter(admin.SimpleListFilter):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductImageInline, ProductInventoryInline]
-    autocomplete_fields = ("categories", "tags")
+    autocomplete_fields = ("categories",)
     list_display = ("id", 'product_name', "product_price", "is_active", "site_reviews_count", "site_avg_rating")
     search_fields = ("id", "name")
     list_filter = (SiteFilter, "is_active", "modified_at", HasReviewFilter, "site_avg_rating",)
@@ -145,7 +145,7 @@ class ProductAdmin(admin.ModelAdmin):
         ),
         (
             _("Relations"),
-            {'classes': ['collapse'], 'fields': ('categories', 'tags')}
+            {'classes': ['collapse'], 'fields': ('categories',)}
         )
     )
 
