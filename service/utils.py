@@ -99,8 +99,8 @@ def convert_price(current_price: float | Decimal | int, price_per: Decimal, divi
         current_price = Decimal(current_price)
 
     if divide:
-        return current_price / price_per
-    return current_price * price_per
+        return Decimal(current_price) / Decimal(price_per)
+    return Decimal(current_price) * Decimal(price_per)
 
 
 def get_currency_by_id(instance_id):
