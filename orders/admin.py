@@ -28,9 +28,14 @@ class OrderShippingDetailInline(admin.StackedInline):
     extra = 1
 
 
+class PaymentInline(admin.StackedInline):
+    model = Payment
+    extra = 0
+
+
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    inlines = [OrderConversionInline, OrderShippingDetailInline]
+    inlines = [OrderConversionInline, OrderShippingDetailInline, PaymentInline]
     autocomplete_fields = ('customer', 'delivery_address')
     list_display = ('id', 'delivery_address', 'status', 'created_at')
     list_display_links = ('id', 'delivery_address')
@@ -45,6 +50,3 @@ class ReceiptAdmin(admin.ModelAdmin):
     list_display = ('id', 'order', 'product_code')
     search_fields = ('id', 'order_id', 'product_code', "product_name", "shop_code")
     readonly_fields = ("id",)
-
-
-admin.site.register(Payment)
