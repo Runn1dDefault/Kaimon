@@ -124,7 +124,7 @@ class ReceiptSerializer(serializers.ModelSerializer):
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
-        exclude = ("order",)
+        fields = ("payment_link", "qrcode")
 
 
 class OrderSerializer(serializers.ModelSerializer):
