@@ -1,3 +1,4 @@
+import logging
 from collections import OrderedDict
 
 from django.conf import settings
@@ -174,11 +175,15 @@ class OrderSerializer(serializers.ModelSerializer):
                 new_receipts.append(receipt)
 
             receipts = Receipt.objects.bulk_create(new_receipts)
-            match payment_type:
-                case "paybox":
-                    payment = self._make_paybox(order, receipts)
-                case "moneta":
-                    payment = self._make_moneta(order, receipts)
+            try:
+                match payment_type:
+                    case "paybox":
+                        payment = self._make_paybox(order, receipts)
+                    case "moneta":
+                        payment = self._make_moneta(order, receipts)
+            except Exception as e:
+                payment = None
+                logging.error(e)
 
         if not payment:
             raise serializers.ValidationError(
