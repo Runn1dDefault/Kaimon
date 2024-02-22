@@ -174,17 +174,17 @@ class OrderSerializer(serializers.ModelSerializer):
                 new_receipts.append(receipt)
 
             receipts = Receipt.objects.bulk_create(new_receipts)
-        #     match payment_type:
-        #         case "paybox":
-        #             payment = self._make_paybox(order, receipts)
-        #         case "moneta":
-        #             payment = self._make_moneta(order, receipts)
-        #
-        # if not payment:
-        #     raise serializers.ValidationError(
-        #         {"detail": "Something went wrong. Please try again another time."},
-        #         code=status.HTTP_402_PAYMENT_REQUIRED
-        #     )
+            match payment_type:
+                case "paybox":
+                    payment = self._make_paybox(order, receipts)
+                case "moneta":
+                    payment = self._make_moneta(order, receipts)
+
+        if not payment:
+            raise serializers.ValidationError(
+                {"detail": "Something went wrong. Please try again another time."},
+                code=status.HTTP_402_PAYMENT_REQUIRED
+            )
         return order
 
     @staticmethod

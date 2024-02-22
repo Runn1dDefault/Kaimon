@@ -3,7 +3,6 @@ from copy import deepcopy
 import xmltodict
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import transaction
 from django.http import HttpResponseNotFound
 from django.shortcuts import get_object_or_404, render
 from drf_spectacular.utils import extend_schema
