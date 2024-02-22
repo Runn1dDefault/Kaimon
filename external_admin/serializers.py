@@ -253,10 +253,6 @@ class BannerAdminSerializer(serializers.ModelSerializer):
 
 
 class PromotionAdminSerializer(serializers.ModelSerializer):
-    name = serializers.CharField(write_only=True, required=True)
-    description = serializers.CharField(write_only=True, required=False)
-    image = serializers.ImageField(write_only=True, required=False)
-
     set_products = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.all(),
         write_only=True,
@@ -265,23 +261,14 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
     )
     set_discount = serializers.FloatField(validators=[MaxValueValidator(100)], write_only=True, required=False)
     discount = serializers.SlugRelatedField(slug_field='percentage', read_only=True)
-    banner = BannerAdminSerializer(many=False, read_only=True)
+    banner = BannerAdminSerializer(many=False)
     products = ProductAdminSerializer(many=True, read_only=True)
 
     class Meta:
         model = Promotion
-        banner_fields = ('type', 'name', 'description', 'image', 'link')
         fields = ('id', 'site', 'discount', 'set_discount', 'banner', 'products', 'set_products',
-                  'deactivated', 'created_at', *banner_fields)
+                  'deactivated', 'created_at', 'banner')
         extra_kwargs = {"site": {"required": True}}
-
-    def collect_banner_data(self, validated_data) -> dict[str, Any]:
-        banner_data = {}
-        fields = list(validated_data.keys())
-        for field in fields:
-            if field in self.Meta.banner_fields:
-                banner_data[field] = validated_data.pop(field)
-        return banner_data
 
     @staticmethod
     def validate_products_site(site, products) -> bool:
@@ -301,14 +288,14 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         discount = validated_data.pop('set_discount', None)
         products = validated_data.pop('set_products', None)
-        banner_data = self.collect_banner_data(validated_data)
-        banner_serializer = BannerAdminSerializer(data=banner_data, many=False, context=self.context)
-        banner_serializer.is_valid(raise_exception=True)
-        banner_serializer.save()
+        banner_data = validated_data.pop("banner", None)
+        if banner_data:
+            banner_serializer = BannerAdminSerializer(data=banner_data, many=False, context=self.context)
+            banner_serializer.is_valid(raise_exception=True)
+            banner_serializer.save()
+            validated_data['banner'] = banner_serializer.instance
 
-        validated_data['banner_id'] = banner_serializer.instance.id
         promotion = super().create(validated_data)
-
         banner_type = banner_data.get("type")
         match banner_type:
             case Banner.Type.promotion if products:

@@ -91,7 +91,7 @@ def check_paybox_status_for_order(order_id, tries: int = 0):
 
 
 @app.task()
-def check_moneta_status(order_id, tries: int, max_tries: int = 10):
+def check_moneta_status(order_id, tries: int = 3, max_tries: int = 10):
     order = Order.objects.get(id=order_id)
     if order.status != Order.Status.wait_payment:
         return

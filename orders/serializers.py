@@ -274,7 +274,7 @@ class OrderSerializer(serializers.ModelSerializer):
         data = client.invoice(amount=amount, meta={"title": "Payment for order No.%s via Paybox" % order.id})
         invoice_data = data.get("result", {})
         payment_link = invoice_data["paymentLink"]
-        payment_id = invoice_data["invoice_id"]
+        payment_id = invoice_data["invoiceId"]
         payment = Payment.objects.create(
             order=order,
             payment_id=payment_id,
