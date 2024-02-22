@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -65,7 +65,7 @@ def create_order_shipping_details(order_id: str):
 
 
 @app.task()
-def check_paybox_status_for_order(order_id, tries: int = 0):
+def check_paybox_status_for_order(order_id, tries: int = 0, max_tries: int = 10):
     order = Order.objects.get(id=order_id)
     if order.status != Order.Status.wait_payment:
         return
@@ -81,9 +81,10 @@ def check_paybox_status_for_order(order_id, tries: int = 0):
         order.status = Order.Status.pending
         order.save()
     else:
-        if tries <= 7:
+        if tries <= max_tries:
             tries += 1
-            check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=5), args=(order_id, tries))
+            check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=5),
+                                                      args=(order_id, tries, max_tries))
             return
 
         order.status = Order.Status.payment_rejected
@@ -91,13 +92,14 @@ def check_paybox_status_for_order(order_id, tries: int = 0):
 
 
 @app.task()
-def check_moneta_status(order_id, tries: int = 3, max_tries: int = 10):
+def check_moneta_status(order_id, tries: int = 0, max_tries: int = 10):
     order = Order.objects.get(id=order_id)
     if order.status != Order.Status.wait_payment:
         return
 
+    payment = order.payment
     client = MonetaAPI(merchant_id=settings.MONETA_MERCHANT_ID, private_key=settings.MONETA_PRIVATE_KEY)
-    status = client.status(order.payment.payment_id).get("result", {}).get("status", "")
+    status = client.status(payment.payment_id).get("result", {}).get("status", "")
 
     save = False
     match status:
@@ -111,10 +113,29 @@ def check_moneta_status(order_id, tries: int = 3, max_tries: int = 10):
     if save:
         order.save()
     else:
-        if tries <= max_tries:
+        if tries > max_tries:
+            order.status = Order.Status.payment_rejected
+            order.save()
+
+        if tries < max_tries:
             tries += 1
-            check_moneta_status.apply_async(eta=now() + timedelta(seconds=5), args=(order_id, tries))
+            check_moneta_status.apply_async(eta=now() + timedelta(seconds=5),
+                                            args=(order_id, tries, max_tries))
             return
 
-        order.status = Order.Status.payment_rejected
-        order.save()
+        # if tries equal to max_tries
+        expired = payment.payment_meta.get("expiredBy")
+        if not expired:
+            order.status = Order.Status.payment_rejected
+            order.save()
+
+        try:
+            check_paybox_status_for_order.apply_async(
+                eta=datetime.strptime(expired, "%Y-%m-%dT%H:%M:%S.%fZ"),
+                args=(order_id, tries + 1, max_tries)
+            )
+        except ValueError:
+            order.status = Order.Status.payment_rejected
+            order.save()
+        else:
+            return
