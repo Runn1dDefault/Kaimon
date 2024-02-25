@@ -119,6 +119,10 @@ class ProductInventorySerializer(serializers.ModelSerializer):
     color_name = serializers.SerializerMethodField(read_only=True)
     size_name = serializers.SerializerMethodField(read_only=True)
 
+    def __init__(self, *args, **kwargs):
+        self._include_products = kwargs.pop("include_products", False)
+        super().__init__(*args, **kwargs)
+
     class Meta:
         model = ProductInventory
         fields = ("id", 'item_code', 'name', "quantity", "status_code", 'price',
@@ -155,6 +159,23 @@ class ProductInventorySerializer(serializers.ModelSerializer):
         color = instance.tags.filter(group_id="uniqlo_c1olors").only("id").first()
         if color:
             return color.id
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if self._include_products:
+            request = self.context["request"]
+
+            image = instance.product.images.first()
+            image_url = None
+            if image:
+                image_url = request.build_absolute_uri(image.image.url) if image.image else image.url
+
+            data["product"] = {
+                "id": instance.product.id,
+                "name": instance.product.name,
+                "image": image_url
+            }
+        return data
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
