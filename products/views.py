@@ -253,3 +253,6 @@ class InventoriesByIdsView(CachingMixin, CurrencyMixin, ListAPIView):
     def get_cache_prefix(cls) -> str:
         return 'product'
 
+    def get_serializer(self, *args, **kwargs):
+        kwargs.setdefault("include_products", True)
+        super().get_serializer(*args, **kwargs)
