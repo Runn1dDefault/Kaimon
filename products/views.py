@@ -255,4 +255,4 @@ class InventoriesByIdsView(CachingMixin, CurrencyMixin, ListAPIView):
 
     def get_serializer(self, *args, **kwargs):
         kwargs.setdefault("include_products", True)
-        super().get_serializer(*args, **kwargs)
+        return super().get_serializer(*args, **kwargs)
