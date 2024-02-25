@@ -20,13 +20,14 @@ from service.utils import recursive_single_tree
 from .filters import (
     CategoryLevelFilter, ProductFilter,
     ProductSQLPopularFilter, ProductSQLSearchFilter, ProductSQLNewFilter, ProductsByCategorySQLFilter,
-    ProductsByIdsSQlFilter
+    ProductsByIdsSQlFilter, FilterByIds
 )
-from .models import Category, Product, Tag, ProductReview
+from .models import Category, Product, Tag, ProductReview, ProductInventory
 from .paginations import CategoryPagination, ProductReviewPagination, ProductPagination
 from .serializers import (
     CategorySerializer,
-    ShortProductSerializer, ProductDetailSerializer, ProductReferenceSerializer, ProductReviewSerializer
+    ShortProductSerializer, ProductDetailSerializer, ProductReferenceSerializer, ProductReviewSerializer,
+    ProductInventorySerializer
 )
 
 
@@ -240,3 +241,15 @@ class UserReviewViewSet(
 
     def get_queryset(self):
         return super().get_queryset().filter(user=self.request.user)
+
+
+class InventoriesByIdsView(CachingMixin, CurrencyMixin, ListAPIView):
+    permission_classes = (AllowAny,)
+    queryset = ProductInventory.objects.filter(product__is_active=True)
+    filter_backends = (FilterByIds,)
+    serializer_class = ProductInventorySerializer
+
+    @classmethod
+    def get_cache_prefix(cls) -> str:
+        return 'product'
+

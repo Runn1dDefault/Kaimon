@@ -546,3 +546,18 @@ class CategoryTagsFilter(BaseSQLProductsFilter):
 
     def get_schema_operation_parameters(self, view):
         return []
+
+
+class FilterByIds(BaseFilterBackend):
+    def filter_queryset(self, request, queryset, view):
+        ids = request.query_params.get("ids")
+        ids_param_required = getattr(view, "ids_param_required", True)
+
+        if not ids and ids_param_required:
+            raise ValidationError({"detail": "ids param is required!"})
+
+        if not ids and not ids_param_required:
+            return queryset
+        ids = [i for i in ids.replace(" ", "").split(",") if i.strip()]
+        return queryset.filter(id__in=ids)
+        
