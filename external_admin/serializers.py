@@ -282,7 +282,6 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
         return all(product.id.startswith(site) for product in products)
 
     def validate(self, attrs):
-        attrs = self.validate_banner_data(attrs)
         products = attrs.get('set_products')
         if products:
             site = attrs.get('site')
