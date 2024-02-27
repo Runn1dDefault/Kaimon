@@ -80,6 +80,7 @@ def check_paybox_status_for_order(order_id, tries: int = 0, max_tries: int = 10)
     if response_data.get("response", {}).get("pg_status", "") == "ok":
         order.status = Order.Status.pending
         order.save()
+        logging.info("Success")
     else:
         if tries <= max_tries:
             tries += 1
@@ -89,6 +90,7 @@ def check_paybox_status_for_order(order_id, tries: int = 0, max_tries: int = 10)
 
         order.status = Order.Status.payment_rejected
         order.save()
+        logging.error("Max tries to check paybox status")
 
 
 @app.task()
@@ -112,23 +114,15 @@ def check_moneta_status(order_id, tries: int = 0, max_tries: int = 10):
 
     if save:
         order.save()
+        logging.info("Success")
     else:
-        if tries > max_tries:
-            order.status = Order.Status.payment_rejected
-            order.save()
-
-        if tries < max_tries:
+        if tries <= max_tries:
             tries += 1
             check_moneta_status.apply_async(eta=now() + timedelta(seconds=5),
                                             args=(order_id, tries, max_tries))
             return
 
-        # if tries equal to max_tries
-        expired = payment.payment_meta.get("expiredBy")
-        if not expired:
-            order.status = Order.Status.payment_rejected
-            order.save()
-
+        expired = payment.payment_meta.get("expiredBy", "")
         try:
             check_paybox_status_for_order.apply_async(
                 eta=datetime.strptime(expired, "%Y-%m-%dT%H:%M:%S.%fZ"),
@@ -137,5 +131,4 @@ def check_moneta_status(order_id, tries: int = 0, max_tries: int = 10):
         except ValueError:
             order.status = Order.Status.payment_rejected
             order.save()
-        else:
-            return
+            logging.error("Max tries to check paybox status")
