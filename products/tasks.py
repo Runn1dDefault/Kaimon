@@ -2,12 +2,14 @@ import logging
 import time
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Avg
+from django.db.models import Avg, F
 
 from kaimon.celery import app
+from service.enums import Site
 from service.utils import get_translated_text, is_japanese_char
 
 from .models import Product, ProductInventory, Tag, Category
+from .utils import delete_products
 from .views import CategoryViewSet, ProductsViewSet
 
 
@@ -83,7 +85,25 @@ def translated_tag_group(group_id):
 
 
 @app.task()
-def update_category_products_activity(category_id):
+def delete_category_products(category_id):
     category = Category.objects.get(id=category_id)
-    category.products.update(is_active=not category.deactivated)
+    delete_products(category.products.only("id"))
 
+
+@app.task()
+def rakuten_clear_products():
+    categories = Category.objects.filter(level=1, deactivated=False, id__startswith=Site.rakuten.value)
+    categories_count = categories.count()
+
+    Product.objects.filter(is_active=False)
+
+    products_limit = 1_000_000 // categories_count
+
+    for category in categories:
+        products = category.products.only("id")
+        products_count = products.count()
+
+        if products_count <= products_limit:
+            continue
+
+        delete_products(products.order_by(F("is_active").asc(), F("modified_at").asc()), products_count=products_count)
