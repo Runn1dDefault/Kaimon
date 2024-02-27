@@ -1,14 +1,46 @@
+import json
 import unicodedata
 import uuid
+import time
 from datetime import datetime
 from decimal import Decimal
-from functools import lru_cache
+from functools import lru_cache, wraps
 
 import qrcode
 import requests
+from django.db import connection, reset_queries
+
 
 from .enums import Site, SiteCurrency
 from .models import Conversion, Currencies
+
+
+def query_debugger(func):
+    @wraps(func)
+    def inner_func(*args, **kwargs):
+        reset_queries()
+
+        start_queries = len(connection.queries)
+
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        end = time.perf_counter()
+
+        end_queries = len(connection.queries)
+
+        print(f"Function : {func.__name__}")
+        print(f"Number of Queries : {end_queries - start_queries}")
+        print(f"Finished in : {(end - start):.2f}s")
+        return result
+
+    return inner_func
+
+
+def check_to_json(instance, key):
+    data = instance.get(key, {})
+    if isinstance(data, str):
+        data = json.loads(data)
+    return data
 
 
 def import_model(model_import_path: str):

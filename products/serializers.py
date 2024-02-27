@@ -1,11 +1,8 @@
-import json
-
 from django.core.files.storage import default_storage
 from rest_framework import serializers
 
-from service.models import Currencies
 from service.serializers import ConversionField
-from service.utils import get_currency_by_id, get_currencies_price_per, convert_price, increase_price
+from service.utils import get_currency_by_id, get_currencies_price_per, convert_price, increase_price, check_to_json
 
 from .models import Category, Product, ProductInventory, ProductReview, ProductImage
 
@@ -25,90 +22,48 @@ class ShortProductSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'avg_rating', 'reviews_count', 'prices', "image")
 
     def get_prices(self, instance):
-        prices_template = {"price": 0.0, "sale_price": 0.0}
         if isinstance(instance, dict):
-            inventory_info = instance.get("inventory_info", {})
-            if isinstance(inventory_info, str):
-                inventory_info = json.loads(inventory_info)
-
-            if not inventory_info:
-                return prices_template
-
             obj_id = instance.get('id')
-            site_price = inventory_info.get("site_price") or 0.0
-            increase_per = inventory_info.get("increase_per") or 0.0
-            sale_price = inventory_info.get("sale_price")
+            inventory = check_to_json(instance, "inventory_info")
         else:
-            inventory = instance.inventories.first()
-            if not inventory:
-                return prices_template
-
             obj_id = instance.id
+            inventory = instance.inventories.first()
+
+        if not inventory:
+            return {"price": 0.0, "sale_price": 0.0}
+
+        if isinstance(inventory, dict):
+            site_price = inventory.get("site_price") or 0.0
+            increase_per = inventory.get("increase_per") or 0.0
+            sale_price = inventory.get("sale_price")
+        else:
             site_price = inventory.site_price
             increase_per = inventory.increase_per
             sale_price = inventory.sale_price
 
         price = site_price if increase_per <= 0 else increase_price(site_price, increase_per)
-        currency = self.context['currency']
         obj_currency = get_currency_by_id(obj_id)
-        if currency == obj_currency:
-            prices_template['price'] = price
-            prices_template['sale_price'] = sale_price
-            return prices_template
+        currency = self.context.get('currency', obj_currency)
 
-        if currency != Currencies.moneta:
+        if obj_currency != currency:
             price_per = get_currencies_price_per(currency_from=obj_currency, currency_to=currency)
-            prices_template['price'] = convert_price(price, price_per) if price_per else 0.0
-            prices_template['sale_price'] = convert_price(sale_price, price_per) if sale_price and price_per else None
-            return prices_template
+            price = convert_price(price, price_per) if price_per else 0.0
+            sale_price = convert_price(sale_price, price_per) if sale_price and price_per else None
 
-        if obj_currency == Currencies.usd:
-            price_per = get_currencies_price_per(currency_from=Currencies.moneta, currency_to=Currencies.usd)
-            prices_template['price'] = convert_price(price, price_per, divide=True) if price_per else 0.0
-            prices_template['sale_price'] = (
-                convert_price(sale_price, price_per, divide=True) if sale_price and price_per else None
-            )
-            return prices_template
-
-        usd_price_per = get_currencies_price_per(currency_from=obj_currency, currency_to=Currencies.usd)
-        if not usd_price_per:
-            return prices_template
-
-        moneta_price_per = get_currencies_price_per(currency_from=Currencies.moneta, currency_to=Currencies.usd)
-        if not moneta_price_per:
-            return prices_template
-
-        usd_price = convert_price(price, usd_price_per)
-        usd_sale = convert_price(sale_price, usd_price_per)
-        prices_template["price"] = convert_price(usd_price, moneta_price_per, divide=True)
-        prices_template['sale_price'] = convert_price(usd_sale, moneta_price_per, divide=True)
-        return prices_template
+        return {"price": price, "sale_price": sale_price}
 
     def get_image(self, instance):
+        request = self.context['request']
         if isinstance(instance, dict):
-            image_info = instance.get('image_info')
-            if not image_info:
-                return
+            image_obj = check_to_json(instance, "image_info") or {}
+        else:
+            image = instance.images.only("url", "image").first()
+            image_obj = {"image": image.image, "url": image.url} if image else {}
 
-            if isinstance(image_info, str):
-                image_info = json.loads(image_info)
-
-            image = image_info.get("image")
-            if image:
-                image = default_storage.url(image)
-                request = self.context['request']
-                return request.build_absolute_uri(image)
-
-            return image_info.get("url") or None
-
-        image_obj = instance.images.only("url", "image").first()
-        if not image_obj:
-            return
-
-        if image_obj.image:
-            request = self.context['request']
-            return request.build_absolute_uri(image_obj.image)
-        return image_obj.url or None
+        filepath = image_obj.get("image")
+        if filepath:
+            return request.build_absolute_uri(default_storage.url(filepath))
+        return image_obj.get('url') or None
 
 
 class ProductInventorySerializer(serializers.ModelSerializer):

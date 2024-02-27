@@ -1,5 +1,4 @@
 from django.db import transaction
-from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, mixins, viewsets, status, filters, parsers
 from rest_framework.decorators import action
@@ -8,7 +7,7 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 
-from products.filters import CategoryLevelFilter
+from products.filters import CategoryLevelFilter, ProductFilter
 from service.models import Conversion
 from products.models import Product, ProductReview, Tag, Category, ProductInventory, ProductImage
 from promotions.models import Promotion
@@ -22,7 +21,7 @@ from .mixins import DirectorViewMixin, StaffViewMixin
 from .paginators import UserListPagination, AdminPagePagination
 from .serializers import (
     ConversionAdminSerializer, PromotionAdminSerializer,
-    ProductAdminSerializer, ProductDetailAdminSerializer,
+    ShortProductAdminSerializer, ProductDetailAdminSerializer,
     ProductImageAdminSerializer, UserAdminSerializer, TagAdminSerializer,
     ProductReviewAdminSerializer, OrderAnalyticsSerializer, UserAnalyticsSerializer, ReviewAnalyticsSerializer,
     OrderAdminSerializer, CategoryAdminSerializer, ReceiptAdminSerializer, ProductInventorySerializer,
@@ -104,43 +103,28 @@ class TagGroupAdminViewSet(CachingMixin, StaffViewMixin, generics.ListAPIView):
 
 # ----------------------------------------------- Product --------------------------------------------------------------
 class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
-    queryset = Product.objects.all()
-    list_serializer_class = ProductAdminSerializer
-    serializer_class = ProductDetailAdminSerializer
-    pagination_class = AdminPagePagination
     parser_classes = (parsers.JSONParser, parsers.FormParser, parsers.MultiPartParser)
-    lookup_url_kwarg = 'product_id'
-    lookup_field = 'id'
-    filter_backends = (filters.SearchFilter, SiteFilter, ListFilter)
+    queryset = Product.objects.all()
+    serializer_class = ShortProductAdminSerializer
+    retrieve_serializer_class = ProductDetailAdminSerializer
+    pagination_class = AdminPagePagination
+    lookup_url_kwarg = "product_id"
+    lookup_field = "id"
+    filter_backends = (SiteFilter, OrderingFilter, ProductFilter)
+    ordering_fields = ("created_at",)
     search_fields = ('id', 'name', 'categories__name')
 
     def get_serializer_class(self):
         if self.request.method == 'GET' and self.detail is False:
-            return self.list_serializer_class or self.serializer_class
-        return self.serializer_class
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        if self.request.method != "GET":
-            return queryset
-
-        if self.detail is False:
-            queryset = queryset.only("id", "name", "is_active", "avg_rating", "reviews_count")
-        else:
-            queryset = queryset.only("id", "name", "description", "avg_rating", "reviews_count", "is_active",
-                                     "created_at", "can_choose_tags")
-        return queryset
-
-    @action(methods=['GET'], detail=True, url_path='tags')
-    def tags(self, request, product_id):
-        return Response(Tag.collections.filter(products__id=product_id).grouped_tags())
+            return self.serializer_class
+        return self.retrieve_serializer_class
 
     @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
     @action(methods=['GET'], detail=True, url_path='change-activity')
     def activate_or_deactivate_product(self, request, **kwargs):
-        genre = self.get_object()
-        genre.is_active = not genre.is_active
-        genre.save()
+        product = self.get_object()
+        product.is_active = not product.is_active
+        product.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(responses={status.HTTP_200_OK: None}, request=ProductImageLoaderSerializer)
@@ -167,39 +151,6 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
         image = get_object_or_404(ProductImage.objects.filter(product_id=product_id), id=image_id)
         image.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @extend_schema(responses={status.HTTP_204_NO_CONTENT: None, status.HTTP_404_NOT_FOUND: None})
-    @action(
-        methods=['DELETE'],
-        detail=True,
-        url_path=r'remove-tag/(?P<tag_id>.+)'
-    )
-    def remove_tag(self, request, **kwargs):
-        tag = get_object_or_404(self.get_object().tags.all(), id=kwargs['tag_id'])
-        tag.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @extend_schema(responses={status.HTTP_200_OK: TagAdminSerializer, status.HTTP_404_NOT_FOUND: None})
-    @action(
-        methods=['GET'],
-        detail=True,
-        url_path=r'add-tag/(?P<tag_id>.+)'
-    )
-    def add_tag(self, request, **kwargs):
-        tag_id = kwargs['tag_id']
-        if not Tag.objects.filter(id=tag_id).exists():
-            return Response(
-                {'detail': _('Tag does with id %s not exist!') % tag_id},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        product = self.get_object()
-        product.tags.add(tag_id)
-        serializer = TagAdminSerializer(
-            instance=product.tags.get(id=tag_id),
-            many=False,
-            context=self.get_serializer_context()
-        )
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
         responses={status.HTTP_200_OK: CategoryAdminSerializer(many=True), status.HTTP_404_NOT_FOUND: None},
