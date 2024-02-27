@@ -44,6 +44,8 @@ class SiteCurrency(Enum):
 class Spider(Enum):
     rakuten = Site.rakuten.value
     rakuten_category = 'rakuten_category'
+    rakuten_check_products = 'rakuten_products'
     uniqlo = Site.uniqlo.value
     uniqlo_category = 'uniqlo_category'
+
 
