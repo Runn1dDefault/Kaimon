@@ -162,14 +162,12 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = (
-            'id', 'name', 'description', 'site_avg_rating', 'site_reviews_count', 'avg_rating', 'reviews_count',
-            'is_active', 'created_at', 'modified_at', 'category', 'tags', 'images', "discount", "categories",
+            'id', 'name', 'description', 'avg_rating', 'reviews_count',
+            'is_active', 'created_at', 'category', 'tags', 'images', "discount", "categories",
             "set_images", 'can_choose_tags'
         )
         extra_kwargs = {
             'id': {'read_only': True},
-            'site_avg_rating': {'read_only': True},
-            'site_reviews_count': {'read_only': True},
             'avg_rating': {'read_only': True},
             'reviews_count': {'read_only': True},
             'created_at': {'read_only': True},

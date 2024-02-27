@@ -119,6 +119,18 @@ class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
             return self.list_serializer_class or self.serializer_class
         return self.serializer_class
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.request.method != "GET":
+            return queryset
+
+        if self.detail is False:
+            queryset = queryset.only("id", "name", "is_active", "avg_rating", "reviews_count")
+        else:
+            queryset = queryset.only("id", "name", "description", "avg_rating", "reviews_count", "is_active",
+                                     "created_at", "can_choose_tags")
+        return queryset
+
     @action(methods=['GET'], detail=True, url_path='tags')
     def tags(self, request, product_id):
         return Response(Tag.collections.filter(products__id=product_id).grouped_tags())
