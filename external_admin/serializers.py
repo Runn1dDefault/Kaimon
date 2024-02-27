@@ -9,6 +9,7 @@ from rest_framework import serializers
 from orders.serializers import OrderConversionField
 from orders.utils import order_currencies_price_per
 from products.models import Product, Category, Tag, ProductImage, ProductReview, ProductInventory
+from products.serializers import ShortProductSerializer
 from promotions.models import Banner, Promotion, Discount
 from orders.models import Order, Customer, DeliveryAddress, Receipt, OrderShipping, OrderConversion
 from service.models import Conversion, Currencies
@@ -69,31 +70,10 @@ class CategoryAdminSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class ProductAdminSerializer(serializers.ModelSerializer):
-    site_price = ConversionField(method_name="get_price", all_conversions=True, read_only=True)
-    sale_price = ConversionField(method_name="get_sale_price", all_conversions=True, read_only=True)
-    image = serializers.SerializerMethodField(read_only=True)
-
+class ShortProductAdminSerializer(ShortProductSerializer):
     class Meta:
         model = Product
-        fields = ('id', 'name', 'site_price', 'sale_price', 'is_active', 'avg_rating', 'reviews_count', 'image')
-        extra_fields = {"id": {"read_only": True}}
-
-    def get_price(self, instance):
-        inventory = instance.inventories.first()
-        if inventory:
-            return inventory.site_price
-
-    def get_sale_price(self, instance):
-        inventory = instance.inventories.first()
-        if inventory:
-            return inventory.sale_price
-
-    def get_image(self, instance):
-        obj = instance.images.first()
-        if obj:
-            request = self.context['request']
-            return request.build_absolute_uri(obj.image.url) if obj.image else obj.url
+        fields = ('id', 'name', 'avg_rating', 'reviews_count', 'prices', "image", "is_active")
 
 
 class ProductInventorySerializer(serializers.ModelSerializer):
@@ -229,7 +209,7 @@ class ProductDetailAdminSerializer(serializers.ModelSerializer):
 
 class ProductReviewAdminSerializer(serializers.ModelSerializer):
     user = UserAdminSerializer(read_only=True)
-    product = ProductAdminSerializer(many=False, read_only=True)
+    product = ShortProductAdminSerializer(many=False, read_only=True)
     product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), write_only=True, required=True)
 
     class Meta:
@@ -260,7 +240,7 @@ class PromotionAdminSerializer(serializers.ModelSerializer):
     set_discount = serializers.FloatField(validators=[MaxValueValidator(100)], write_only=True, required=False)
     discount = serializers.SlugRelatedField(slug_field='percentage', read_only=True)
     banner = BannerAdminSerializer(many=False, read_only=True)
-    products = ProductAdminSerializer(many=True, read_only=True)
+    products = ShortProductAdminSerializer(many=True, read_only=True)
 
     type = serializers.ChoiceField(choices=Banner.Type.choices, default=Banner.Type.promotion, write_only=True)
     name = serializers.CharField(write_only=True, max_length=255, required=False)
