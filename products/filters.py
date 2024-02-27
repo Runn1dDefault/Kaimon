@@ -84,9 +84,6 @@ class ProductFilter(BaseFilterBackend):
     product_ids_param = "product_ids"
     product_ids_description = _("Filter by product ids...")
 
-    tag_ids_param = "tag_ids"
-    tag_ids_description = _("Filter by tag ids...")
-
     inventory_subquery = Subquery(
         ProductInventory.objects.filter(product=OuterRef('id'))
                                 .values("sale_price", "site_price", "increase_per")
@@ -121,13 +118,6 @@ class ProductFilter(BaseFilterBackend):
                 product_id for product_id in product_ids.replace(" ", "").split(',')
                 if product_id.strip()
             ]
-
-        tag_ids = request.query_params.get(self.tag_ids_param)
-        if tag_ids:
-            filters["tags__in"] = [
-                tag_id for tag_id in tag_ids.replace(" ", "").split(",")
-                if tag_id.strip()
-            ]
         return filters
 
     def filter_queryset(self, request, queryset, view):
@@ -160,15 +150,6 @@ class ProductFilter(BaseFilterBackend):
                 'required': False,
                 'in': 'query',
                 'description': force_str(self.product_ids_description),
-                'schema': {
-                    'type': 'string'
-                }
-            },
-            {
-                'name': self.tag_ids_param,
-                'required': False,
-                'in': 'query',
-                'description': force_str(self.tag_ids_description),
                 'schema': {
                     'type': 'string'
                 }
