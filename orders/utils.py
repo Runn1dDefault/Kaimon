@@ -75,11 +75,11 @@ def get_bayer_code(user):
 
 
 def create_customer(user):
-    customer, _ = Customer.objects.get_or_create(
-        name=user.full_name,
-        bayer_code=get_bayer_code(user),
-        email=user.email
-    )
+    customer, created = Customer.objects.get_or_create(email=user.email)
+    if created:
+        customer.name = user.full_name
+        customer.bayer_code = get_bayer_code(user)
+        customer.save()
     return customer
 
 
