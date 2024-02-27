@@ -22,41 +22,41 @@ class CategoryLevelFilter(BaseFilterBackend):
     def get_schema_operation_parameters(self, view):
         return [
             {
-                'name': self.query_param,
-                'required': False,
-                'in': 'query',
-                'description': force_str(self.description),
-                'schema': {
-                    'type': 'number',
-                    'default': 1
+                "name": self.query_param,
+                "required": False,
+                "in": "query",
+                "description": force_str(self.description),
+                "schema": {
+                    "type": "number",
+                    "default": 1
                 }
             }
         ]
 
 
 class ProductPopularFilter(BaseFilterBackend):
-    description = _('Popular products ordering')
-    popular_param = 'popular'
+    description = _("Popular products ordering")
+    popular_param = "popular"
 
     def filter_queryset(self, request, queryset, view):
-        popular_value = request.query_params.get(self.popular_param, '')
-        if popular_value != '1':
+        popular_value = request.query_params.get(self.popular_param, "")
+        if popular_value != "1":
             return queryset
         return (
             queryset.filter(site_reviews_count__gt=0, site_avg_rating__gt=0)
-                    .order_by('-site_reviews_count', '-site_avg_rating')[:100]
+                    .order_by("-site_reviews_count", "-site_avg_rating")[:100]
         )
 
     def get_schema_operation_parameters(self, view):
         return [
             {
-                'name': self.popular_param,
-                'required': False,
-                'in': 'query',
-                'description': force_str(self.description),
-                'schema': {
-                    'type': 'number',
-                    'default': 0
+                "name": self.popular_param,
+                "required": False,
+                "in": "query",
+                "description": force_str(self.description),
+                "schema": {
+                    "type": "number",
+                    "default": 0
                 }
             }
         ]
@@ -70,10 +70,10 @@ class ProductTagFilter(BaseFilterBackend):
         if not tag_ids:
             return queryset
 
-        tag_ids = [tag_id for tag_id in tag_ids.split(',') if tag_id.strip()]
+        tag_ids = [tag_id for tag_id in tag_ids.split(",") if tag_id.strip()]
         ids = queryset.filter(
             Q(tags__id__in=tag_ids) | Q(inventories__tags__id__in=tag_ids)
-        ).values_list('id', flat=True)
+        ).values_list("id", flat=True)
         return queryset.filter(id__in=ids)
 
 
@@ -85,7 +85,7 @@ class ProductFilter(BaseFilterBackend):
     product_ids_description = _("Filter by product ids...")
 
     inventory_subquery = Subquery(
-        ProductInventory.objects.filter(product=OuterRef('id'))
+        ProductInventory.objects.filter(product=OuterRef("id"))
                                 .values("sale_price", "site_price", "increase_per")
                                 .annotate(
                                     inventory_info=JSONObject(
@@ -115,43 +115,45 @@ class ProductFilter(BaseFilterBackend):
         product_ids = request.query_params.get(self.product_ids_param)
         if product_ids:
             filters["id__in"] = [
-                product_id for product_id in product_ids.replace(" ", "").split(',')
+                product_id for product_id in product_ids.replace(" ", "").split(",")
                 if product_id.strip()
             ]
         return filters
 
     def filter_queryset(self, request, queryset, view):
-        if request.method == 'GET' and view.lookup_url_kwarg in view.kwargs:
+        if request.method == "GET" and view.lookup_url_kwarg in view.kwargs:
             return (
-                queryset.only('id', 'name', 'description', 'avg_rating', 'reviews_count', 'can_choose_tags', "images",
-                              "inventories").prefetch_related("images", "inventories")
+                queryset.only(
+                    "id", "name", "description", "avg_rating", "reviews_count", "can_choose_tags",
+                    "images", "inventories"
+                ).prefetch_related("images", "inventories")
             )
         filters = self.get_query_filters(request)
         if filters:
             queryset = queryset.filter(**filters)
         return (
-            queryset.values("id", "name", "avg_rating", "reviews_count")
+            queryset.values("id", "name", "avg_rating", "reviews_count", "is_active")
                     .annotate(inventory_info=self.inventory_subquery, image_info=self.image_subquery)
         )
 
     def get_schema_operation_parameters(self, view):
         return [
             {
-                'name': self.category_param,
-                'required': False,
-                'in': 'query',
-                'description': force_str(self.category_description),
-                'schema': {
-                    'type': 'string'
+                "name": self.category_param,
+                "required": False,
+                "in": "query",
+                "description": force_str(self.category_description),
+                "schema": {
+                    "type": "string"
                 }
             },
             {
-                'name': self.product_ids_param,
-                'required': False,
-                'in': 'query',
-                'description': force_str(self.product_ids_description),
-                'schema': {
-                    'type': 'string'
+                "name": self.product_ids_param,
+                "required": False,
+                "in": "query",
+                "description": force_str(self.product_ids_description),
+                "schema": {
+                    "type": "string"
                 }
             }
         ]
@@ -163,8 +165,8 @@ class BaseSQLProductsFilter(BaseFilterBackend):
     def filter_queryset(self, request, queryset, view):
         assert self.sql
         filters = self.get_filters(request)
-        site = filters['site']
-        limit, offset = filters['limit'], filters['offset']
+        site = filters["site"]
+        limit, offset = filters["limit"], filters["offset"]
         with connection.cursor() as cursor:
             cursor.execute(self.sql, [site + "%", limit, offset])
             columns = [col[0] for col in cursor.description]
@@ -172,51 +174,51 @@ class BaseSQLProductsFilter(BaseFilterBackend):
 
     @staticmethod
     def get_filters(request):
-        site = request.query_params.get('site', 'rakuten')
+        site = request.query_params.get("site", "rakuten")
         try:
-            page = abs(int(request.query_params.get('page', 1)))
+            page = abs(int(request.query_params.get("page", 1)))
         except ValueError:
             page = 1
 
         try:
-            limit = abs(int(request.query_params.get('page_size', 10)))
+            limit = abs(int(request.query_params.get("page_size", 10)))
         except ValueError:
             limit = 20
         else:
             if limit > 20:
                 limit = 20
-        return {'site': site, 'limit': limit, 'offset': limit * page if page > 1 else 0}
+        return {"site": site, "limit": limit, "offset": limit * page if page > 1 else 0}
 
     def get_schema_operation_parameters(self, view):
         return [
             {
-                'name': 'site',
-                'required': False,
-                'in': 'query',
-                'description': '',
-                'schema': {
-                    'type': 'string',
-                    'default': 'rakuten'
+                "name": "site",
+                "required": False,
+                "in": "query",
+                "description": "",
+                "schema": {
+                    "type": "string",
+                    "default": "rakuten"
                 }
             },
             {
-                'name': 'page',
-                'required': False,
-                'in': 'query',
-                'description': '',
-                'schema': {
-                    'type': 'number',
-                    'default': 1
+                "name": "page",
+                "required": False,
+                "in": "query",
+                "description": "",
+                "schema": {
+                    "type": "number",
+                    "default": 1
                 }
             },
             {
-                'name': 'page_size',
-                'required': False,
-                'in': 'query',
-                'description': '',
-                'schema': {
-                    'type': 'string',
-                    'default': 10
+                "name": "page_size",
+                "required": False,
+                "in": "query",
+                "description": "",
+                "schema": {
+                    "type": "string",
+                    "default": 10
                 }
             }
         ]
@@ -230,14 +232,14 @@ class ProductSQLSearchFilter(BaseSQLProductsFilter):
         p.avg_rating, 
         p.reviews_count, 
         (SELECT JSONB_BUILD_OBJECT(
-            ('site_price')::text, inv.site_price, 
-            ('sale_price')::text, inv.sale_price, 
-            ('increase_per')::text, inv.increase_per) AS inventory_info
+            ("site_price")::text, inv.site_price, 
+            ("sale_price")::text, inv.sale_price, 
+            ("increase_per")::text, inv.increase_per) AS inventory_info
             FROM products_productinventory as inv WHERE inv.product_id = (p.id) LIMIT 1
         ) AS inventory_info,
         (SELECT JSONB_BUILD_OBJECT(
-            ('image')::text, img.image, 
-            ('url')::text, img.url) AS image_info 
+            ("image")::text, img.image, 
+            ("url")::text, img.url) AS image_info 
             FROM products_productimage as img WHERE img.product_id = (p.id) LIMIT 1
         ) AS image_info 
     FROM products_product as p
@@ -246,14 +248,14 @@ class ProductSQLSearchFilter(BaseSQLProductsFilter):
     """
 
     def filter_queryset(self, request, queryset, view):
-        search_term = request.query_params.get('search')
+        search_term = request.query_params.get("search")
         if not search_term:
-            raise ValidationError({'detail': "search is required!"})
+            raise ValidationError({"detail": "search is required!"})
 
         filters = self.get_filters(request)
-        site = filters['site']
+        site = filters["site"]
         if search_term:
-            limit, offset = filters['limit'], filters['offset']
+            limit, offset = filters["limit"], filters["offset"]
             with connection.cursor() as cursor:
                 cursor.execute(self.sql, [site + "%", f"%{search_term}%", limit, offset])
                 columns = [col[0] for col in cursor.description]
@@ -263,12 +265,12 @@ class ProductSQLSearchFilter(BaseSQLProductsFilter):
     def get_schema_operation_parameters(self, view):
         return [
             {
-                'name': 'search',
-                'required': True,
-                'in': 'query',
-                'description': '',
-                'schema': {
-                    'type': 'string'
+                "name": "search",
+                "required": True,
+                "in": "query",
+                "description": "",
+                "schema": {
+                    "type": "string"
                 }
             }, *super().get_schema_operation_parameters(view)
         ]
@@ -281,13 +283,13 @@ class ProductSQLNewFilter(BaseSQLProductsFilter):
         p.avg_rating,
         p.reviews_count,
         JSONB_BUILD_OBJECT(
-            ('site_price')::text, inv.site_price,
-            ('sale_price')::text, inv.sale_price,
-            ('increase_per')::text, inv.increase_per
+            ("site_price")::text, inv.site_price,
+            ("sale_price")::text, inv.sale_price,
+            ("increase_per")::text, inv.increase_per
         ) AS inventory_info,
         JSONB_BUILD_OBJECT(
-            ('image')::text, img.image,
-            ('url')::text, img.url
+            ("image")::text, img.image,
+            ("url")::text, img.url
         ) AS image_info
     FROM 
         products_product AS p
@@ -311,13 +313,13 @@ class ProductSQLPopularFilter(BaseSQLProductsFilter):
         p.avg_rating,
         p.reviews_count,
         JSONB_BUILD_OBJECT(
-            ('site_price')::text, inv.site_price,
-            ('sale_price')::text, inv.sale_price,
-            ('increase_per')::text, inv.increase_per
+            ("site_price")::text, inv.site_price,
+            ("sale_price")::text, inv.sale_price,
+            ("increase_per")::text, inv.increase_per
         ) AS inventory_info,
         JSONB_BUILD_OBJECT(
-            ('image')::text, img.image,
-            ('url')::text, img.url
+            ("image")::text, img.image,
+            ("url")::text, img.url
         ) AS image_info
     FROM 
         products_product AS p
@@ -342,14 +344,14 @@ class ProductsByCategorySQLFilter(BaseSQLProductsFilter):
         p.avg_rating, 
         p.reviews_count, 
         (SELECT JSONB_BUILD_OBJECT(
-            ('site_price')::text, inv.site_price, 
-            ('sale_price')::text, inv.sale_price, 
-            ('increase_per')::text, inv.increase_per) AS inventory_info
+            ("site_price")::text, inv.site_price, 
+            ("sale_price")::text, inv.sale_price, 
+            ("increase_per")::text, inv.increase_per) AS inventory_info
             FROM products_productinventory as inv WHERE inv.product_id = (p.id) LIMIT 1
         ) AS inventory_info,
         (SELECT JSONB_BUILD_OBJECT(
-            ('image')::text, img.image, 
-            ('url')::text, img.url) AS image_info 
+            ("image")::text, img.image, 
+            ("url")::text, img.url) AS image_info 
             FROM products_productimage as img WHERE img.product_id = (p.id) LIMIT 1
         ) AS image_info 
     FROM 
@@ -383,14 +385,14 @@ class ProductsByCategorySQLFilter(BaseSQLProductsFilter):
         p.avg_rating, 
         p.reviews_count, 
         (SELECT JSONB_BUILD_OBJECT(
-            ('site_price')::text, inv.site_price, 
-            ('sale_price')::text, inv.sale_price, 
-            ('increase_per')::text, inv.increase_per) AS inventory_info
+            ("site_price")::text, inv.site_price, 
+            ("sale_price")::text, inv.sale_price, 
+            ("increase_per")::text, inv.increase_per) AS inventory_info
             FROM products_productinventory as inv WHERE inv.product_id = (p.id) LIMIT 1
         ) AS inventory_info,
         (SELECT JSONB_BUILD_OBJECT(
-            ('image')::text, img.image, 
-            ('url')::text, img.url) AS image_info 
+            ("image")::text, img.image, 
+            ("url")::text, img.url) AS image_info 
             FROM products_productimage as img WHERE img.product_id = (p.id) LIMIT 1
         ) AS image_info 
     FROM 
@@ -410,7 +412,7 @@ class ProductsByCategorySQLFilter(BaseSQLProductsFilter):
             tag_id for tag_id in request.query_params.get("tag_ids", "").split(",") if tag_id.strip()
         )
         filters = self.get_filters(request)
-        site, limit, offset = filters['site'], filters['limit'], filters['offset']
+        site, limit, offset = filters["site"], filters["limit"], filters["offset"]
 
         with connection.cursor() as cursor:
             if tag_ids:
@@ -432,14 +434,14 @@ class ProductsByIdsSQlFilter(BaseSQLProductsFilter):
         p.avg_rating, 
         p.reviews_count, 
         (SELECT JSONB_BUILD_OBJECT(
-            ('site_price')::text, inv.site_price, 
-            ('sale_price')::text, inv.sale_price, 
-            ('increase_per')::text, inv.increase_per) AS inventory_info
+            ("site_price")::text, inv.site_price, 
+            ("sale_price")::text, inv.sale_price, 
+            ("increase_per")::text, inv.increase_per) AS inventory_info
             FROM products_productinventory as inv WHERE inv.product_id = (p.id) LIMIT 1
         ) AS inventory_info,
         (SELECT JSONB_BUILD_OBJECT(
-            ('image')::text, img.image, 
-            ('url')::text, img.url) AS image_info 
+            ("image")::text, img.image, 
+            ("url")::text, img.url) AS image_info 
             FROM products_productimage as img WHERE img.product_id = (p.id) LIMIT 1
         ) AS image_info 
     FROM 
@@ -454,7 +456,7 @@ class ProductsByIdsSQlFilter(BaseSQLProductsFilter):
             product_id for product_id in request.query_params.get("product_ids", "").split() if product_id.strip()
         )
         filters = self.get_filters(request)
-        limit, offset = filters['limit'], filters['offset']
+        limit, offset = filters["limit"], filters["offset"]
         with connection.cursor() as cursor:
             cursor.execute(self.sql, [product_ids, limit, offset])
             columns = [col[0] for col in cursor.description]
@@ -463,12 +465,12 @@ class ProductsByIdsSQlFilter(BaseSQLProductsFilter):
     def get_schema_operation_parameters(self, view):
         return [
             {
-                'name': 'product_ids',
-                'required': True,
-                'in': 'query',
-                'description': '',
-                'schema': {
-                    'type': 'string'
+                "name": "product_ids",
+                "required": True,
+                "in": "query",
+                "description": "",
+                "schema": {
+                    "type": "string"
                 }
             }
         ]
@@ -484,11 +486,11 @@ class CategoryTagsFilter(BaseSQLProductsFilter):
                 ARRAY_AGG(
                     DISTINCT 
                     JSONB_BUILD_OBJECT(
-                        ('id')::text, ptg.id,
-                        ('name')::text, ptg.name
+                        ("id")::text, ptg.id,
+                        ("name")::text, ptg.name
                     )
                 ),
-                '{}'
+                "{}"
             ) AS tags
              AS tag_object,
             ROW_NUMBER() OVER (PARTITION BY pt.id ORDER BY ptg.id) AS row_num
@@ -514,7 +516,7 @@ class CategoryTagsFilter(BaseSQLProductsFilter):
             tag_group_name,
             COALESCE(
                 ARRAY_AGG(DISTINCT tag_object) FILTER (WHERE row_num <= 5),
-                '{}'
+                "{}"
             ) AS tags
     """
 
