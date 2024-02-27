@@ -1,3 +1,6 @@
+from products.models import Product
+
+
 def delete_products(products_query, products_count: int = None, delete_limit: int = 20_000):
     products = products_query
     count = products_count or products.count()
@@ -5,5 +8,6 @@ def delete_products(products_query, products_count: int = None, delete_limit: in
     remaining_count = count
     while remaining_count > 0:
         delete_count = min(remaining_count, delete_limit)
-        products[:delete_count].delete()
+        product_ids = products[:delete_count].values_list("id", flat=True)
+        Product.objects.filter(id__in=product_ids).delete()
         remaining_count -= delete_count
