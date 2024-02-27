@@ -67,7 +67,7 @@ class CategoryViewSet(CachingMixin, ReadOnlyModelViewSet):
         return Response(serializer.data)
 
 
-class ProductsViewSet(CurrencyMixin, ReadOnlyModelViewSet):
+class ProductsViewSet(CurrencyMixin, CachingMixin, ReadOnlyModelViewSet):
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ShortProductSerializer
     retrieve_serializer_class = ProductDetailSerializer
