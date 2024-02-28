@@ -41,7 +41,7 @@ class ProductAdminSQLFilter(BaseSQLProductsFilter):
     def get_sql_params(self, request) -> list:
         filters = self.get_filters(request)
         site, limit, offset = filters['site'], filters['limit'], filters['offset']
-        return [site, limit, offset]
+        return [site + '%', limit, offset]
 
     def filter_queryset(self, request, queryset, view):
         with connection.cursor() as cursor:
@@ -91,10 +91,4 @@ class SearchProductAdminSQLFilter(BaseSQLProductsFilter):
 
         filters = self.get_filters(request)
         site, limit, offset = filters['site'], filters['limit'], filters['offset']
-        return [site, f"%{search_term}%", limit, offset]
-
-    def filter_queryset(self, request, queryset, view):
-        with connection.cursor() as cursor:
-            cursor.execute(self.sql, self.get_sql_params(request))
-            columns = [col[0] for col in cursor.description]
-            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        return [site + '%', f"%{search_term}%", limit, offset]
