@@ -122,7 +122,7 @@ def check_moneta_status(order_id, tries: int = 0, max_tries: int = 10, retry_sec
         expired_date_string = payment.payment_meta.get("expiredBy", "")
         expired = datetime.strptime(expired_date_string, "%Y-%m-%dT%H:%M:%S.%fZ")
 
-        if now() > expired:
+        if now() >= expired:
             order.status = Order.Status.payment_rejected
             order.save()
             return
