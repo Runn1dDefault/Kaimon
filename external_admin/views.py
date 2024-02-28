@@ -16,6 +16,7 @@ from users.models import User
 from orders.models import Order
 from service.mixins import CachingMixin
 from service.filters import FilterByFields, DateRangeFilter, ListFilter, SiteFilter
+from .filters import ProductAdminSQLFilter, SearchProductAdminSQLFilter
 
 from .mixins import DirectorViewMixin, StaffViewMixin
 from .paginators import UserListPagination, AdminPagePagination
@@ -390,3 +391,15 @@ class UserAnalyticsView(AnalyticsView):
 
 class ReviewAnalyticsView(AnalyticsView):
     serializer_class = ReviewAnalyticsSerializer
+
+
+class ProductListView(StaffViewMixin, generics.ListAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ShortProductAdminSerializer
+    filter_backends = (ProductAdminSQLFilter,)
+
+
+class ProductSearchListView(StaffViewMixin, generics.ListAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ShortProductAdminSerializer
+    filter_backends = (SearchProductAdminSQLFilter,)

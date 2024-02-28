@@ -6,6 +6,7 @@ from .views import (
     ProductAdminViewSet, ProductReviewAdminViewSet,
     CategoryAdminViewSet, PromotionAdminViewSet,
     OrderAdminViewSet, ConversionAdminViewSet, UserAdminViewSet, ProductInventoryViewSet, TagGroupAdminViewSet,
+    ProductListView, ProductSearchListView
 )
 
 router = SimpleRouter()
@@ -25,6 +26,9 @@ analytics_urlpatterns = [
 ]
 
 urlpatterns = analytics_urlpatterns + [
+    path('products/list/', ProductListView.as_view()),
+    path('products/search/', ProductSearchListView.as_view()),
+
     path('tags/', TagGroupAdminViewSet.as_view(), name="admin-grouped-tags"),
     path('', include(router.urls)),
 ]
