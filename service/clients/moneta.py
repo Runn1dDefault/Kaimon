@@ -1,6 +1,7 @@
 import hashlib
 import json
 from functools import cached_property
+from typing import Literal
 
 from ecdsa import SigningKey, SECP256k1
 from ecdsa.util import sigencode_der_canonize, sigdecode_der
@@ -11,7 +12,7 @@ from service.clients.base import BaseAPIClient
 
 class MonetaAPI(BaseAPIClient):
     def __init__(self, merchant_id: str, private_key: str):
-        super().__init__(base_url="https://moneta.today/api/v1/payment/")
+        super().__init__(base_url="https://moneta.today/api/v1/")
         self.merchant_id = merchant_id
         self._private_key = private_key
 
@@ -46,29 +47,18 @@ class MonetaAPI(BaseAPIClient):
             request.headers["x-public-key"] = self._verifying_key.to_string("compressed").hex()
             request.headers["x-request-sign"] = self._make_signature(request.json)
 
-    def invoice(self, amount: float | int, meta: dict = None):
+    def invoice(self, amount: float | int, meta: dict = None, coin: Literal["MONETA", "HEALTH"] = "HEALTH"):
         return self.post(
-            "invoice",
+            "payment/invoice",
             json={
-                "currency": "MONETA",
+                "currency": coin,
                 "amount": str(amount),
                 "meta": meta or {}
             }
         )
 
     def status(self, invoice_id: str):
-        return self.get("status", params={"invoiceId": invoice_id})
+        return self.get("payment/status", params={"invoiceId": invoice_id})
 
-
-if __name__ == "__main__":
-    from pprint import pprint
-    c = MonetaAPI(
-        merchant_id="65aa57d8dfaa362db54f1de5",
-        private_key="6c3d868cdb6792b4b6812f0857fdb26f7885afd47efcd56f4e8a9527777a179d"
-    )
-    data = c.invoice(
-        amount=10,
-        meta={"title": "Test Payment"}
-    )
-    pprint(data)
-
+    def health_usd_price_per(self):
+        return self.get("coins/health/price")

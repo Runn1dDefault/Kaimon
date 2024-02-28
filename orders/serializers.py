@@ -19,7 +19,7 @@ from service.utils import get_currency_by_id, convert_price, get_currencies_pric
 from .models import DeliveryAddress, Order, Receipt, Payment
 from .tasks import check_paybox_status_for_order, check_moneta_status
 from .utils import duplicate_delivery_address, get_product_yen_price, order_currencies_price_per, create_customer, \
-    qrcode_for_url
+    qrcode_for_url, get_health_usd_price_per
 
 
 class DeliveryAddressSerializer(serializers.ModelSerializer):
@@ -262,16 +262,21 @@ class OrderSerializer(serializers.ModelSerializer):
         return payment
 
     def _make_moneta(self, order, receipts) -> Payment | None:
-        amount = self._get_receipts_amount(
-            receipts,
-            target_currency=Currencies.moneta,
-            intermediate_currency=Currencies.usd
-        )
-        if amount <= 0:
+        usd_amount = self._get_receipts_amount(receipts, target_currency=Currencies.usd)
+        if usd_amount <= 0:
             return
 
         client = MonetaAPI(merchant_id=settings.MONETA_MERCHANT_ID, private_key=settings.MONETA_PRIVATE_KEY)
-        data = client.invoice(amount=amount, meta={"title": "Payment for order No.%s via Paybox" % order.id})
+        health_price_per = get_health_usd_price_per(client)
+        health_amount = convert_price(usd_amount, price_per=health_price_per) if health_price_per else 0
+        if health_amount <= 0:
+            return
+
+        data = client.invoice(
+            amount=health_amount,
+            meta={"title": "Payment for order No.%s via Moneta" % order.id},
+            coin="HEALTH"
+        )
         invoice_data = data.get("result", {})
         payment_link = invoice_data["paymentLink"]
         payment_id = invoice_data["invoiceId"]
@@ -283,7 +288,10 @@ class OrderSerializer(serializers.ModelSerializer):
             payment_meta=invoice_data,
             qrcode=qrcode_for_url(f"moneta:{payment_id}", url=payment_link)
         )
-        check_moneta_status.apply_async(eta=timezone.now() + timezone.timedelta(seconds=15), args=(order.id,))
+        check_moneta_status.apply_async(
+            eta=timezone.now() + timezone.timedelta(seconds=15),
+            args=(order.id, 1, 8, 15)  # order_id, tries, max_tries, retry_sec
+        )
         return payment
 
 

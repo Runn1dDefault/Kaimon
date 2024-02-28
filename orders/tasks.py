@@ -65,7 +65,7 @@ def create_order_shipping_details(order_id: str):
 
 
 @app.task()
-def check_paybox_status_for_order(order_id, tries: int = 0, max_tries: int = 10):
+def check_paybox_status_for_order(order_id, tries: int = 0, max_tries: int = 10, retry_sec: int = 15):
     order = Order.objects.get(id=order_id)
     if order.status != Order.Status.wait_payment:
         return
@@ -84,8 +84,8 @@ def check_paybox_status_for_order(order_id, tries: int = 0, max_tries: int = 10)
     else:
         if tries <= max_tries:
             tries += 1
-            check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=5),
-                                                      args=(order_id, tries, max_tries))
+            check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=retry_sec),
+                                                      args=(order_id, tries, max_tries, retry_sec))
             return
 
         order.status = Order.Status.payment_rejected
@@ -94,7 +94,7 @@ def check_paybox_status_for_order(order_id, tries: int = 0, max_tries: int = 10)
 
 
 @app.task()
-def check_moneta_status(order_id, tries: int = 0, max_tries: int = 10):
+def check_moneta_status(order_id, tries: int = 0, max_tries: int = 10, retry_sec: int = 15):
     order = Order.objects.get(id=order_id)
     if order.status != Order.Status.wait_payment:
         return
@@ -114,21 +114,32 @@ def check_moneta_status(order_id, tries: int = 0, max_tries: int = 10):
 
     if save:
         order.save()
-        logging.info("Success")
-    else:
-        if tries <= max_tries:
-            tries += 1
-            check_moneta_status.apply_async(eta=now() + timedelta(seconds=5),
-                                            args=(order_id, tries, max_tries))
-            return
+        logging.info(f"Success moneta status of invoice {payment.payment_id} for order {order_id}.")
+        return
 
-        expired = payment.payment_meta.get("expiredBy", "")
-        try:
-            check_paybox_status_for_order.apply_async(
-                eta=datetime.strptime(expired, "%Y-%m-%dT%H:%M:%S.%fZ"),
-                args=(order_id, tries + 1, max_tries)
-            )
-        except ValueError:
+    tries += 1
+    try:
+        expired_date_string = payment.payment_meta.get("expiredBy", "")
+        expired = datetime.strptime(expired_date_string, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+        if now() >= expired:
             order.status = Order.Status.payment_rejected
             order.save()
-            logging.error("Max tries to check paybox status")
+            return
+
+        if tries > max_tries:
+            check_moneta_status.apply_async(eta=expired, args=(order_id, tries, max_tries, retry_sec))
+
+            logging.info(
+                f"Max tries to check moneta status of invoice {payment.payment_id} for order {order_id}. "
+                f"Last check will be on {expired}"
+            )
+            return
+
+    except ValueError:
+        pass
+
+    check_moneta_status.apply_async(
+        eta=now() + timedelta(seconds=retry_sec),
+        args=(order_id, tries, max_tries, retry_sec)
+    )

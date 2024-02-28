@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 from functools import lru_cache
@@ -6,9 +7,11 @@ import hashlib
 from uuid import uuid4
 
 from django.conf import settings
+from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import now
 
+from service.clients.moneta import MonetaAPI
 from service.models import Currencies
 from service.utils import get_currency_by_id, get_currencies_price_per, convert_price, generate_qrcode
 
@@ -91,3 +94,17 @@ def qrcode_for_url(filename: str, url: str):
 
     generate_qrcode(directory / png, url=url)
     return f'qrcodes/{png}'
+
+
+def get_health_usd_price_per(moneta_client: MonetaAPI) -> int | float | None:
+    cache = caches["scraping"]
+    cache_key = "moneta_health_usd"
+
+    try:
+        price_per = moneta_client.health_usd_price_per().get("result")
+    except Exception as e:
+        logging.error(e)
+        price_per = cache.get(cache_key)
+    else:
+        cache.set(cache_key, price_per, timeout=None)
+    return price_per
