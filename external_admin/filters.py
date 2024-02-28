@@ -33,7 +33,6 @@ class ProductAdminSQLFilter(BaseSQLProductsFilter):
         ) AS image_info 
     FROM 
         products_product as p
-    JOIN products_product_categories as pc ON p.id = pc.product_id
     WHERE p.id LIKE %s 
     LIMIT %s OFFSET %s;
     '''
@@ -79,7 +78,6 @@ class SearchProductAdminSQLFilter(BaseSQLProductsFilter):
         ) AS image_info 
     FROM 
         products_product as p
-    JOIN products_product_categories as pc ON p.id = pc.product_id
     WHERE p.id LIKE %s AND p.name ILIKE %s
     LIMIT %s OFFSET %s;
     '''
