@@ -49,7 +49,7 @@ class ProductAdminSQLFilter(BaseSQLProductsFilter):
             return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
-class SearchProductAdminSQLFilter(BaseSQLProductsFilter):
+class SearchProductAdminSQLFilter(ProductAdminSQLFilter):
     sql = '''
     SELECT 
         p.id,
