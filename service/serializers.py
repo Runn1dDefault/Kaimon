@@ -51,7 +51,7 @@ class ConversionField(serializers.FloatField):
             return method(instance)
         return False
 
-    def get_currency(self) -> Currencies:
+    def get_currency(self) -> Currencies | None:
         return Currencies.from_string(self.context['currency'])
 
     def convert(self, currency, value):
