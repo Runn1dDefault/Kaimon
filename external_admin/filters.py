@@ -35,6 +35,7 @@ class ProductAdminSQLFilter(BaseSQLProductsFilter):
     FROM 
         products_product as p
     WHERE p.id LIKE %s 
+    ORDER BY p.id
     LIMIT %s OFFSET %s;
     '''
 
@@ -81,8 +82,8 @@ class SearchProductAdminSQLFilter(ProductAdminSQLFilter):
     FROM 
         products_product as p
     WHERE p.ids IN %s
+    ORDER BY p.id
     LIMIT %s OFFSET %s;
-    
     '''
     sql = '''
     SELECT 
@@ -113,6 +114,7 @@ class SearchProductAdminSQLFilter(ProductAdminSQLFilter):
     FROM 
         products_product as p
     WHERE p.id LIKE %s AND p.name ILIKE %s
+    ORDER BY p.id
     LIMIT %s OFFSET %s;
     '''
 
