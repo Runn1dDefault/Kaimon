@@ -11,6 +11,8 @@ from service.clients.base import BaseAPIClient
 
 
 class MonetaAPI(BaseAPIClient):
+    ERROR_STATUSES = [400, 404, 500]
+
     def __init__(self, merchant_id: str, private_key: str):
         super().__init__(base_url="https://moneta.today/api/v1/")
         self.merchant_id = merchant_id
@@ -62,3 +64,15 @@ class MonetaAPI(BaseAPIClient):
 
     def health_usd_price_per(self):
         return self.get("coins/health/price")
+
+
+if __name__ == "__main__":
+    from pprint import pprint
+
+    client = MonetaAPI(
+        merchant_id="65df2795db23e06e6abb20f5",
+        private_key="a396b54558e58a661668c65736c17a1d7a696ed9787e09cad8b1d96e8fc70b51"
+    )
+
+    data = client.invoice(1, meta={"title": "Test Invoice"})
+    pprint(data)
