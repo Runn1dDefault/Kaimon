@@ -36,7 +36,7 @@ class ProductAdminSQLFilter(BaseSQLProductsFilter):
         products_product as p
     WHERE p.id LIKE %s 
     ORDER BY p.id
-    LIMIT %s OFFSET %s
+    LIMIT %s OFFSET %s;
     '''
 
     def get_sql(self, request) -> tuple[str, list]:
@@ -83,7 +83,7 @@ class SearchProductAdminSQLFilter(ProductAdminSQLFilter):
         products_product as p
     WHERE p.ids IN %s
     ORDER BY p.id
-    LIMIT %s OFFSET %s
+    LIMIT %s OFFSET %s;
     '''
     sql = '''
     SELECT 
