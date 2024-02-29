@@ -78,7 +78,7 @@ class SearchProductAdminSQLFilter(ProductAdminSQLFilter):
         ) AS image_info 
     FROM 
         products_product as p
-    WHERE p.id LIKE %s OR p.id = %s AND p.name ILIKE %s
+    WHERE p.id LIKE %s AND p.name ILIKE %s
     LIMIT %s OFFSET %s;
     '''
 
