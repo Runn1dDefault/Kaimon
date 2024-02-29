@@ -11,7 +11,7 @@ from orders.utils import order_currencies_price_per
 from products.models import Product, Category, Tag, ProductImage, ProductReview, ProductInventory
 from products.serializers import ShortProductSerializer
 from promotions.models import Banner, Promotion, Discount
-from orders.models import Order, Customer, DeliveryAddress, Receipt, OrderShipping, OrderConversion
+from orders.models import Order, Customer, DeliveryAddress, Receipt, OrderShipping, OrderConversion, Payment
 from service.models import Conversion, Currencies
 from service.serializers import ConversionField, AnalyticsSerializer
 from service.utils import get_currencies_price_per, recursive_single_tree, get_currency_by_id, uid_generate, \
@@ -439,16 +439,23 @@ class BaseOrderAdminSerializer(serializers.ModelSerializer):
         return total_price
 
 
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = ("payment_type", "payment_link", "qrcode", "created_at")
+
+
 class OrderAdminSerializer(BaseOrderAdminSerializer):
+    payment = PaymentSerializer(many=False, read_only=True)
     shipping_detail = OrderShippingSerializer(many=False, read_only=True)
-    delivery_address = DeliveryAddressAdminSerializer(read_only=True)
+    delivery_address = DeliveryAddressAdminSerializer(read_only=True, many=False)
     receipts = ReceiptAdminSerializer(many=True, read_only=True)
     conversions = OrderConversionSerializer(many=True, read_only=True)
 
     class Meta:
         model = Order
         fields = ('id', 'status', 'comment', 'customer', 'receipts', 'delivery_address', 'shipping_detail',
-                  "conversions", "total_price", "created_at")
+                  "conversions", "total_price", "created_at", 'payment')
 
 
 # ------------------------------------------------- Analytics ----------------------------------------------------------
