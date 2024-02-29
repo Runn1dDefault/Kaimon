@@ -242,7 +242,7 @@ class OrderSerializer(serializers.ModelSerializer):
         invoice_data = payment_client.init_transaction(
             order_id=order.id,
             amount=usd_amount,
-            description="Payment for order No.%s via Paybox" % order.id,
+            description="Payment for Kaimono order No.%s via Paybox" % order.id,
             currency="USD",
             salt=settings.PAYBOX_SALT,
             result_url=settings.PAYBOX_RESULT_URL,
@@ -274,7 +274,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
         data = client.invoice(
             amount=health_amount,
-            meta={"title": "Payment for order No.%s via Moneta" % order.id},
+            meta={"title": "Payment for Kaimono order No.%s via Moneta Today" % order.id},
             coin="HEALTH"
         )
         invoice_data = data.get("result", {})
