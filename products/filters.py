@@ -113,7 +113,7 @@ class ProductFilter(BaseFilterBackend):
         if category_id:
             filters['categories__id'] = category_id
 
-        product_ids = get_tuple_from_query_param(request.query_params.get(self.product_ids_param))
+        product_ids = get_tuple_from_query_param(request.query_params.get(self.product_ids_param, ""))
         if product_ids:
             filters['id__in'] = product_ids
         return filters

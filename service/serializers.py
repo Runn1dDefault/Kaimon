@@ -52,7 +52,7 @@ class ConversionField(serializers.FloatField):
         return False
 
     def get_currency(self) -> Currencies:
-        return Currencies.from_string(self.context.get('currency', 'yen'))
+        return Currencies.from_string(self.context['currency'])
 
     def convert(self, currency, value):
         if not value or currency == self.instance_currency:
