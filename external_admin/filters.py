@@ -78,7 +78,7 @@ class SearchProductAdminSQLFilter(ProductAdminSQLFilter):
         ) AS image_info 
     FROM 
         products_product as p
-    WHERE (p.id = %s) OR p.id LIKE %s AND p.name ILIKE %s
+    WHERE p.id LIKE %s AND p.name ILIKE %s
     LIMIT %s OFFSET %s;
     '''
 
@@ -89,4 +89,4 @@ class SearchProductAdminSQLFilter(ProductAdminSQLFilter):
 
         filters = self.get_filters(request)
         site, limit, offset = filters['site'], filters['limit'], filters['offset']
-        return [search_term, site + '%', f"%{search_term}%",  limit, offset]
+        return [site + '%', f"%{search_term}%",  limit, offset]
