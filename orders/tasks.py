@@ -128,7 +128,10 @@ def check_moneta_status(order_id, tries: int = 0, max_tries: int = 10, retry_sec
             return
 
         if tries > max_tries:
-            check_moneta_status.apply_async(eta=expired, args=(order_id, tries, max_tries, retry_sec))
+            check_moneta_status.apply_async(
+                eta=expired + timedelta(seconds=5),
+                args=(order_id, tries, max_tries, retry_sec)
+            )
 
             logging.info(
                 f"Max tries to check moneta status of invoice {payment.payment_id} for order {order_id}. "
