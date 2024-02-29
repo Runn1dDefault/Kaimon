@@ -47,18 +47,15 @@ class OrderConversionField(ConversionField):
         self.order_id_field = order_id_field
         self.order_id = None
 
-    def init_instance_currency(self, instance):
-        self.instance_currency = instance.site_currency
+    def _init_instance_currency(self, instance):
+        self._instance_currency = instance.site_currency
         self.order_id = getattr(instance, self.order_id_field)
 
-    def convert(self, currency, value):
-        if not value or currency == self.instance_currency:
-            return value
-
+    def _convert(self, value, target_currency):
         price_per = order_currencies_price_per(
             order_id=self.order_id,
-            currency_from=self.instance_currency,
-            currency_to=currency
+            currency_from=self._instance_currency,
+            currency_to=target_currency
         )
         return convert_price(value, price_per) if price_per else None
 
