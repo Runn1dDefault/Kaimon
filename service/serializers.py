@@ -20,45 +20,31 @@ from .querysets import BaseAnalyticsQuerySet, AnalyticsFilterBy
 class ConversionField(serializers.FloatField):
     def __init__(
         self,
-        method_name=None,
         all_conversions: bool = False,
-        instance_currency: str = None,
         site_contains_field: str = 'id',
         **kwargs
     ):
         super().__init__(**kwargs)
-        self.method_name = method_name
-        self.instance_currency = Currencies.from_string(instance_currency) if instance_currency else None
+        self._instance_currency = None
         self.site_contains_field = site_contains_field
         self.all_conversions = all_conversions
 
     def get_attribute(self, instance):
-        if not self.instance_currency:
-            self.init_instance_currency(instance)
-        convert_value = self.get_convert_value(instance)
-        if convert_value is not False:
-            return convert_value
+        self._instance_currency = get_currency_by_id(getattr(instance, self.site_contains_field))
         return super().get_attribute(instance)
 
-    def init_instance_currency(self, instance):
-        instance_id = getattr(instance, self.site_contains_field)
-        self.instance_currency = get_currency_by_id(instance_id)
-
-    def get_convert_value(self, instance):
-        if self.method_name:
-            method = getattr(self.parent, self.method_name)
-            assert callable(method)
-            return method(instance)
-        return False
-
-    def get_currency(self) -> Currencies:
+    def get_currency(self) -> Currencies | None:
         return Currencies.from_string(self.context['currency'])
 
     def convert(self, currency, value):
-        if not value or currency == self.instance_currency:
+        assert self._instance_currency
+        if not value:
+            return
+
+        if currency == self._instance_currency:
             return value
 
-        price_per = get_currencies_price_per(currency_from=self.instance_currency, currency_to=currency)
+        price_per = get_currencies_price_per(currency_from=self._instance_currency, currency_to=currency)
         return convert_price(value, price_per) if price_per else None
 
     def to_representation(self, value):

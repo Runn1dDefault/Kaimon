@@ -132,7 +132,7 @@ class SearchProductAdminSQLFilter(ProductAdminSQLFilter):
                 params = [site + '%', f"%{search_term}%",  limit, offset]
             case "ids":
                 sql = self.sql_by_ids
-                ids = get_tuple_from_query_param(search_term.replace(' ', ''), split_by=',')
+                ids = get_tuple_from_query_param(search_term)
                 params = [ids, limit, offset]
             case _:
                 raise ValidationError({'detail': 'unsupported search type!'})
