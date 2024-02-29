@@ -265,7 +265,10 @@ class OrderSerializer(serializers.ModelSerializer):
             payment_link=payment_link,
             payment_meta=invoice_data
         )
-        check_paybox_status_for_order.apply_async(eta=timezone.now() + timezone.timedelta(seconds=15), args=(order.id,))
+        check_paybox_status_for_order.apply_async(
+            eta=timezone.now() + timezone.timedelta(seconds=15),
+            args=(order.id, 1, 7, 30)
+        )
         return payment
 
     def _make_moneta(self, order, receipts) -> Payment | None:
