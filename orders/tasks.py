@@ -3,7 +3,7 @@ from datetime import timedelta, datetime
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
-from django.utils.timezone import now
+from django.utils import timezone
 
 from kaimon.celery import app
 from orders.models import Order, OrderConversion, OrderShipping
@@ -84,7 +84,7 @@ def check_paybox_status_for_order(order_id, tries: int = 0, max_tries: int = 10,
     else:
         if tries <= max_tries:
             tries += 1
-            check_paybox_status_for_order.apply_async(eta=now() + timedelta(seconds=retry_sec),
+            check_paybox_status_for_order.apply_async(eta=timezone.now() + timedelta(seconds=retry_sec),
                                                       args=(order_id, tries, max_tries, retry_sec))
             return
 
@@ -120,9 +120,9 @@ def check_moneta_status(order_id, tries: int = 0, max_tries: int = 10, retry_sec
     tries += 1
     try:
         expired_date_string = payment.payment_meta.get("expiredBy", "")
-        expired = datetime.strptime(expired_date_string, "%Y-%m-%dT%H:%M:%S.%fZ")
+        expired = datetime.strptime(expired_date_string, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
 
-        if now() >= expired:
+        if timezone.now() >= expired:
             order.status = Order.Status.payment_rejected
             order.save()
             return
@@ -140,6 +140,6 @@ def check_moneta_status(order_id, tries: int = 0, max_tries: int = 10, retry_sec
         pass
 
     check_moneta_status.apply_async(
-        eta=now() + timedelta(seconds=retry_sec),
+        eta=timezone.now() + timedelta(seconds=retry_sec),
         args=(order_id, tries, max_tries, retry_sec)
     )
