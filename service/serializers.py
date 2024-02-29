@@ -30,11 +30,18 @@ class ConversionField(serializers.FloatField):
         self.all_conversions = all_conversions
 
     def get_attribute(self, instance):
-        self._instance_currency = get_currency_by_id(getattr(instance, self.site_contains_field))
+        self._init_instance_currency(instance)
         return super().get_attribute(instance)
+
+    def _init_instance_currency(self, instance):
+        self._instance_currency = get_currency_by_id(getattr(instance, self.site_contains_field))
 
     def get_currency(self) -> Currencies | None:
         return Currencies.from_string(self.context['currency'])
+
+    def _convert(self, value, target_currency):
+        price_per = get_currencies_price_per(currency_from=self._instance_currency, currency_to=target_currency)
+        return convert_price(value, price_per) if price_per else None
 
     def convert(self, currency, value):
         assert self._instance_currency
@@ -43,9 +50,7 @@ class ConversionField(serializers.FloatField):
 
         if currency == self._instance_currency:
             return value
-
-        price_per = get_currencies_price_per(currency_from=self._instance_currency, currency_to=currency)
-        return convert_price(value, price_per) if price_per else None
+        return self._convert(value, currency)
 
     def to_representation(self, value):
         value = super().to_representation(value)
