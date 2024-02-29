@@ -89,4 +89,4 @@ class SearchProductAdminSQLFilter(ProductAdminSQLFilter):
 
         filters = self.get_filters(request)
         site, limit, offset = filters['site'], filters['limit'], filters['offset']
-        return [site + '%', search_term, f"%{search_term}%",  limit, offset]
+        return [site + '%', f"%{search_term}%",  limit, offset]
