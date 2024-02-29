@@ -88,28 +88,38 @@ class ReceiptSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         inventory = attrs.get('inventory_id', None)
-        if inventory:
-            attrs['unit_price'] = inventory.price
-            product = inventory.product
-            promotion = product.promotions.active_promotions().first()
-            if promotion:
-                try:
-                    attrs['discount'] = promotion.discount.percentage
-                except ObjectDoesNotExist:
-                    attrs['discount'] = 0.0
+        if not inventory:
+            return attrs
 
-            image = product.images.first()
-            attrs['shop_url'] = product.shop_url
-            attrs['product_code'] = product.id
-            attrs['product_url'] = inventory.product_url
-            if inventory.id.startswith('uniqlo'):
-                attrs['product_name'] = product.name
-            else:
-                attrs['product_name'] = inventory.name
-            attrs['product_image'] = image.url if image else None
-            attrs['site_currency'] = get_currency_by_id(product.id)
-            attrs['site_price'] = inventory.site_price
-            attrs['tags'] = ', '.join(inventory.tags.values_list('name', flat=True))
+        attrs['unit_price'] = inventory.price
+        product = inventory.product
+        promotion = product.promotions.active_promotions().first()
+        if promotion:
+            try:
+                attrs['discount'] = promotion.discount.percentage
+            except ObjectDoesNotExist:
+                attrs['discount'] = 0.0
+
+        image = product.images.first()
+        image_url = None
+
+        if image and image.image:
+            image_url = self.context["request"].build_absolute_uri(image.image.url)
+        elif image and image.url:
+            image_url = image.url
+
+        attrs['shop_url'] = product.shop_url
+        attrs['product_code'] = product.id
+        attrs['product_url'] = inventory.product_url
+        if inventory.id.startswith('uniqlo'):
+            attrs['product_name'] = product.name
+        else:
+            attrs['product_name'] = inventory.name
+
+        attrs['product_image'] = image_url
+        attrs['site_currency'] = get_currency_by_id(product.id)
+        attrs['site_price'] = inventory.site_price
+        attrs['tags'] = ', '.join(inventory.tags.values_list('name', flat=True))
         return attrs
 
     def create(self, validated_data):
