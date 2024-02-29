@@ -175,3 +175,7 @@ def is_japanese_char(char):
                 return True
 
     return False
+
+
+def get_tuple_from_query_param(param_value: str, split_by: str = ',') -> tuple[str]:
+    return tuple(value for value in param_value.split(split_by) if value.strip())
