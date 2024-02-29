@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import BaseFilterBackend
 
+from service.utils import get_tuple_from_query_param
 from .models import ProductInventory, ProductImage
 
 
@@ -70,7 +71,7 @@ class ProductTagFilter(BaseFilterBackend):
         if not tag_ids:
             return queryset
 
-        tag_ids = [tag_id for tag_id in tag_ids.split(',') if tag_id.strip()]
+        tag_ids = get_tuple_from_query_param(tag_ids)
         ids = queryset.filter(
             Q(tags__id__in=tag_ids) | Q(inventories__tags__id__in=tag_ids)
         ).values_list('id', flat=True)
@@ -112,12 +113,9 @@ class ProductFilter(BaseFilterBackend):
         if category_id:
             filters['categories__id'] = category_id
 
-        product_ids = request.query_params.get(self.product_ids_param)
+        product_ids = get_tuple_from_query_param(request.query_params.get(self.product_ids_param))
         if product_ids:
-            filters['id__in'] = [
-                product_id for product_id in product_ids.replace(' ', '').split(',')
-                if product_id.strip()
-            ]
+            filters['id__in'] = product_ids
         return filters
 
     def filter_queryset(self, request, queryset, view):
@@ -408,9 +406,7 @@ class ProductsByCategorySQLFilter(BaseSQLProductsFilter):
 
     def filter_queryset(self, request, queryset, view):
         category_id = view.kwargs[view.lookup_url_kwarg]
-        tag_ids = tuple(
-            tag_id for tag_id in request.query_params.get('tag_ids', '').split(',') if tag_id.strip()
-        )
+        tag_ids = get_tuple_from_query_param(request.query_params.get('tag_ids', ''))
         filters = self.get_filters(request)
         site, limit, offset = filters['site'], filters['limit'], filters['offset']
 
@@ -452,9 +448,7 @@ class ProductsByIdsSQlFilter(BaseSQLProductsFilter):
     '''
 
     def filter_queryset(self, request, queryset, view):
-        product_ids = tuple(
-            product_id for product_id in request.query_params.get('product_ids', '').split() if product_id.strip()
-        )
+        product_ids = get_tuple_from_query_param(request.query_params.get('product_ids', ''))
         filters = self.get_filters(request)
         limit, offset = filters['limit'], filters['offset']
         with connection.cursor() as cursor:
@@ -533,14 +527,14 @@ class CategoryTagsFilter(BaseSQLProductsFilter):
 
 class FilterByIds(BaseFilterBackend):
     def filter_queryset(self, request, queryset, view):
-        ids = request.query_params.get('ids')
+        ids_in_query = request.query_params.get('ids')
         ids_param_required = getattr(view, 'ids_param_required', True)
 
-        if not ids and ids_param_required:
-            raise ValidationError({'detail': 'ids param is required!'})
-
-        if not ids and not ids_param_required:
+        if not ids_in_query and not ids_param_required:
             return queryset
-        ids = [i for i in ids.replace(' ', '').split(',') if i.strip()]
+
+        ids = get_tuple_from_query_param(ids_in_query)
+        if not ids:
+            raise ValidationError({'detail': 'ids param is required!'})
         return queryset.filter(id__in=ids)
         
