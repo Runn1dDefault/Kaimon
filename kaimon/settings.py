@@ -1,6 +1,7 @@
 from datetime import timedelta
 from pathlib import Path
 
+import dj_database_url
 from decouple import config
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter
@@ -78,14 +79,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'kaimon.wsgi.application'
 
 DATABASES = {
-    "default": {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('PRIMARY_DB'),
-        'USER': config('PRIMARY_USER'),
-        'PASSWORD': config('PRIMARY_PASSWORD'),
-        'HOST': config('PRIMARY_HOST'),
-        'PORT': config('PRIMARY_PORT', cast=int)
-    },
+    "default": dj_database_url.config(default=config('POSTGRES_DB_CONNECTION_URL')),
     # "replica1": {
     #     "ENGINE": 'django.db.backends.postgresql',
     #     "NAME": config('REPLICATION1_DB'),
