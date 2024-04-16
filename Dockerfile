@@ -1,4 +1,4 @@
-FROM python:3.11.9-alpine3.19
+FROM python:3.11-slim
 
 RUN apt-get update
 
@@ -11,3 +11,5 @@ COPY ./requirements.txt ./
 RUN pip install -r requirements.txt
 
 COPY . .
+
+RUN ["chmod", "+x", "web-runner.sh"]
