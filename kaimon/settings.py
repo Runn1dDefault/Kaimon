@@ -79,26 +79,12 @@ TEMPLATES = [
 WSGI_APPLICATION = 'kaimon.wsgi.application'
 
 DATABASES = {
-    "default": dj_database_url.config(default=config('POSTGRES_DB_CONNECTION_URL')),
-    # "replica1": {
-    #     "ENGINE": 'django.db.backends.postgresql',
-    #     "NAME": config('REPLICATION1_DB'),
-    #     "USER": config('REPLICATION1_USER'),
-    #     "PASSWORD": config('REPLICATION1_PASSWORD'),
-    #     'HOST': config('REPLICATION1_HOST'),
-    #     'PORT': config('REPLICATION1_PORT', cast=int)
-    # },
-    # "replica2": {
-    #     "ENGINE": 'django.db.backends.postgresql',
-    #     "NAME": config('REPLICATION2_DB'),
-    #     "USER": config('REPLICATION2_USER'),
-    #     "PASSWORD": config('REPLICATION2_PASSWORD'),
-    #     'HOST': config('REPLICATION2_HOST'),
-    #     'PORT': config('REPLICATION2_PORT', cast=int)
-    # }
+    "default": dj_database_url.config(default=config('POSTGRES_URL')),
 }
 
-# CONN_MAX_AGE = 300
+REDIS_CONNECTION_URL = config("REDIS_URL")
+
+CONN_MAX_AGE = 300
 # DATABASE_ROUTERS = ["kaimon.routers.PrimaryReplicaRouter"]
 
 # Password validation
@@ -139,7 +125,6 @@ AUTH_USER_MODEL = 'users.User'
 AUTHENTICATION_BACKENDS = ['users.backends.EmailOrUsernameAuthBackend']
 
 # Caches
-REDIS_CONNECTION_URL = config("REDIS_URL")
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -264,7 +249,11 @@ SHIPPER_COUNTRY_CODE = "JP"
 FEDEX_DEFAULT_AVG_WEIGHT = 0.300
 
 DEFAULT_INCREASE_PRICE_PER = 15
+
 CRAWLER_URL = config("CRAWLER_URL")
+CRAWLER_USER = config("CRAWLER_USER")
+CRAWLER_PWD = config("CRAWLER_PWD")
+
 QR_URL_TEMPLATE = config("QR_URL_TEMPLATE")
 PRODUCT_URL_TEMPLATE = config("PRODUCT_URL_TEMPLATE")
 

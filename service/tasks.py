@@ -8,7 +8,7 @@ from service.enums import Spider
 from scrapyd_api import ScrapydAPI
 
 
-scrapyd = ScrapydAPI(settings.CRAWLER_URL)
+scrapyd = ScrapydAPI(settings.CRAWLER_URL, auth=(settings.CRAWLER_USER, settings.CRAWLER_PWD))
 
 
 @app.task()
