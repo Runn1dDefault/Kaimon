@@ -1,3 +1,5 @@
+import logging
+
 from django.db import connection
 from django.db.models import Subquery, Q, OuterRef, F
 from django.db.models.functions import JSONObject
@@ -119,13 +121,16 @@ class ProductFilter(BaseFilterBackend):
         return filters
 
     def filter_queryset(self, request, queryset, view):
-        if request.method == 'GET' and view.lookup_url_kwarg in view.kwargs:
+        logging.error(f"Action is: {view.action}")
+
+        if view.action in ("delete", "detail") and view.lookup_url_kwarg in view.kwargs:
             return (
                 queryset.only(
                     'id', 'name', 'description', 'avg_rating', 'reviews_count', 'can_choose_tags',
                     'images', 'inventories'
                 ).prefetch_related('images', 'inventories')
             )
+
         filters = self.get_query_filters(request)
         if filters:
             queryset = queryset.filter(**filters)

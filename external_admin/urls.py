@@ -6,13 +6,12 @@ from .views import (
     ProductAdminViewSet, ProductReviewAdminViewSet,
     CategoryAdminViewSet, PromotionAdminViewSet,
     OrderAdminViewSet, ConversionAdminViewSet, UserAdminViewSet, ProductInventoryViewSet, TagGroupAdminViewSet,
-    ProductListView, ProductSearchListView, DetailProductViewSet
+    ProductListView, ProductSearchListView
 )
 
 router = SimpleRouter()
 router.register('categories', CategoryAdminViewSet, basename='admin-categories')
 router.register('products', ProductAdminViewSet, basename='admin-products')
-router.register('detail-product', DetailProductViewSet, basename='admin-product-detail')
 router.register('inventories', ProductInventoryViewSet, basename='admin-inventories')
 router.register('reviews', ProductReviewAdminViewSet, basename='admin-reviews')
 router.register('orders', OrderAdminViewSet, basename='admin-orders')
