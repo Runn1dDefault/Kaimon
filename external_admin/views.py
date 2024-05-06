@@ -103,22 +103,22 @@ class TagGroupAdminViewSet(CachingMixin, StaffViewMixin, generics.ListAPIView):
 
 
 # ----------------------------------------------- Product --------------------------------------------------------------
-class ProductAdminViewSet(StaffViewMixin, viewsets.ModelViewSet):
+class ProductAdminViewSet(StaffViewMixin, viewsets.ReadOnlyModelViewSet):
     parser_classes = (parsers.JSONParser, parsers.FormParser, parsers.MultiPartParser)
     queryset = Product.objects.all()
     serializer_class = ShortProductAdminSerializer
-    retrieve_serializer_class = ProductDetailAdminSerializer
     pagination_class = AdminPagePagination
-    lookup_url_kwarg = "product_id"
-    lookup_field = "id"
     filter_backends = (SiteFilter, OrderingFilter, ProductFilter)
     ordering_fields = ("created_at",)
     search_fields = ('id', 'name', 'categories__name')
 
-    def get_serializer_class(self):
-        if self.request.method == 'GET' and self.detail is False:
-            return self.serializer_class
-        return self.retrieve_serializer_class
+
+class DetailProductViewSet(StaffViewMixin, viewsets.ModelViewSet):
+    parser_classes = (parsers.JSONParser, parsers.FormParser, parsers.MultiPartParser)
+    queryset = Product.objects.all()
+    serializer_class = ProductDetailAdminSerializer
+    lookup_url_kwarg = "product_id"
+    lookup_field = "id"
 
     @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
     @action(methods=['GET'], detail=True, url_path='change-activity')
