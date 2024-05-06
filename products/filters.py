@@ -123,7 +123,7 @@ class ProductFilter(BaseFilterBackend):
     def filter_queryset(self, request, queryset, view):
         logging.error(f"Action is: {view.action}")
 
-        if view.action in ("delete", "detail") and view.lookup_url_kwarg in view.kwargs:
+        if view.action != "list" and view.lookup_url_kwarg in view.kwargs:
             return (
                 queryset.only(
                     'id', 'name', 'description', 'avg_rating', 'reviews_count', 'can_choose_tags',
