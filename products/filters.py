@@ -1,5 +1,3 @@
-import logging
-
 from django.db import connection
 from django.db.models import Subquery, Q, OuterRef, F
 from django.db.models.functions import JSONObject
@@ -121,8 +119,6 @@ class ProductFilter(BaseFilterBackend):
         return filters
 
     def filter_queryset(self, request, queryset, view):
-        logging.error(f"Action is: {view.action}")
-
         if view.action != "list" and view.lookup_url_kwarg in view.kwargs:
             return (
                 queryset.only(
