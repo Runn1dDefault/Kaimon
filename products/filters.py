@@ -119,7 +119,8 @@ class ProductFilter(BaseFilterBackend):
         return filters
 
     def filter_queryset(self, request, queryset, view):
-        if view.action != "list" and view.lookup_url_kwarg in view.kwargs:
+        action = getattr(view, "action", None) or "list" if request.method == "GET" else ""
+        if action != "list" and view.lookup_url_kwarg in view.kwargs:
             return (
                 queryset.only(
                     'id', 'name', 'description', 'avg_rating', 'reviews_count', 'can_choose_tags',
